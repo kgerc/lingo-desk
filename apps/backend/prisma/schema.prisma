@@ -1,0 +1,785 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+enum LessonStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  PENDING_CONFIRMATION
+  NO_SHOW
+}
+
+enum LessonDeliveryMode {
+  IN_PERSON
+  ONLINE
+}
+
+enum CourseFormat {
+  GROUP
+  INDIVIDUAL
+  HYBRID
+}
+
+enum CourseDeliveryMode {
+  IN_PERSON
+  ONLINE
+  BOTH
+}
+
+enum LanguageLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  ALL_LEVELS
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  PAUSED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  STRIPE
+  CASH
+  BANK_TRANSFER
+}
+
+enum ContractType {
+  B2B
+  EMPLOYMENT
+  CIVIL
+}
+
+enum NotificationType {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+enum RecurringFrequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+// ============================================
+// CORE MODELS
+// ============================================
+
+model Organization {
+  id                   String   @id @default(uuid())
+  name                 String
+  slug                 String   @unique
+  logoUrl              String?  @map("logo_url")
+  primaryColor         String?  @default("#3B82F6") @map("primary_color")
+  timezone             String   @default("Europe/Warsaw")
+  currency             String   @default("PLN")
+  country              String   @default("PL")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  users                User[]
+  students             Student[]
+  teachers             Teacher[]
+  courses              Course[]
+  courseTypes          CourseType[]
+  packages             Package[]
+  subscriptions        Subscription[]
+  lessons              Lesson[]
+  locations            Location[]
+  payments             Payment[]
+  notifications        Notification[]
+  notificationTemplates NotificationTemplate[]
+  files                File[]
+  notes                Note[]
+  settings             OrganizationSettings?
+
+  @@map("organizations")
+}
+
+model User {
+  id               String    @id @default(uuid())
+  organizationId   String    @map("organization_id")
+  email            String    @unique
+  passwordHash     String    @map("password_hash")
+  firstName        String    @map("first_name")
+  lastName         String    @map("last_name")
+  phone            String?
+  avatarUrl        String?   @map("avatar_url")
+  role             UserRole
+  isActive         Boolean   @default(true) @map("is_active")
+  lastLoginAt      DateTime? @map("last_login_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  profile          UserProfile?
+  teacher          Teacher?
+  student          Student?
+  parentRelations  ParentStudentRelation[] @relation("ParentRelations")
+  notifications    Notification[]
+  filesUploaded    File[]
+  notesCreated     Note[]
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model UserProfile {
+  id                      String   @id @default(uuid())
+  userId                  String   @unique @map("user_id")
+  dateOfBirth             DateTime? @map("date_of_birth")
+  address                 String?
+  emergencyContact        String?  @map("emergency_contact")
+  notes                   String?
+  languagePreference      String   @default("pl") @map("language_preference")
+  notificationPreferences Json?    @map("notification_preferences")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+// ============================================
+// TEACHERS
+// ============================================
+
+model Teacher {
+  id                     String       @id @default(uuid())
+  userId                 String       @unique @map("user_id")
+  organizationId         String       @map("organization_id")
+  hourlyRate             Decimal      @map("hourly_rate") @db.Decimal(10, 2)
+  contractType           ContractType @map("contract_type")
+  specializations        String[]
+  languages              String[]
+  bio                    String?
+  isAvailableForBooking  Boolean      @default(true) @map("is_available_for_booking")
+  createdAt              DateTime     @default(now()) @map("created_at")
+  updatedAt              DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  availability   TeacherAvailability[]
+  courses        Course[]
+  lessons        Lesson[]
+  payouts        TeacherPayout[]
+
+  @@index([organizationId])
+  @@map("teachers")
+}
+
+model TeacherAvailability {
+  id           String    @id @default(uuid())
+  teacherId    String    @map("teacher_id")
+  dayOfWeek    Int       @map("day_of_week") // 0-6 (Sunday-Saturday)
+  startTime    String    @map("start_time") // HH:MM format
+  endTime      String    @map("end_time")   // HH:MM format
+  isRecurring  Boolean   @default(true) @map("is_recurring")
+  effectiveFrom DateTime? @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+
+  // Relations
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([teacherId])
+  @@map("teacher_availability")
+}
+
+// ============================================
+// STUDENTS
+// ============================================
+
+model Student {
+  id             String        @id @default(uuid())
+  userId         String        @unique @map("user_id")
+  organizationId String        @map("organization_id")
+  studentNumber  String        @map("student_number")
+  enrollmentDate DateTime      @default(now()) @map("enrollment_date")
+  languageLevel  LanguageLevel @map("language_level")
+  goals          String?
+  isMinor        Boolean       @default(false) @map("is_minor")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  user              User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parentRelations   ParentStudentRelation[]  @relation("StudentRelations")
+  enrollments       StudentEnrollment[]
+  lessons           Lesson[]
+  payments          Payment[]
+  budget            StudentBudget?
+  attendances       LessonAttendance[]
+
+  @@unique([organizationId, studentNumber])
+  @@index([organizationId])
+  @@map("students")
+}
+
+model ParentStudentRelation {
+  id                String   @id @default(uuid())
+  parentId          String   @map("parent_id")
+  studentId         String   @map("student_id")
+  relationshipType  String   @default("parent") @map("relationship_type")
+  canManagePayments Boolean  @default(true) @map("can_manage_payments")
+  canManageSchedule Boolean  @default(true) @map("can_manage_schedule")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relations
+  parent  User    @relation("ParentRelations", fields: [parentId], references: [id], onDelete: Cascade)
+  student Student @relation("StudentRelations", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, studentId])
+  @@map("parent_student_relations")
+}
+
+// ============================================
+// COURSES & PACKAGES
+// ============================================
+
+model CourseType {
+  id                     String             @id @default(uuid())
+  organizationId         String             @map("organization_id")
+  name                   String
+  description            String?
+  language               String
+  level                  LanguageLevel
+  format                 CourseFormat
+  deliveryMode           CourseDeliveryMode @map("delivery_mode")
+  defaultDurationMinutes Int                @default(60) @map("default_duration_minutes")
+  maxStudents            Int?               @map("max_students")
+  pricePerLesson         Decimal            @map("price_per_lesson") @db.Decimal(10, 2)
+  createdAt              DateTime           @default(now()) @map("created_at")
+  updatedAt              DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  courses       Course[]
+  packages      Package[]
+  subscriptions Subscription[]
+
+  @@index([organizationId])
+  @@map("course_types")
+}
+
+model Course {
+  id                   String    @id @default(uuid())
+  organizationId       String    @map("organization_id")
+  courseTypeId         String    @map("course_type_id")
+  teacherId            String    @map("teacher_id")
+  name                 String
+  startDate            DateTime  @map("start_date")
+  endDate              DateTime? @map("end_date")
+  isActive             Boolean   @default(true) @map("is_active")
+  locationId           String?   @map("location_id")
+  classroomId          String?   @map("classroom_id")
+  maxStudents          Int?      @map("max_students")
+  currentStudentsCount Int       @default(0) @map("current_students_count")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  organization  Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  courseType    CourseType          @relation(fields: [courseTypeId], references: [id])
+  teacher       Teacher             @relation(fields: [teacherId], references: [id])
+  location      Location?           @relation(fields: [locationId], references: [id])
+  classroom     Classroom?          @relation(fields: [classroomId], references: [id])
+  enrollments   StudentEnrollment[]
+  lessons       Lesson[]
+  materials     CourseMaterial[]
+
+  @@index([organizationId])
+  @@index([teacherId])
+  @@index([isActive])
+  @@map("courses")
+}
+
+model Package {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  name           String
+  description    String?
+  totalHours     Decimal     @map("total_hours") @db.Decimal(10, 2)
+  price          Decimal     @db.Decimal(10, 2)
+  validityDays   Int         @map("validity_days")
+  courseTypeId   String?     @map("course_type_id")
+  isActive       Boolean     @default(true) @map("is_active")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  courseType   CourseType?         @relation(fields: [courseTypeId], references: [id])
+  enrollments  StudentEnrollment[]
+
+  @@index([organizationId])
+  @@map("packages")
+}
+
+model Subscription {
+  id               String      @id @default(uuid())
+  organizationId   String      @map("organization_id")
+  name             String
+  description      String?
+  monthlyPrice     Decimal     @map("monthly_price") @db.Decimal(10, 2)
+  lessonsPerMonth  Int         @map("lessons_per_month")
+  courseTypeId     String?     @map("course_type_id")
+  isActive         Boolean     @default(true) @map("is_active")
+  stripeProductId  String?     @map("stripe_product_id")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  courseType   CourseType?         @relation(fields: [courseTypeId], references: [id])
+  enrollments  StudentEnrollment[]
+
+  @@index([organizationId])
+  @@map("subscriptions")
+}
+
+model StudentEnrollment {
+  id               String           @id @default(uuid())
+  studentId        String           @map("student_id")
+  courseId         String?          @map("course_id")
+  packageId        String?          @map("package_id")
+  subscriptionId   String?          @map("subscription_id")
+  enrollmentDate   DateTime         @default(now()) @map("enrollment_date")
+  status           EnrollmentStatus
+  hoursPurchased   Decimal          @map("hours_purchased") @db.Decimal(10, 2)
+  hoursUsed        Decimal          @default(0) @map("hours_used") @db.Decimal(10, 2)
+  expiresAt        DateTime?        @map("expires_at")
+  notes            String?
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  student      Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course       Course?       @relation(fields: [courseId], references: [id])
+  package      Package?      @relation(fields: [packageId], references: [id])
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+  lessons      Lesson[]
+  payments     Payment[]
+
+  @@index([studentId])
+  @@index([courseId])
+  @@index([status])
+  @@map("student_enrollments")
+}
+
+// ============================================
+// SCHEDULING
+// ============================================
+
+model Lesson {
+  id                    String             @id @default(uuid())
+  organizationId        String             @map("organization_id")
+  courseId              String?            @map("course_id")
+  enrollmentId          String             @map("enrollment_id")
+  teacherId             String             @map("teacher_id")
+  studentId             String             @map("student_id")
+  title                 String
+  description           String?
+  scheduledAt           DateTime           @map("scheduled_at")
+  durationMinutes       Int                @default(60) @map("duration_minutes")
+  locationId            String?            @map("location_id")
+  classroomId           String?            @map("classroom_id")
+  deliveryMode          LessonDeliveryMode @map("delivery_mode")
+  meetingUrl            String?            @map("meeting_url")
+  status                LessonStatus
+  isRecurring           Boolean            @default(false) @map("is_recurring")
+  recurringPatternId    String?            @map("recurring_pattern_id")
+  cancelledAt           DateTime?          @map("cancelled_at")
+  cancellationReason    String?            @map("cancellation_reason")
+  completedAt           DateTime?          @map("completed_at")
+  confirmedByTeacherAt  DateTime?          @map("confirmed_by_teacher_at")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  course            Course?            @relation(fields: [courseId], references: [id])
+  enrollment        StudentEnrollment  @relation(fields: [enrollmentId], references: [id])
+  teacher           Teacher            @relation(fields: [teacherId], references: [id])
+  student           Student            @relation(fields: [studentId], references: [id])
+  location          Location?          @relation(fields: [locationId], references: [id])
+  classroom         Classroom?         @relation(fields: [classroomId], references: [id])
+  recurringPattern  RecurringPattern?  @relation(fields: [recurringPatternId], references: [id])
+  attendances       LessonAttendance[]
+
+  @@index([organizationId])
+  @@index([teacherId])
+  @@index([studentId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([teacherId, scheduledAt])
+  @@index([studentId, scheduledAt])
+  @@map("lessons")
+}
+
+model RecurringPattern {
+  id                   String             @id @default(uuid())
+  organizationId       String             @map("organization_id")
+  frequency            RecurringFrequency
+  interval             Int                @default(1)
+  dayOfWeek            Int?               @map("day_of_week") // 0-6
+  daysOfWeek           Int[]              @map("days_of_week")
+  startDate            DateTime           @map("start_date")
+  endDate              DateTime?          @map("end_date")
+  occurrencesCount     Int?               @map("occurrences_count")
+  createdLessonsCount  Int                @default(0) @map("created_lessons_count")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lessons      Lesson[]
+
+  @@map("recurring_patterns")
+}
+
+model LessonAttendance {
+  id        String           @id @default(uuid())
+  lessonId  String           @map("lesson_id")
+  studentId String           @map("student_id")
+  status    AttendanceStatus
+  notes     String?
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  lesson  Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@unique([lessonId, studentId])
+  @@map("lesson_attendances")
+}
+
+// ============================================
+// PAYMENTS & FINANCE
+// ============================================
+
+model Payment {
+  id                    String        @id @default(uuid())
+  organizationId        String        @map("organization_id")
+  studentId             String        @map("student_id")
+  enrollmentId          String?       @map("enrollment_id")
+  amount                Decimal       @db.Decimal(10, 2)
+  currency              String        @default("PLN")
+  status                PaymentStatus
+  paymentMethod         PaymentMethod @map("payment_method")
+  stripePaymentIntentId String?       @unique @map("stripe_payment_intent_id")
+  paidAt                DateTime?     @map("paid_at")
+  notes                 String?
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  student      Student            @relation(fields: [studentId], references: [id])
+  enrollment   StudentEnrollment? @relation(fields: [enrollmentId], references: [id])
+  invoice      Invoice?
+
+  @@index([organizationId])
+  @@index([studentId])
+  @@index([status])
+  @@index([paidAt])
+  @@map("payments")
+}
+
+model Invoice {
+  id            String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  paymentId     String   @unique @map("payment_id")
+  invoiceNumber String   @map("invoice_number")
+  issueDate     DateTime @map("issue_date")
+  dueDate       DateTime @map("due_date")
+  studentId     String   @map("student_id")
+  totalAmount   Decimal  @map("total_amount") @db.Decimal(10, 2)
+  taxAmount     Decimal  @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  fileUrl       String?  @map("file_url")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, invoiceNumber])
+  @@map("invoices")
+}
+
+model StudentBudget {
+  id                  String   @id @default(uuid())
+  studentId           String   @unique @map("student_id")
+  organizationId      String   @map("organization_id")
+  totalHoursPurchased Decimal  @default(0) @map("total_hours_purchased") @db.Decimal(10, 2)
+  totalHoursUsed      Decimal  @default(0) @map("total_hours_used") @db.Decimal(10, 2)
+  balance             Decimal  @default(0) @db.Decimal(10, 2)
+  lastUpdatedAt       DateTime @updatedAt @map("last_updated_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@map("student_budgets")
+}
+
+model TeacherPayout {
+  id          String        @id @default(uuid())
+  organizationId String     @map("organization_id")
+  teacherId   String        @map("teacher_id")
+  periodStart DateTime      @map("period_start")
+  periodEnd   DateTime      @map("period_end")
+  totalHours  Decimal       @map("total_hours") @db.Decimal(10, 2)
+  totalAmount Decimal       @map("total_amount") @db.Decimal(10, 2)
+  status      String
+  paidAt      DateTime?     @map("paid_at")
+  notes       String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+
+  @@index([teacherId])
+  @@index([periodStart, periodEnd])
+  @@map("teacher_payouts")
+}
+
+// ============================================
+// COMMUNICATION
+// ============================================
+
+model Notification {
+  id             String             @id @default(uuid())
+  organizationId String             @map("organization_id")
+  userId         String             @map("user_id")
+  type           NotificationType
+  channel        String
+  subject        String?
+  body           String
+  status         NotificationStatus
+  sentAt         DateTime?          @map("sent_at")
+  readAt         DateTime?          @map("read_at")
+  metadata       Json?
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model NotificationTemplate {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  triggerEvent   String   @map("trigger_event")
+  subjectTemplate String  @map("subject_template")
+  bodyTemplate   String   @map("body_template")
+  channels       String[]
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("notification_templates")
+}
+
+model Note {
+  id            String   @id @default(uuid())
+  organizationId String  @map("organization_id")
+  createdBy     String   @map("created_by")
+  relatedToType String   @map("related_to_type")
+  relatedToId   String   @map("related_to_id")
+  content       String
+  isPrivate     Boolean  @default(false) @map("is_private")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator      User         @relation(fields: [createdBy], references: [id])
+
+  @@index([relatedToType, relatedToId])
+  @@index([createdBy])
+  @@map("notes")
+}
+
+// ============================================
+// FILES & MATERIALS
+// ============================================
+
+model File {
+  id            String   @id @default(uuid())
+  organizationId String  @map("organization_id")
+  uploadedBy    String   @map("uploaded_by")
+  fileName      String   @map("file_name")
+  fileType      String   @map("file_type")
+  fileSize      BigInt   @map("file_size")
+  storagePath   String   @map("storage_path")
+  publicUrl     String   @map("public_url")
+  relatedToType String?  @map("related_to_type")
+  relatedToId   String?  @map("related_to_id")
+  isPublic      Boolean  @default(false) @map("is_public")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploader       User             @relation(fields: [uploadedBy], references: [id])
+  courseMaterials CourseMaterial[]
+
+  @@index([organizationId])
+  @@index([relatedToType, relatedToId])
+  @@map("files")
+}
+
+model CourseMaterial {
+  id          String   @id @default(uuid())
+  courseId    String   @map("course_id")
+  fileId      String   @map("file_id")
+  title       String
+  description String?
+  orderIndex  Int      @map("order_index")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  file   File   @relation(fields: [fileId], references: [id])
+
+  @@index([courseId])
+  @@map("course_materials")
+}
+
+// ============================================
+// SETTINGS & CONFIG
+// ============================================
+
+model Location {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  name           String
+  address        String?
+  isActive       Boolean     @default(true) @map("is_active")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  classrooms   Classroom[]
+  courses      Course[]
+  lessons      Lesson[]
+
+  @@map("locations")
+}
+
+model Classroom {
+  id         String   @id @default(uuid())
+  locationId String   @map("location_id")
+  name       String
+  capacity   Int?
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  courses  Course[]
+  lessons  Lesson[]
+
+  @@index([locationId])
+  @@map("classrooms")
+}
+
+model OrganizationSettings {
+  id                         String   @id @default(uuid())
+  organizationId             String   @unique @map("organization_id")
+  lessonReminderHours        Int      @default(24) @map("lesson_reminder_hours")
+  budgetAlertThresholdHours  Int      @default(2) @map("budget_alert_threshold_hours")
+  autoGenerateLessonsEnabled Boolean  @default(true) @map("auto_generate_lessons_enabled")
+  stripeAccountId            String?  @map("stripe_account_id")
+  stripePublishableKey       String?  @map("stripe_publishable_key")
+  emailFromAddress           String?  @map("email_from_address")
+  emailFromName              String?  @map("email_from_name")
+  smsEnabled                 Boolean  @default(false) @map("sms_enabled")
+  timezone                   String   @default("Europe/Warsaw")
+  settings                   Json?
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_settings")
+}

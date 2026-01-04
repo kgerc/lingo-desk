@@ -1,0 +1,209 @@
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import prisma from '../utils/prisma';
+import { UserRole } from '@prisma/client';
+
+interface RegisterData {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  organizationName?: string;
+  role?: UserRole;
+}
+
+interface LoginData {
+  email: string;
+  password: string;
+}
+
+export class AuthService {
+  private readonly JWT_SECRET: string;
+  private readonly JWT_EXPIRES_IN: string;
+
+  constructor() {
+    this.JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+    this.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+  }
+
+  async register(data: RegisterData) {
+    const { email, password, firstName, lastName, organizationName, role } = data;
+
+    // Check if user exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      throw new Error('User with this email already exists');
+    }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create organization if registering as admin
+    let organizationId: string;
+
+    if (role === UserRole.ADMIN || !role) {
+      const organization = await prisma.organization.create({
+        data: {
+          name: organizationName || `${firstName}'s School`,
+          slug: this.generateSlug(organizationName || `${firstName}'s School`),
+        },
+      });
+      organizationId = organization.id;
+
+      // Create default settings
+      await prisma.organizationSettings.create({
+        data: {
+          organizationId: organization.id,
+        },
+      });
+    } else {
+      throw new Error('Organization ID required for non-admin users');
+    }
+
+    // Create user
+    const user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        firstName,
+        lastName,
+        organizationId,
+        role: role || UserRole.ADMIN,
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        organizationId: true,
+      },
+    });
+
+    // Create user profile
+    await prisma.userProfile.create({
+      data: {
+        userId: user.id,
+      },
+    });
+
+    // Generate token
+    const token = this.generateToken(user);
+
+    return {
+      user,
+      token,
+    };
+  }
+
+  async login(data: LoginData) {
+    const { email, password } = data;
+
+    // Find user
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new Error('Invalid credentials');
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      throw new Error('Account is deactivated');
+    }
+
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+
+    if (!isValidPassword) {
+      throw new Error('Invalid credentials');
+    }
+
+    // Update last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Generate token
+    const token = this.generateToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      organizationId: user.organizationId,
+    });
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        organizationId: user.organizationId,
+      },
+      token,
+    };
+  }
+
+  async getMe(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        avatarUrl: true,
+        role: true,
+        organizationId: true,
+        isActive: true,
+        createdAt: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logoUrl: true,
+            primaryColor: true,
+            timezone: true,
+            currency: true,
+          },
+        },
+        profile: true,
+      },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    return user;
+  }
+
+  private generateToken(payload: {
+    id: string;
+    email: string;
+    role: UserRole;
+    organizationId: string;
+  }): string {
+    return jwt.sign(payload, this.JWT_SECRET, {
+      expiresIn: this.JWT_EXPIRES_IN,
+    });
+  }
+
+  private generateSlug(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      + '-' + Math.random().toString(36).substring(2, 8);
+  }
+}
+
+export default new AuthService();
