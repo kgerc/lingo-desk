@@ -140,6 +140,7 @@ model Organization {
   packages             Package[]
   subscriptions        Subscription[]
   lessons              Lesson[]
+  recurringPatterns    RecurringPattern[]
   locations            Location[]
   payments             Payment[]
   notifications        Notification[]
