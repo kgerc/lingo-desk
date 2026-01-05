@@ -17,6 +17,10 @@ import courseTypeRoutes from './routes/courseType.routes';
 import lessonRoutes from './routes/lesson.routes';
 import paymentRoutes from './routes/payment.routes';
 import organizationRoutes from './routes/organization.routes';
+import notificationRoutes from './routes/notification.routes';
+
+// Import scheduler
+import scheduler from './utils/scheduler';
 
 // Load environment variables
 dotenv.config();
@@ -77,6 +81,7 @@ app.use('/api/course-types', courseTypeRoutes);
 app.use('/api/lessons', lessonRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/organizations', organizationRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // ============================================
 // ERROR HANDLING
@@ -94,6 +99,18 @@ app.listen(PORT, () => {
   console.log(`📍 Environment: ${process.env.NODE_ENV}`);
   console.log(`🔗 API: http://localhost:${PORT}`);
   console.log(`💚 Health check: http://localhost:${PORT}/health`);
+
+  // Start scheduled tasks
+  if (process.env.NODE_ENV !== 'test') {
+    scheduler.start();
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  scheduler.stop();
+  process.exit(0);
 });
 
 export default app;

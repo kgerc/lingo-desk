@@ -8,6 +8,7 @@ import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { lessonService, Lesson } from '../services/lessonService';
 import LessonModal from '../components/LessonModal';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Plus, Filter } from 'lucide-react';
 
 // Set Polish locale
@@ -86,8 +87,6 @@ const CalendarPage: React.FC = () => {
       end: new Date(new Date(lesson.scheduledAt).getTime() + lesson.durationMinutes * 60000),
       resource: lesson,
     }));
-    console.log('📅 Calendar events:', mappedEvents.length, 'events');
-    console.log('📅 First event:', mappedEvents[0]);
     return mappedEvents;
   }, [lessons]);
 
@@ -301,9 +300,7 @@ const CalendarPage: React.FC = () => {
       {/* Calendar - grows to fill remaining space */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex-1 min-h-0 calendar-container">
         {isLoading ? (
-          <div className="h-full flex items-center justify-center">
-            <p className="text-gray-500">Ładowanie kalendarza...</p>
-          </div>
+          <LoadingSpinner message="Ładowanie kalendarza..." />
         ) : (
           <DnDCalendar
             localizer={localizer}

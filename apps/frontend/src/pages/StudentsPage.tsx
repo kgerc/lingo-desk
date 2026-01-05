@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { studentService, Student } from '../services/studentService';
 import { Plus, Search, Edit, Trash2, Mail, Phone } from 'lucide-react';
 import StudentModal from '../components/StudentModal';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const StudentsPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -97,7 +98,7 @@ const StudentsPage: React.FC = () => {
       {/* Students Table */}
       <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center text-gray-500">Ładowanie...</div>
+          <LoadingSpinner message="Ładowanie uczniów..." />
         ) : students.length === 0 ? (
           <div className="p-12 text-center text-gray-500">
             {searchTerm ? 'Nie znaleziono uczniów' : 'Brak uczniów. Dodaj pierwszego ucznia!'}

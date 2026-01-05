@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { studentService } from '../services/studentService';
 import { Users, GraduationCap, BookOpen, Calendar, AlertTriangle } from 'lucide-react';
+import NotificationBell from '../components/NotificationBell';
 
 const DashboardPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
@@ -23,13 +24,17 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">
-          Witaj, {user?.firstName}! 👋
-        </h1>
-        <p className="mt-2 text-gray-600">
-          Oto podsumowanie Twojej szkoły językowej
-        </p>
+      {/* Header with NotificationBell */}
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Witaj, {user?.firstName}! 👋
+          </h1>
+          <p className="mt-2 text-gray-600">
+            Oto podsumowanie Twojej szkoły językowej
+          </p>
+        </div>
+        <NotificationBell />
       </div>
 
       {/* Stats Grid */}

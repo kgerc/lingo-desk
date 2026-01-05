@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { lessonService, Lesson, LessonStatus } from '../services/lessonService';
 import LessonModal from '../components/LessonModal';
+import LoadingSpinner from '../components/LoadingSpinner';
 import {
   Calendar,
   Clock,
@@ -143,11 +144,7 @@ const LessonsPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Ładowanie...</div>
-      </div>
-    );
+    return <LoadingSpinner message="Ładowanie lekcji..." />;
   }
 
   return (

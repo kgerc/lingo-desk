@@ -8,6 +8,7 @@ import TeachersPage from './pages/TeachersPage'
 import CoursesPage from './pages/CoursesPage'
 import LessonsPage from './pages/LessonsPage'
 import CalendarPage from './pages/CalendarPage'
+import PaymentsPage from './pages/PaymentsPage'
 import Layout from './components/Layout'
 
 function App() {
@@ -111,6 +112,19 @@ function App() {
             isAuthenticated ? (
               <Layout>
                 <CalendarPage />
+              </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/payments"
+          element={
+            isAuthenticated ? (
+              <Layout>
+                <PaymentsPage />
               </Layout>
             ) : (
               <Navigate to="/login" />

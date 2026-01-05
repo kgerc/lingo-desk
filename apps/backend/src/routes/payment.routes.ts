@@ -1,19 +1,23 @@
 import { Router } from 'express';
+import paymentController from '../controllers/payment.controller';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
+
+// All payment routes require authentication
 router.use(authenticate);
 
-router.get('/', (req, res) => {
-  res.json({ message: 'List payments - TODO' });
-});
+// Statistics (must be before /:id route)
+router.get('/stats', paymentController.getPaymentStats);
 
-router.get('/:id', (req, res) => {
-  res.json({ message: `Get payment ${req.params.id} - TODO` });
-});
+// Student payment history
+router.get('/student/:studentId', paymentController.getStudentPaymentHistory);
 
-router.post('/', (req, res) => {
-  res.json({ message: 'Create payment - TODO' });
-});
+// CRUD operations
+router.get('/', paymentController.getPayments);
+router.get('/:id', paymentController.getPaymentById);
+router.post('/', paymentController.createPayment);
+router.put('/:id', paymentController.updatePayment);
+router.delete('/:id', paymentController.deletePayment);
 
 export default router;

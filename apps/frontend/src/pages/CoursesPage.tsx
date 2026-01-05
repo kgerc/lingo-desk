@@ -4,6 +4,7 @@ import { courseService, Course } from '../services/courseService';
 import { Plus, Search, Edit, Trash2, Users, BookOpen, Calendar, MapPin, Wifi, Home, UserPlus } from 'lucide-react';
 import CourseModal from '../components/CourseModal';
 import EnrollStudentModal from '../components/EnrollStudentModal';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const CoursesPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -144,7 +145,7 @@ const CoursesPage: React.FC = () => {
       {/* Courses Table */}
       <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center text-gray-500">Ładowanie...</div>
+          <LoadingSpinner message="Ładowanie kursów..." />
         ) : courses.length === 0 ? (
           <div className="p-12 text-center text-gray-500">
             {searchTerm ? 'Nie znaleziono kursów' : 'Brak kursów. Dodaj pierwszy kurs!'}
@@ -153,8 +154,7 @@ const CoursesPage: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <tr><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Kurs
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -182,8 +182,7 @@ const CoursesPage: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {courses.map((course) => (
-                  <tr key={course.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
+                  <tr key={course.id} className="hover:bg-gray-50 transition-colors"><td className="px-6 py-4">
                       <div className="flex items-center">
                         <div className="h-10 w-10 flex-shrink-0">
                           <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
