@@ -1,31 +1,46 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
+import { UserRole } from '@prisma/client';
+import lessonController from '../controllers/lesson.controller';
 
 const router = Router();
 router.use(authenticate);
 
-router.get('/', (req, res) => {
-  res.json({ message: 'List lessons - TODO' });
-});
+// Get all lessons
+router.get('/', lessonController.getLessons.bind(lessonController));
 
-router.get('/:id', (req, res) => {
-  res.json({ message: `Get lesson ${req.params.id} - TODO` });
-});
+// Get lesson stats
+router.get('/stats', lessonController.getStats.bind(lessonController));
 
-router.post('/', (req, res) => {
-  res.json({ message: 'Create lesson - TODO' });
-});
+// Get lesson by ID
+router.get('/:id', lessonController.getLessonById.bind(lessonController));
 
-router.put('/:id', (req, res) => {
-  res.json({ message: `Update lesson ${req.params.id} - TODO` });
-});
+// Create new lesson (teachers, managers, admins)
+router.post(
+  '/',
+  authorize(UserRole.ADMIN, UserRole.MANAGER, UserRole.TEACHER),
+  lessonController.createLesson.bind(lessonController)
+);
 
-router.delete('/:id', (req, res) => {
-  res.json({ message: `Delete lesson ${req.params.id} - TODO` });
-});
+// Update lesson (teachers, managers, admins)
+router.put(
+  '/:id',
+  authorize(UserRole.ADMIN, UserRole.MANAGER, UserRole.TEACHER),
+  lessonController.updateLesson.bind(lessonController)
+);
 
-router.post('/:id/confirm', (req, res) => {
-  res.json({ message: `Confirm lesson ${req.params.id} - TODO` });
-});
+// Delete lesson (managers, admins)
+router.delete(
+  '/:id',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  lessonController.deleteLesson.bind(lessonController)
+);
+
+// Confirm lesson (teachers, managers, admins)
+router.post(
+  '/:id/confirm',
+  authorize(UserRole.ADMIN, UserRole.MANAGER, UserRole.TEACHER),
+  lessonController.confirmLesson.bind(lessonController)
+);
 
 export default router;

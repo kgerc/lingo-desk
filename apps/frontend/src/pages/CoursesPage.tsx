@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { courseService, Course } from '../services/courseService';
-import { Plus, Search, Edit, Trash2, Users, BookOpen, Calendar, MapPin, Wifi, Home } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Users, BookOpen, Calendar, MapPin, Wifi, Home, UserPlus } from 'lucide-react';
 import CourseModal from '../components/CourseModal';
+import EnrollStudentModal from '../components/EnrollStudentModal';
 
 const CoursesPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
+  const [courseForEnrollment, setCourseForEnrollment] = useState<Course | null>(null);
 
   // Fetch courses
   const { data: courses = [], isLoading } = useQuery({
@@ -35,9 +38,19 @@ const CoursesPage: React.FC = () => {
     }
   };
 
+  const handleManageStudents = (course: Course) => {
+    setCourseForEnrollment(course);
+    setIsEnrollModalOpen(true);
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedCourse(null);
+  };
+
+  const handleCloseEnrollModal = () => {
+    setIsEnrollModalOpen(false);
+    setCourseForEnrollment(null);
   };
 
   const handleSuccess = () => {
@@ -208,7 +221,7 @@ const CoursesPage: React.FC = () => {
                       <div className="flex items-center gap-1">
                         <Users className="h-4 w-4 text-gray-400" />
                         <span className="text-gray-900">
-                          {course._count?.enrollments || 0}
+                          {course.enrollments?.length || 0}
                           {course.maxStudents ? `/${course.maxStudents}` : ''}
                         </span>
                       </div>
@@ -232,6 +245,13 @@ const CoursesPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleManageStudents(course)}
+                          className="text-green-600 hover:text-green-900"
+                          title="Zarządzaj uczniami"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handleEdit(course)}
                           className="text-blue-600 hover:text-blue-900"
@@ -257,12 +277,20 @@ const CoursesPage: React.FC = () => {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Course Modal */}
       {isModalOpen && (
         <CourseModal
           course={selectedCourse}
           onClose={handleCloseModal}
           onSuccess={handleSuccess}
+        />
+      )}
+
+      {/* Enroll Student Modal */}
+      {isEnrollModalOpen && courseForEnrollment && (
+        <EnrollStudentModal
+          course={courseForEnrollment}
+          onClose={handleCloseEnrollModal}
         />
       )}
     </div>

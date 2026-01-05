@@ -147,6 +147,16 @@ class CourseService {
             },
           },
         },
+        enrollments: {
+          where: {
+            status: 'ACTIVE',
+          },
+          select: {
+            id: true,
+            studentId: true,
+            status: true,
+          },
+        },
         _count: {
           select: {
             enrollments: true,
@@ -187,6 +197,9 @@ class CourseService {
         location: true,
         classroom: true,
         enrollments: {
+          where: {
+            status: 'ACTIVE',
+          },
           include: {
             student: {
               include: {
@@ -205,7 +218,7 @@ class CourseService {
         },
         lessons: {
           include: {
-            attendance: true,
+            attendances: true,
           },
           orderBy: {
             scheduledAt: 'desc',
@@ -353,7 +366,7 @@ class CourseService {
         isActive: true,
         enrollments: {
           some: {
-            isActive: true,
+            status: 'ACTIVE',
           },
         },
       },
@@ -376,9 +389,9 @@ class CourseService {
         isActive: true,
       },
       include: {
-        _count: {
-          select: {
-            enrollments: true,
+        enrollments: {
+          where: {
+            status: 'ACTIVE',
           },
         },
       },
@@ -388,8 +401,9 @@ class CourseService {
       throw new Error('Course not found or inactive');
     }
 
-    // Check if course is full
-    if (course.maxStudents && course._count.enrollments >= course.maxStudents) {
+    // Check if course is full (count only active enrollments)
+    const activeEnrollmentsCount = course.enrollments.length;
+    if (course.maxStudents && activeEnrollmentsCount >= course.maxStudents) {
       throw new Error('Course is full');
     }
 
@@ -406,10 +420,11 @@ class CourseService {
     }
 
     // Check if already enrolled
-    const existingEnrollment = await prisma.enrollment.findFirst({
+    const existingEnrollment = await prisma.studentEnrollment.findFirst({
       where: {
         courseId,
         studentId,
+        status: 'ACTIVE',
       },
     });
 
@@ -418,12 +433,14 @@ class CourseService {
     }
 
     // Create enrollment
-    const enrollment = await prisma.enrollment.create({
+    const enrollment = await prisma.studentEnrollment.create({
       data: {
         courseId,
         studentId,
-        enrolledAt: new Date(),
-        isActive: true,
+        enrollmentDate: new Date(),
+        status: 'ACTIVE',
+        hoursPurchased: 0,
+        hoursUsed: 0,
       },
       include: {
         student: {
@@ -451,7 +468,7 @@ class CourseService {
 
   // Unenroll student from course
   async unenrollStudent(enrollmentId: string, organizationId: string) {
-    const enrollment = await prisma.enrollment.findFirst({
+    const enrollment = await prisma.studentEnrollment.findFirst({
       where: {
         id: enrollmentId,
         course: { organizationId },
@@ -462,10 +479,10 @@ class CourseService {
       throw new Error('Enrollment not found');
     }
 
-    // Soft delete - mark as inactive
-    await prisma.enrollment.update({
+    // Soft delete - mark as cancelled
+    await prisma.studentEnrollment.update({
       where: { id: enrollmentId },
-      data: { isActive: false },
+      data: { status: 'CANCELLED' },
     });
 
     return { message: 'Student unenrolled successfully' };

@@ -1,0 +1,182 @@
+import api from '../lib/api';
+
+export type LessonStatus =
+  | 'SCHEDULED'
+  | 'CONFIRMED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'PENDING_CONFIRMATION'
+  | 'NO_SHOW';
+
+export type LessonDeliveryMode = 'IN_PERSON' | 'ONLINE';
+
+export interface Lesson {
+  id: string;
+  organizationId: string;
+  courseId?: string;
+  enrollmentId: string;
+  teacherId: string;
+  studentId: string;
+  title: string;
+  description?: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  locationId?: string;
+  classroomId?: string;
+  deliveryMode: LessonDeliveryMode;
+  meetingUrl?: string;
+  status: LessonStatus;
+  isRecurring: boolean;
+  recurringPatternId?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  completedAt?: string;
+  confirmedByTeacherAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  teacher: {
+    id: string;
+    userId: string;
+    hourlyRate: number;
+    user: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      avatarUrl?: string;
+    };
+  };
+  student: {
+    id: string;
+    userId: string;
+    user: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      avatarUrl?: string;
+    };
+  };
+  course?: {
+    id: string;
+    name: string;
+    courseType: {
+      id: string;
+      name: string;
+      language: string;
+      level: string;
+    };
+  };
+  enrollment: {
+    id: string;
+    courseId: string;
+    studentId: string;
+    isActive: boolean;
+  };
+  location?: {
+    id: string;
+    name: string;
+    address: string;
+  };
+  classroom?: {
+    id: string;
+    name: string;
+  };
+  attendances?: Array<{
+    id: string;
+    studentId: string;
+    status: string;
+    notes?: string;
+  }>;
+}
+
+export interface CreateLessonData {
+  courseId?: string;
+  enrollmentId: string;
+  teacherId: string;
+  studentId: string;
+  title: string;
+  description?: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  locationId?: string;
+  classroomId?: string;
+  deliveryMode: LessonDeliveryMode;
+  meetingUrl?: string;
+  status?: LessonStatus;
+  isRecurring?: boolean;
+  recurringPatternId?: string;
+}
+
+export interface UpdateLessonData {
+  title?: string;
+  description?: string;
+  scheduledAt?: string;
+  durationMinutes?: number;
+  locationId?: string;
+  classroomId?: string;
+  deliveryMode?: LessonDeliveryMode;
+  meetingUrl?: string;
+  status?: LessonStatus;
+  cancellationReason?: string;
+}
+
+export const lessonService = {
+  async getLessons(filters?: {
+    search?: string;
+    teacherId?: string;
+    studentId?: string;
+    courseId?: string;
+    status?: LessonStatus;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    const params = new URLSearchParams();
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.teacherId) params.append('teacherId', filters.teacherId);
+    if (filters?.studentId) params.append('studentId', filters.studentId);
+    if (filters?.courseId) params.append('courseId', filters.courseId);
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+
+    const response = await api.get(`/lessons?${params.toString()}`);
+    return response.data.data as Lesson[];
+  },
+
+  async getLessonById(id: string) {
+    const response = await api.get(`/lessons/${id}`);
+    return response.data.data as Lesson;
+  },
+
+  async createLesson(data: CreateLessonData) {
+    const response = await api.post('/lessons', data);
+    return response.data.data as Lesson;
+  },
+
+  async updateLesson(id: string, data: UpdateLessonData) {
+    const response = await api.put(`/lessons/${id}`, data);
+    return response.data.data as Lesson;
+  },
+
+  async deleteLesson(id: string) {
+    const response = await api.delete(`/lessons/${id}`);
+    return response.data;
+  },
+
+  async confirmLesson(id: string) {
+    const response = await api.post(`/lessons/${id}/confirm`);
+    return response.data.data as Lesson;
+  },
+
+  async getStats() {
+    const response = await api.get('/lessons/stats');
+    return response.data.data as {
+      total: number;
+      scheduled: number;
+      completed: number;
+      cancelled: number;
+      pendingConfirmation: number;
+    };
+  },
+};

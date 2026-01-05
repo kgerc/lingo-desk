@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage'
 import StudentsPage from './pages/StudentsPage'
 import TeachersPage from './pages/TeachersPage'
 import CoursesPage from './pages/CoursesPage'
+import LessonsPage from './pages/LessonsPage'
 import CalendarPage from './pages/CalendarPage'
 import Layout from './components/Layout'
 
@@ -84,6 +85,19 @@ function App() {
             isAuthenticated ? (
               <Layout>
                 <CoursesPage />
+              </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/lessons"
+          element={
+            isAuthenticated ? (
+              <Layout>
+                <LessonsPage />
               </Layout>
             ) : (
               <Navigate to="/login" />

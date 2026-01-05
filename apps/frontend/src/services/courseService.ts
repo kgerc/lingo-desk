@@ -43,17 +43,7 @@ export interface Course {
   enrollments?: Array<{
     id: string;
     studentId: string;
-    isActive: boolean;
-    student: {
-      id: string;
-      user: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        email: string;
-        avatarUrl?: string;
-      };
-    };
+    status: string;
   }>;
   lessons?: Array<{
     id: string;
