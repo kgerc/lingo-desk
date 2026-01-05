@@ -1,28 +1,43 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth';
 import { UserRole } from '@prisma/client';
+import studentController from '../controllers/student.controller';
 
 const router = Router();
 router.use(authenticate);
 
-router.get('/', authorize(UserRole.ADMIN, UserRole.MANAGER), (req, res) => {
-  res.json({ message: 'List students - TODO' });
-});
+// GET /api/students/stats - Get student statistics
+router.get(
+  '/stats',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  studentController.getStats.bind(studentController)
+);
 
-router.get('/:id', (req, res) => {
-  res.json({ message: `Get student ${req.params.id} - TODO` });
-});
+// GET /api/students - List all students
+router.get(
+  '/',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  studentController.getStudents.bind(studentController)
+);
 
-router.post('/', authorize(UserRole.ADMIN, UserRole.MANAGER), (req, res) => {
-  res.json({ message: 'Create student - TODO' });
-});
+// GET /api/students/:id - Get student by ID
+router.get('/:id', studentController.getStudentById.bind(studentController));
 
-router.put('/:id', (req, res) => {
-  res.json({ message: `Update student ${req.params.id} - TODO` });
-});
+// POST /api/students - Create student
+router.post(
+  '/',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  studentController.createStudent.bind(studentController)
+);
 
-router.delete('/:id', authorize(UserRole.ADMIN), (req, res) => {
-  res.json({ message: `Delete student ${req.params.id} - TODO` });
-});
+// PUT /api/students/:id - Update student
+router.put('/:id', studentController.updateStudent.bind(studentController));
+
+// DELETE /api/students/:id - Delete student
+router.delete(
+  '/:id',
+  authorize(UserRole.ADMIN),
+  studentController.deleteStudent.bind(studentController)
+);
 
 export default router;

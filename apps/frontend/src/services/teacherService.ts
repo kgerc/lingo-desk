@@ -1,0 +1,113 @@
+import api from '../lib/api';
+
+export interface Teacher {
+  id: string;
+  userId: string;
+  hourlyRate: number;
+  contractType: 'B2B' | 'EMPLOYMENT' | 'CIVIL';
+  specializations: string[];
+  languages: string[];
+  bio?: string;
+  isAvailableForBooking: boolean;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    avatarUrl?: string;
+    isActive: boolean;
+    createdAt: string;
+  };
+  availability?: Array<{
+    id: string;
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+  }>;
+  _count?: {
+    courses: number;
+    lessons: number;
+  };
+}
+
+export interface CreateTeacherData {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  hourlyRate: number;
+  contractType: 'B2B' | 'EMPLOYMENT' | 'CIVIL';
+  specializations?: string[];
+  languages?: string[];
+  bio?: string;
+}
+
+export interface UpdateTeacherData {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  email?: string;
+  hourlyRate?: number;
+  contractType?: 'B2B' | 'EMPLOYMENT' | 'CIVIL';
+  specializations?: string[];
+  languages?: string[];
+  bio?: string;
+  isAvailableForBooking?: boolean;
+  isActive?: boolean;
+}
+
+export const teacherService = {
+  async getTeachers(filters?: {
+    search?: string;
+    isActive?: boolean;
+    isAvailableForBooking?: boolean;
+  }) {
+    const params = new URLSearchParams();
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.isActive !== undefined) params.append('isActive', String(filters.isActive));
+    if (filters?.isAvailableForBooking !== undefined)
+      params.append('isAvailableForBooking', String(filters.isAvailableForBooking));
+
+    const response = await api.get(`/teachers?${params.toString()}`);
+    return response.data.data as Teacher[];
+  },
+
+  async getTeacherById(id: string) {
+    const response = await api.get(`/teachers/${id}`);
+    return response.data.data as Teacher;
+  },
+
+  async createTeacher(data: CreateTeacherData) {
+    const response = await api.post('/teachers', data);
+    return response.data.data as Teacher;
+  },
+
+  async updateTeacher(id: string, data: UpdateTeacherData) {
+    const response = await api.put(`/teachers/${id}`, data);
+    return response.data.data as Teacher;
+  },
+
+  async deleteTeacher(id: string) {
+    const response = await api.delete(`/teachers/${id}`);
+    return response.data;
+  },
+
+  async setAvailability(
+    id: string,
+    availability: Array<{
+      dayOfWeek: number;
+      startTime: string;
+      endTime: string;
+    }>
+  ) {
+    const response = await api.put(`/teachers/${id}/availability`, { availability });
+    return response.data;
+  },
+
+  async getStats() {
+    const response = await api.get('/teachers/stats');
+    return response.data.data as { total: number; active: number; available: number };
+  },
+};

@@ -1,27 +1,61 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
+import { UserRole } from '@prisma/client';
+import courseController from '../controllers/course.controller';
 
 const router = Router();
 router.use(authenticate);
 
-router.get('/', (req, res) => {
-  res.json({ message: 'List courses - TODO' });
-});
+// GET /api/courses/stats - Get course statistics
+router.get(
+  '/stats',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  courseController.getStats.bind(courseController)
+);
 
-router.get('/:id', (req, res) => {
-  res.json({ message: `Get course ${req.params.id} - TODO` });
-});
+// GET /api/courses - List all courses
+router.get(
+  '/',
+  authorize(UserRole.ADMIN, UserRole.MANAGER, UserRole.TEACHER),
+  courseController.getCourses.bind(courseController)
+);
 
-router.post('/', (req, res) => {
-  res.json({ message: 'Create course - TODO' });
-});
+// GET /api/courses/:id - Get course by ID
+router.get('/:id', courseController.getCourseById.bind(courseController));
 
-router.put('/:id', (req, res) => {
-  res.json({ message: `Update course ${req.params.id} - TODO` });
-});
+// POST /api/courses - Create course
+router.post(
+  '/',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  courseController.createCourse.bind(courseController)
+);
 
-router.delete('/:id', (req, res) => {
-  res.json({ message: `Delete course ${req.params.id} - TODO` });
-});
+// PUT /api/courses/:id - Update course
+router.put(
+  '/:id',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  courseController.updateCourse.bind(courseController)
+);
+
+// POST /api/courses/:id/enroll - Enroll student in course
+router.post(
+  '/:id/enroll',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  courseController.enrollStudent.bind(courseController)
+);
+
+// DELETE /api/courses/enrollments/:enrollmentId - Unenroll student
+router.delete(
+  '/enrollments/:enrollmentId',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  courseController.unenrollStudent.bind(courseController)
+);
+
+// DELETE /api/courses/:id - Delete course
+router.delete(
+  '/:id',
+  authorize(UserRole.ADMIN),
+  courseController.deleteCourse.bind(courseController)
+);
 
 export default router;

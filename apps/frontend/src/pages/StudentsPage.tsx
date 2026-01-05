@@ -1,29 +1,236 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { studentService, Student } from '../services/studentService';
+import { Plus, Search, Edit, Trash2, Mail, Phone } from 'lucide-react';
+import StudentModal from '../components/StudentModal';
 
 const StudentsPage: React.FC = () => {
+  const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+  // Fetch students
+  const { data: students = [], isLoading } = useQuery({
+    queryKey: ['students', searchTerm],
+    queryFn: () => studentService.getStudents({ search: searchTerm }),
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => studentService.deleteStudent(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+  });
+
+  const handleEdit = (student: Student) => {
+    setSelectedStudent(student);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Czy na pewno chcesz usunąć tego ucznia?')) {
+      await deleteMutation.mutateAsync(id);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedStudent(null);
+  };
+
+  const handleSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['students'] });
+    handleCloseModal();
+  };
+
+  const getLanguageLevelBadge = (level: string) => {
+    const colors: Record<string, string> = {
+      A1: 'bg-green-100 text-green-800',
+      A2: 'bg-green-200 text-green-900',
+      B1: 'bg-blue-100 text-blue-800',
+      B2: 'bg-blue-200 text-blue-900',
+      C1: 'bg-purple-100 text-purple-800',
+      C2: 'bg-purple-200 text-purple-900',
+    };
+
+    return (
+      <span className={`px-2 py-1 rounded text-xs font-medium ${colors[level] || 'bg-gray-100 text-gray-800'}`}>
+        {level}
+      </span>
+    );
+  };
+
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Uczniowie</h1>
-        <p className="mt-2 text-gray-600">Zarządzaj uczniami swojej szkoły</p>
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Uczniowie</h1>
+          <p className="mt-2 text-gray-600">
+            Zarządzaj uczniami swojej szkoły ({students.length} uczniów)
+          </p>
+        </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+        >
+          <Plus className="h-5 w-5" />
+          Dodaj ucznia
+        </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
-        <div className="mb-4 flex justify-between items-center">
+      {/* Search */}
+      <div className="bg-white rounded-lg shadow p-6 border border-gray-200 mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Szukaj ucznia..."
-            className="px-4 py-2 border border-gray-300 rounded-lg w-64"
+            placeholder="Szukaj ucznia po imieniu, nazwisku lub emailu..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
           />
-          <button className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
-            + Dodaj ucznia
-          </button>
         </div>
-
-        <p className="text-gray-500 text-center py-12">
-          Lista uczniów - funkcja w przygotowaniu
-        </p>
       </div>
+
+      {/* Students Table */}
+      <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+        {isLoading ? (
+          <div className="p-12 text-center text-gray-500">Ładowanie...</div>
+        ) : students.length === 0 ? (
+          <div className="p-12 text-center text-gray-500">
+            {searchTerm ? 'Nie znaleziono uczniów' : 'Brak uczniów. Dodaj pierwszego ucznia!'}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Nr
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Uczeń
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Kontakt
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Poziom
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Budżet (h)
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Akcje
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {students.map((student) => (
+                  <tr key={student.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      #{student.studentNumber}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 flex-shrink-0">
+                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                            {student.user.firstName[0]}
+                            {student.user.lastName[0]}
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {student.user.firstName} {student.user.lastName}
+                          </div>
+                          {student.isMinor && (
+                            <span className="text-xs text-orange-600">Niepełnoletni</span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {student.user.email}
+                        </div>
+                        {student.user.phone && (
+                          <div className="flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            {student.user.phone}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getLanguageLevelBadge(student.languageLevel)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {student.budget ? (
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {student.budget.totalHoursPurchased - student.budget.totalHoursUsed}h
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            z {student.budget.totalHoursPurchased}h
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          student.user.isActive
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {student.user.isActive ? 'Aktywny' : 'Nieaktywny'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleEdit(student)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Edytuj"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(student.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Usuń"
+                          disabled={deleteMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      {isModalOpen && (
+        <StudentModal
+          student={selectedStudent}
+          onClose={handleCloseModal}
+          onSuccess={handleSuccess}
+        />
+      )}
     </div>
   );
 };
