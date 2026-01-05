@@ -160,7 +160,7 @@ const LessonsPage: React.FC = () => {
         </div>
         <button
           onClick={handleAddLesson}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm"
         >
           <Plus className="h-5 w-5" />
           Dodaj lekcję

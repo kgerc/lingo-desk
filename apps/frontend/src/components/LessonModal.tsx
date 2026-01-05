@@ -8,11 +8,13 @@ import { X } from 'lucide-react';
 
 interface LessonModalProps {
   lesson: Lesson | null;
+  initialDate?: Date;
+  initialDuration?: number;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose, onSuccess }) => {
+const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialDuration, onClose, onSuccess }) => {
   const isEdit = !!lesson;
 
   const [formData, setFormData] = useState({
@@ -22,15 +24,29 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose, onSuccess })
     studentId: lesson?.studentId || '',
     title: lesson?.title || '',
     description: lesson?.description || '',
-    scheduledAt: lesson?.scheduledAt ? new Date(lesson.scheduledAt).toISOString().slice(0, 16) : '',
-    durationMinutes: lesson?.durationMinutes?.toString() || '60',
+    scheduledAt: lesson?.scheduledAt
+      ? new Date(lesson.scheduledAt).toISOString().slice(0, 16)
+      : initialDate
+        ? new Date(initialDate).toISOString().slice(0, 16)
+        : '',
+    durationMinutes: lesson?.durationMinutes?.toString() || initialDuration?.toString() || '60',
     deliveryMode: (lesson?.deliveryMode || 'IN_PERSON') as LessonDeliveryMode,
     meetingUrl: lesson?.meetingUrl || '',
     locationId: lesson?.locationId || '',
     classroomId: lesson?.classroomId || '',
   });
 
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringPattern, setRecurringPattern] = useState({
+    frequency: 'WEEKLY' as 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY',
+    interval: 1,
+    daysOfWeek: [] as number[],
+    endDate: '',
+    occurrencesCount: '',
+  });
+
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [conflicts, setConflicts] = useState<any>(null);
 
   // Fetch teachers for dropdown
   const { data: teachers = [] } = useQuery({
@@ -76,6 +92,33 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose, onSuccess })
     enabled: !!formData.studentId,
   });
 
+  // Check for conflicts when teacher, student, time, or duration changes
+  const { data: conflictData, isLoading: isCheckingConflicts } = useQuery({
+    queryKey: ['conflicts', formData.teacherId, formData.studentId, formData.scheduledAt, formData.durationMinutes],
+    queryFn: async () => {
+      if (!formData.teacherId || !formData.studentId || !formData.scheduledAt || !formData.durationMinutes) {
+        return null;
+      }
+
+      try {
+        const conflicts = await lessonService.checkConflicts(
+          formData.teacherId,
+          formData.studentId,
+          formData.scheduledAt,
+          Number(formData.durationMinutes),
+          lesson?.id
+        );
+        setConflicts(conflicts);
+        return conflicts;
+      } catch (error) {
+        console.error('Error checking conflicts:', error);
+        return null;
+      }
+    },
+    enabled: !!(formData.teacherId && formData.studentId && formData.scheduledAt && formData.durationMinutes),
+    refetchOnWindowFocus: false,
+  });
+
   const createMutation = useMutation({
     mutationFn: (data: CreateLessonData) => lessonService.createLesson(data),
     onSuccess: () => {
@@ -84,6 +127,29 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose, onSuccess })
     onError: (error: any) => {
       setErrors({
         form: error.response?.data?.error?.message || 'Wystąpił błąd podczas tworzenia lekcji',
+      });
+    },
+  });
+
+  const createRecurringMutation = useMutation({
+    mutationFn: (data: {
+      lessonData: CreateLessonData;
+      pattern: {
+        frequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+        interval?: number;
+        daysOfWeek?: number[];
+        startDate: string;
+        endDate?: string;
+        occurrencesCount?: number;
+      };
+    }) => lessonService.createRecurringLessons(data.lessonData, data.pattern),
+    onSuccess: (result) => {
+      alert(`Utworzono ${result.totalCreated} cyklicznych lekcji${result.totalErrors > 0 ? ` (pominięto ${result.totalErrors} z powodu konfliktów)` : ''}`);
+      onSuccess();
+    },
+    onError: (error: any) => {
+      setErrors({
+        form: error.response?.data?.error?.message || 'Wystąpił błąd podczas tworzenia cyklicznych lekcji',
       });
     },
   });
@@ -157,6 +223,11 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose, onSuccess })
       newErrors.meetingUrl = 'Podaj prawidłowy URL spotkania';
     }
 
+    // Check for scheduling conflicts
+    if (conflicts && conflicts.hasConflicts) {
+      newErrors.form = 'Nie można zapisać lekcji - wykryto konflikt terminów. Zmień termin lub czas trwania.';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -188,10 +259,24 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose, onSuccess })
       meetingUrl: formData.meetingUrl || undefined,
       locationId: formData.locationId || undefined,
       classroomId: formData.classroomId || undefined,
+      status: 'SCHEDULED' as const,
     };
 
     if (isEdit && lesson) {
       await updateMutation.mutateAsync({ id: lesson.id, updates: data });
+    } else if (isRecurring) {
+      // Create recurring lessons
+      await createRecurringMutation.mutateAsync({
+        lessonData: data,
+        pattern: {
+          frequency: recurringPattern.frequency,
+          interval: recurringPattern.interval,
+          daysOfWeek: recurringPattern.daysOfWeek.length > 0 ? recurringPattern.daysOfWeek : undefined,
+          startDate: new Date(formData.scheduledAt).toISOString(),
+          endDate: recurringPattern.endDate ? new Date(recurringPattern.endDate).toISOString() : undefined,
+          occurrencesCount: recurringPattern.occurrencesCount ? parseInt(recurringPattern.occurrencesCount) : undefined,
+        },
+      });
     } else {
       await createMutation.mutateAsync(data);
     }
@@ -418,7 +503,215 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose, onSuccess })
                 )}
               </div>
             </div>
+
+            {/* Conflict Warnings */}
+            {isCheckingConflicts && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-700">Sprawdzanie dostępności...</p>
+              </div>
+            )}
+
+            {conflicts && conflicts.hasConflicts && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-red-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="font-medium text-red-800">Wykryto konflikt terminów!</p>
+
+                    {conflicts.teacherConflicts.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-sm font-medium text-red-700">Lektor jest zajęty:</p>
+                        <ul className="mt-1 space-y-1">
+                          {conflicts.teacherConflicts.map((conflict: any) => (
+                            <li key={conflict.id} className="text-sm text-red-600">
+                              • {new Date(conflict.scheduledAt).toLocaleString('pl-PL')} ({conflict.durationMinutes} min) - {conflict.studentName}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {conflicts.studentConflicts.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-sm font-medium text-red-700">Uczeń jest zajęty:</p>
+                        <ul className="mt-1 space-y-1">
+                          {conflicts.studentConflicts.map((conflict: any) => (
+                            <li key={conflict.id} className="text-sm text-red-600">
+                              • {new Date(conflict.scheduledAt).toLocaleString('pl-PL')} ({conflict.durationMinutes} min) - {conflict.teacherName}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {conflicts && !conflicts.hasConflicts && formData.teacherId && formData.studentId && formData.scheduledAt && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-sm text-green-700 font-medium">Termin dostępny ✓</p>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Recurring Lessons - only show for new lessons */}
+          {!isEdit && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Lekcje cykliczne</h3>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isRecurring}
+                    onChange={(e) => setIsRecurring(e.target.checked)}
+                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                  />
+                  <span className="text-sm text-gray-700">Utwórz serię lekcji</span>
+                </label>
+              </div>
+
+              {isRecurring && (
+                <div className="space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Frequency */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Częstotliwość
+                      </label>
+                      <select
+                        value={recurringPattern.frequency}
+                        onChange={(e) =>
+                          setRecurringPattern({
+                            ...recurringPattern,
+                            frequency: e.target.value as any,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="WEEKLY">Co tydzień</option>
+                        <option value="BIWEEKLY">Co dwa tygodnie</option>
+                        <option value="MONTHLY">Co miesiąc</option>
+                        <option value="DAILY">Codziennie</option>
+                      </select>
+                    </div>
+
+                    {/* Interval */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Interwał
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={recurringPattern.interval}
+                        onChange={(e) =>
+                          setRecurringPattern({
+                            ...recurringPattern,
+                            interval: parseInt(e.target.value) || 1,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Days of week (for weekly/biweekly) */}
+                  {(recurringPattern.frequency === 'WEEKLY' || recurringPattern.frequency === 'BIWEEKLY') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Dni tygodnia
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Ndz'].map((day, index) => {
+                          const dayValue = index + 1 === 7 ? 0 : index + 1; // Sunday = 0
+                          const isSelected = recurringPattern.daysOfWeek.includes(dayValue);
+                          return (
+                            <button
+                              key={index}
+                              type="button"
+                              onClick={() => {
+                                const newDays = isSelected
+                                  ? recurringPattern.daysOfWeek.filter((d) => d !== dayValue)
+                                  : [...recurringPattern.daysOfWeek, dayValue].sort();
+                                setRecurringPattern({
+                                  ...recurringPattern,
+                                  daysOfWeek: newDays,
+                                });
+                              }}
+                              className={`px-3 py-1 text-sm rounded-lg border transition-colors ${
+                                isSelected
+                                  ? 'bg-primary text-white border-primary'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:border-primary'
+                              }`}
+                            >
+                              {day}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* End date */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Data zakończenia (opcjonalnie)
+                      </label>
+                      <input
+                        type="date"
+                        value={recurringPattern.endDate}
+                        onChange={(e) =>
+                          setRecurringPattern({
+                            ...recurringPattern,
+                            endDate: e.target.value,
+                            occurrencesCount: '', // Clear occurrences if end date is set
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+
+                    {/* Occurrences count */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Liczba powtórzeń (opcjonalnie)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={recurringPattern.occurrencesCount}
+                        onChange={(e) =>
+                          setRecurringPattern({
+                            ...recurringPattern,
+                            occurrencesCount: e.target.value,
+                            endDate: '', // Clear end date if occurrences is set
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="np. 10"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded p-3">
+                    <p className="font-medium text-blue-800">Informacja:</p>
+                    <p className="mt-1">
+                      System automatycznie pominie terminy, w których wykryje konflikt harmonogramu lektora lub ucznia.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Delivery */}
           <div className="space-y-4">
@@ -474,13 +767,17 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose, onSuccess })
             </button>
             <button
               type="submit"
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={createMutation.isPending || updateMutation.isPending || createRecurringMutation.isPending}
               className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {createMutation.isPending || updateMutation.isPending
-                ? 'Zapisywanie...'
+              {createMutation.isPending || updateMutation.isPending || createRecurringMutation.isPending
+                ? isRecurring
+                  ? 'Tworzenie serii lekcji...'
+                  : 'Zapisywanie...'
                 : isEdit
                 ? 'Zapisz zmiany'
+                : isRecurring
+                ? 'Utwórz serię lekcji'
                 : 'Dodaj lekcję'}
             </button>
           </div>

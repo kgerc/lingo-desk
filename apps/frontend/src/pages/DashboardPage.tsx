@@ -6,10 +6,10 @@ const DashboardPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
 
   const stats = [
-    { name: 'Uczniowie', value: '156', icon: Users, color: 'bg-blue-500' },
-    { name: 'Lektorzy', value: '12', icon: GraduationCap, color: 'bg-green-500' },
-    { name: 'Kursy aktywne', value: '24', icon: BookOpen, color: 'bg-purple-500' },
-    { name: 'Zajęcia dzisiaj', value: '18', icon: Calendar, color: 'bg-orange-500' },
+    { name: 'Uczniowie', value: '156', icon: Users, color: 'bg-secondary' },
+    { name: 'Lektorzy', value: '12', icon: GraduationCap, color: 'bg-primary' },
+    { name: 'Kursy aktywne', value: '24', icon: BookOpen, color: 'bg-secondary' },
+    { name: 'Zajęcia dzisiaj', value: '18', icon: Calendar, color: 'bg-primary' },
   ];
 
   return (
@@ -54,13 +54,13 @@ const DashboardPage: React.FC = () => {
           Szybkie akcje
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <button className="px-4 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+          <button className="px-4 py-3 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm">
             + Dodaj ucznia
           </button>
-          <button className="px-4 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+          <button className="px-4 py-3 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm">
             + Dodaj zajęcia
           </button>
-          <button className="px-4 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+          <button className="px-4 py-3 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm">
             + Dodaj kurs
           </button>
         </div>

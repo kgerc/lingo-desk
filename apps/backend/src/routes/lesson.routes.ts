@@ -12,6 +12,16 @@ router.get('/', lessonController.getLessons.bind(lessonController));
 // Get lesson stats
 router.get('/stats', lessonController.getStats.bind(lessonController));
 
+// Check for conflicts
+router.get('/check-conflicts', lessonController.checkConflicts.bind(lessonController));
+
+// Create recurring lessons (teachers, managers, admins)
+router.post(
+  '/recurring',
+  authorize(UserRole.ADMIN, UserRole.MANAGER, UserRole.TEACHER),
+  lessonController.createRecurringLessons.bind(lessonController)
+);
+
 // Get lesson by ID
 router.get('/:id', lessonController.getLessonById.bind(lessonController));
 

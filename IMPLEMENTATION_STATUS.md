@@ -94,19 +94,22 @@
 ## 🚧 Co jest jako TODO / Placeholder
 
 ### Backend
-- [ ] **Implementacja CRUD operations** dla:
-  - Students (create, update, delete, list)
-  - Teachers (create, update, delete, list)
-  - Courses (create, update, delete, list)
-  - Lessons (create, update, delete, list, confirm)
-  - Payments (create, list)
+- [x] **Implementacja CRUD operations** dla:
+  - Students (create, update, delete, list) ✅
+  - Teachers (create, update, delete, list) ✅
+  - Courses (create, update, delete, list) ✅
+  - Lessons (create, update, delete, list, confirm) ✅
+  - Student enrollment management ✅
 
-- [ ] **Business logic:**
+- [x] **Business logic:**
+  - Conflict detection (lektor/uczeń zajęty) ✅
+  - Recurring lessons generator ✅
+
+- [ ] **Business logic (TODO):**
   - Lesson confirmation flow
   - Budget tracking (odliczanie godzin)
-  - Conflict detection (lektor/uczeń zajęty)
-  - Recurring lessons generator
   - Budget alerts (< 2h remaining)
+  - Payments (create, list)
 
 - [ ] **Notifications:**
   - Email service (Resend/SendGrid integration)
@@ -119,27 +122,29 @@
   - Teacher payouts calculation
 
 ### Frontend
-- [ ] **CRUD forms dla:**
-  - Students (create/edit modal)
-  - Teachers (create/edit modal)
-  - Courses (create/edit modal)
-  - Lessons (create/edit modal)
+- [x] **CRUD forms dla:**
+  - Students (create/edit modal) ✅
+  - Teachers (create/edit modal) ✅
+  - Courses (create/edit modal) ✅
+  - Lessons (create/edit modal) ✅
 
-- [ ] **Advanced UI:**
-  - Calendar component (react-big-calendar)
-  - Drag & drop scheduling
-  - Data tables z sortowaniem/filtrowaniem
+- [x] **Advanced UI:**
+  - Calendar component (react-big-calendar) ✅
+  - Drag & drop scheduling ✅
+  - Data tables z sortowaniem/filtrowaniem ✅
+  - Loading states & skeletons ✅
+
+- [ ] **Advanced UI (TODO):**
   - Toast notifications
-  - Loading states & skeletons
 
-- [ ] **Pages:**
+- [ ] **Pages (TODO):**
   - Student detail page
   - Teacher detail page
   - Course detail page
   - Payments page
   - Settings page
 
-- [ ] **Features:**
+- [ ] **Features (TODO):**
   - Lesson confirmation button (teacher panel)
   - Budget tracking visualization
   - Alerts panel
@@ -148,16 +153,19 @@
 
 ## 📈 Roadmap - Kolejne kroki
 
-### **Priorytet 1: Core CRUD (Tydzień 1-2)**
-1. Implementacja Student CRUD (backend + frontend)
-2. Implementacja Teacher CRUD (backend + frontend)
-3. Implementacja Course CRUD (backend + frontend)
+### ✅ **Priorytet 1: Core CRUD (UKOŃCZONE)**
+1. ✅ Implementacja Student CRUD (backend + frontend)
+2. ✅ Implementacja Teacher CRUD (backend + frontend)
+3. ✅ Implementacja Course CRUD (backend + frontend)
+4. ✅ Enrollment management (zapisy na kursy)
 
-### **Priorytet 2: Scheduling (Tydzień 3-4)**
-1. Lesson CRUD (backend + frontend)
-2. Calendar component (react-big-calendar)
-3. Conflict detection logic
-4. Recurring pattern generator
+### ✅ **Priorytet 2: Scheduling (UKOŃCZONE)**
+1. ✅ Lesson CRUD (backend + frontend)
+2. ✅ Calendar component (react-big-calendar)
+3. ✅ Conflict detection logic (real-time API)
+4. ✅ Recurring pattern generator (daily/weekly/biweekly/monthly)
+5. ✅ Drag & drop scheduling z walidacją konfliktów
+6. ✅ Polish localization & color-coded statuses
 
 ### **Priorytet 3: Budget & Confirmation (Tydzień 5-6)**
 1. Student budget tracking
@@ -179,7 +187,7 @@
 
 ---
 
-## 🎯 Stan obecny: **Foundation Complete** (30% MVP)
+## 🎯 Stan obecny: **Priority 1 & 2 Complete** (60% MVP)
 
 ### Co działa:
 ✅ Rejestracja użytkownika
@@ -188,13 +196,23 @@
 ✅ Nawigacja między stronami
 ✅ Auth flow (protected routes)
 ✅ Database schema gotowe
+✅ **Student CRUD** (backend + frontend)
+✅ **Teacher CRUD** (backend + frontend)
+✅ **Course CRUD** (backend + frontend)
+✅ **Lesson CRUD** (backend + frontend)
+✅ **Enrollment management** (zapisy/wypisywanie z kursów)
+✅ **Calendar z react-big-calendar** (Polish localization, color-coded statuses)
+✅ **Drag & drop scheduling** (move events, block resizing)
+✅ **Conflict detection** (real-time API, teacher/student availability)
+✅ **Recurring lessons generator** (daily/weekly/biweekly/monthly patterns)
+✅ **Conflict blocking** (form validation before save)
 
 ### Co trzeba dodać:
-🔨 CRUD operations (students, teachers, courses, lessons)
-🔨 Calendar z planowaniem zajęć
-🔨 Lesson confirmation mechanism
-🔨 Budget tracking
+🔨 Lesson confirmation mechanism (teacher approval flow)
+🔨 Budget tracking (student hours, auto-deduction)
+🔨 Budget alerts (< 2h remaining)
 🔨 Email notifications
+🔨 Payments management
 
 ---
 
@@ -263,4 +281,75 @@ Jeśli masz pytania odnośnie implementacji, sprawdź:
 
 ---
 
-**Status:** ✅ **Foundation Ready** - Można zacząć implementować funkcje biznesowe!
+## 🎉 Najnowsze implementacje (5 stycznia 2026)
+
+### ✅ **Calendar z pełną funkcjonalnością**
+- **react-big-calendar** z drag & drop addon
+- Polska lokalizacja (moment.js z 'pl' locale)
+- Kolorowe statusy lekcji:
+  - 🔵 SCHEDULED (niebieski)
+  - 🟢 CONFIRMED (zielony)
+  - ⚫ COMPLETED (szary)
+  - 🔴 CANCELLED (czerwony)
+  - 🟠 PENDING_CONFIRMATION (pomarańczowy)
+- Drag & drop do **przenoszenia** lekcji (nie rozmiaru!)
+- Automatyczne blokowanie konfliktów przy przeciąganiu
+- Responsywny design bez scrolla (flexbox layout)
+- Zaokrąglone rogi i nowoczesna stylizacja
+
+### ✅ **System wykrywania konfliktów**
+**Backend:**
+- Endpoint `/api/lessons/check-conflicts` (GET)
+- Sprawdza dostępność lektora i ucznia
+- Uwzględnia czas trwania lekcji
+- Zwraca szczegóły konfliktujących lekcji
+
+**Frontend:**
+- Real-time walidacja w LessonModal
+- Wizualne ostrzeżenia o konfliktach
+- **Blokowanie zapisu** gdy wykryto konflikt
+- Wyświetlanie listy konfliktujących terminów
+
+### ✅ **Generator lekcji cyklicznych**
+**Backend:**
+- Service method `createRecurringLessons()`
+- Obsługa częstotliwości:
+  - DAILY (codziennie)
+  - WEEKLY (co tydzień)
+  - BIWEEKLY (co dwa tygodnie)
+  - MONTHLY (co miesiąc)
+- Parametry:
+  - Interwał (np. co 2 tygodnie)
+  - Dni tygodnia (dla weekly/biweekly)
+  - Data zakończenia LUB liczba powtórzeń
+- **Automatyczne pomijanie konfliktów**
+- Raport: ile utworzono, ile pominięto
+
+**Frontend:**
+- Checkbox "Utwórz serię lekcji" w LessonModal
+- UI do wyboru:
+  - Częstotliwości
+  - Interwału
+  - Dni tygodnia (przyciski Pon-Ndz)
+  - Daty zakończenia LUB liczby powtórzeń
+- Informacja o automatycznym pomijaniu konfliktów
+- Alert po utworzeniu z raportem
+
+### ✅ **Enrollment Management (Zapisy na kursy)**
+- Modal "Zarządzaj uczniami" w CoursesPage
+- Lista zapisanych uczniów
+- Przycisk "Zapisz ucznia" z dropdown
+- Przycisk "Wypisz" przy każdym uczniu
+- Real-time aktualizacja liczników
+- Walidacja limitu miejsc (maxStudents)
+- Soft delete (status: CANCELLED)
+
+### 🔧 **Poprawki techniczne**
+- Relation fixes (attendance → attendances, enrollment → studentEnrollment)
+- Enum fixes (INACTIVE → CANCELLED w EnrollmentStatus)
+- Real-time query invalidation (React Query)
+- Proper error handling z user-friendly messages
+
+---
+
+**Status:** ✅ **Priority 1 & 2 Complete** (60% MVP) - Scheduling gotowe, teraz Budget & Confirmation!

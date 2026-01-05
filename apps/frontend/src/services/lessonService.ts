@@ -179,4 +179,59 @@ export const lessonService = {
       pendingConfirmation: number;
     };
   },
+
+  async checkConflicts(
+    teacherId: string,
+    studentId: string,
+    scheduledAt: string,
+    durationMinutes: number,
+    excludeLessonId?: string
+  ) {
+    const params = new URLSearchParams();
+    params.append('teacherId', teacherId);
+    params.append('studentId', studentId);
+    params.append('scheduledAt', scheduledAt);
+    params.append('durationMinutes', durationMinutes.toString());
+    if (excludeLessonId) params.append('excludeLessonId', excludeLessonId);
+
+    const response = await api.get(`/lessons/check-conflicts?${params.toString()}`);
+    return response.data.data as {
+      hasConflicts: boolean;
+      teacherConflicts: Array<{
+        id: string;
+        title: string;
+        scheduledAt: string;
+        durationMinutes: number;
+        studentName: string;
+      }>;
+      studentConflicts: Array<{
+        id: string;
+        title: string;
+        scheduledAt: string;
+        durationMinutes: number;
+        teacherName: string;
+      }>;
+    };
+  },
+
+  async createRecurringLessons(
+    lessonData: CreateLessonData,
+    pattern: {
+      frequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+      interval?: number;
+      daysOfWeek?: number[];
+      startDate: string;
+      endDate?: string;
+      occurrencesCount?: number;
+    }
+  ) {
+    const response = await api.post('/lessons/recurring', { lessonData, pattern });
+    return response.data.data as {
+      recurringPattern: any;
+      createdLessons: Lesson[];
+      errors: Array<{ date: string; error: string }>;
+      totalCreated: number;
+      totalErrors: number;
+    };
+  },
 };

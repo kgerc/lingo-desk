@@ -531,6 +531,284 @@ class LessonService {
       pendingConfirmation,
     };
   }
+
+  // Check for scheduling conflicts
+  async checkConflicts(
+    organizationId: string,
+    teacherId: string,
+    studentId: string,
+    scheduledAt: Date,
+    durationMinutes: number,
+    excludeLessonId?: string
+  ) {
+    const lessonStart = new Date(scheduledAt);
+    const lessonEnd = new Date(lessonStart.getTime() + durationMinutes * 60000);
+
+    // Build where clause to exclude cancelled and specific lesson
+    const baseWhere: any = {
+      organizationId,
+      status: {
+        notIn: ['CANCELLED', 'NO_SHOW'],
+      },
+      scheduledAt: {
+        lt: lessonEnd,
+      },
+    };
+
+    if (excludeLessonId) {
+      baseWhere.id = { not: excludeLessonId };
+    }
+
+    // Check teacher conflicts
+    const teacherConflicts = await prisma.lesson.findMany({
+      where: {
+        ...baseWhere,
+        teacherId,
+      },
+      select: {
+        id: true,
+        title: true,
+        scheduledAt: true,
+        durationMinutes: true,
+        student: {
+          select: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Filter to actual time conflicts
+    const teacherOverlaps = teacherConflicts.filter((lesson) => {
+      const existingStart = new Date(lesson.scheduledAt);
+      const existingEnd = new Date(existingStart.getTime() + lesson.durationMinutes * 60000);
+      return existingStart < lessonEnd && existingEnd > lessonStart;
+    });
+
+    // Check student conflicts
+    const studentConflicts = await prisma.lesson.findMany({
+      where: {
+        ...baseWhere,
+        studentId,
+      },
+      select: {
+        id: true,
+        title: true,
+        scheduledAt: true,
+        durationMinutes: true,
+        teacher: {
+          select: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Filter to actual time conflicts
+    const studentOverlaps = studentConflicts.filter((lesson) => {
+      const existingStart = new Date(lesson.scheduledAt);
+      const existingEnd = new Date(existingStart.getTime() + lesson.durationMinutes * 60000);
+      return existingStart < lessonEnd && existingEnd > lessonStart;
+    });
+
+    return {
+      hasConflicts: teacherOverlaps.length > 0 || studentOverlaps.length > 0,
+      teacherConflicts: teacherOverlaps.map((lesson) => ({
+        id: lesson.id,
+        title: lesson.title,
+        scheduledAt: lesson.scheduledAt,
+        durationMinutes: lesson.durationMinutes,
+        studentName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
+      })),
+      studentConflicts: studentOverlaps.map((lesson) => ({
+        id: lesson.id,
+        title: lesson.title,
+        scheduledAt: lesson.scheduledAt,
+        durationMinutes: lesson.durationMinutes,
+        teacherName: `${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}`,
+      })),
+    };
+  }
+
+  /**
+   * Create recurring lessons based on a pattern
+   */
+  async createRecurringLessons(
+    organizationId: string,
+    lessonData: {
+      title: string;
+      description?: string;
+      teacherId: string;
+      studentId: string;
+      enrollmentId: string;
+      courseId?: string;
+      durationMinutes: number;
+      locationId?: string;
+      classroomId?: string;
+      deliveryMode: 'ONLINE' | 'IN_PERSON' | 'HYBRID';
+      meetingUrl?: string;
+      status: 'SCHEDULED' | 'CONFIRMED' | 'PENDING_CONFIRMATION';
+    },
+    pattern: {
+      frequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+      interval?: number;
+      daysOfWeek?: number[]; // 0 = Sunday, 1 = Monday, etc.
+      startDate: Date;
+      endDate?: Date;
+      occurrencesCount?: number;
+    }
+  ) {
+    // Create the recurring pattern first
+    const recurringPattern = await prisma.recurringPattern.create({
+      data: {
+        organizationId,
+        frequency: pattern.frequency,
+        interval: pattern.interval || 1,
+        daysOfWeek: pattern.daysOfWeek || [],
+        startDate: pattern.startDate,
+        endDate: pattern.endDate,
+        occurrencesCount: pattern.occurrencesCount,
+      },
+    });
+
+    const createdLessons = [];
+    const errors = [];
+    let currentDate = new Date(pattern.startDate);
+    let count = 0;
+    const maxOccurrences = pattern.occurrencesCount || 100;
+
+    // Generate lessons
+    while (
+      count < maxOccurrences &&
+      (!pattern.endDate || currentDate <= pattern.endDate)
+    ) {
+      // Check if this day should have a lesson (for weekly/biweekly)
+      if (pattern.frequency === 'WEEKLY' || pattern.frequency === 'BIWEEKLY') {
+        const dayOfWeek = currentDate.getDay();
+        if (!pattern.daysOfWeek || !pattern.daysOfWeek.includes(dayOfWeek)) {
+          // Move to next day
+          currentDate = this.getNextDate(currentDate, pattern.frequency, pattern.interval || 1);
+          continue;
+        }
+      }
+
+      // Check for conflicts before creating
+      const conflicts = await this.checkConflicts(
+        organizationId,
+        lessonData.teacherId,
+        lessonData.studentId,
+        currentDate,
+        lessonData.durationMinutes
+      );
+
+      if (!conflicts.hasConflicts) {
+        try {
+          const lesson = await prisma.lesson.create({
+            data: {
+              organizationId,
+              ...lessonData,
+              scheduledAt: currentDate,
+              isRecurring: true,
+              recurringPatternId: recurringPattern.id,
+            },
+            include: {
+              teacher: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                    },
+                  },
+                },
+              },
+              student: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                    },
+                  },
+                },
+              },
+            },
+          });
+          createdLessons.push(lesson);
+          count++;
+        } catch (error) {
+          errors.push({
+            date: currentDate.toISOString(),
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      } else {
+        errors.push({
+          date: currentDate.toISOString(),
+          error: 'Scheduling conflict',
+        });
+      }
+
+      // Move to next occurrence
+      currentDate = this.getNextDate(currentDate, pattern.frequency, pattern.interval || 1);
+    }
+
+    // Update the pattern with count of created lessons
+    await prisma.recurringPattern.update({
+      where: { id: recurringPattern.id },
+      data: { createdLessonsCount: createdLessons.length },
+    });
+
+    return {
+      recurringPattern,
+      createdLessons,
+      errors,
+      totalCreated: createdLessons.length,
+      totalErrors: errors.length,
+    };
+  }
+
+  /**
+   * Calculate next date based on frequency and interval
+   */
+  private getNextDate(
+    currentDate: Date,
+    frequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY',
+    interval: number
+  ): Date {
+    const nextDate = new Date(currentDate);
+
+    switch (frequency) {
+      case 'DAILY':
+        nextDate.setDate(nextDate.getDate() + interval);
+        break;
+      case 'WEEKLY':
+        nextDate.setDate(nextDate.getDate() + 7 * interval);
+        break;
+      case 'BIWEEKLY':
+        nextDate.setDate(nextDate.getDate() + 14 * interval);
+        break;
+      case 'MONTHLY':
+        nextDate.setMonth(nextDate.getMonth() + interval);
+        break;
+    }
+
+    return nextDate;
+  }
 }
 
 export default new LessonService();

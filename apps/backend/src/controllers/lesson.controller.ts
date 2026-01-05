@@ -120,6 +120,71 @@ class LessonController {
       next(error);
     }
   }
+
+  async checkConflicts(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { teacherId, studentId, scheduledAt, durationMinutes, excludeLessonId } = req.query;
+
+      if (!teacherId || !studentId || !scheduledAt || !durationMinutes) {
+        return res.status(400).json({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Missing required parameters: teacherId, studentId, scheduledAt, durationMinutes',
+          },
+        });
+      }
+
+      const conflicts = await lessonService.checkConflicts(
+        req.user.organizationId,
+        String(teacherId),
+        String(studentId),
+        new Date(String(scheduledAt)),
+        Number(durationMinutes),
+        excludeLessonId ? String(excludeLessonId) : undefined
+      );
+
+      res.json({ message: 'Conflict check completed', data: conflicts });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createRecurringLessons(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { lessonData, pattern } = req.body;
+
+      if (!lessonData || !pattern) {
+        return res.status(400).json({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Missing lessonData or pattern',
+          },
+        });
+      }
+
+      const result = await lessonService.createRecurringLessons(
+        req.user.organizationId,
+        {
+          ...lessonData,
+          durationMinutes: Number(lessonData.durationMinutes),
+        },
+        {
+          ...pattern,
+          startDate: new Date(pattern.startDate),
+          endDate: pattern.endDate ? new Date(pattern.endDate) : undefined,
+          occurrencesCount: pattern.occurrencesCount ? Number(pattern.occurrencesCount) : undefined,
+          interval: pattern.interval ? Number(pattern.interval) : 1,
+        }
+      );
+
+      res.status(201).json({
+        message: `Successfully created ${result.totalCreated} recurring lessons`,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new LessonController();

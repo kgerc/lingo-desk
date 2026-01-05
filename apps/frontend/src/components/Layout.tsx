@@ -37,10 +37,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200">
+      <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-secondary border-r border-secondary/20">
         {/* Logo */}
-        <div className="h-16 flex items-center px-6 border-b border-gray-200">
-          <h1 className="text-2xl font-bold text-primary">LingoDesk</h1>
+        <div className="h-24 flex items-center gap-2 px-5 border-b border-secondary/20">
+          <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
+            <img
+              src="/lingodesk_logo_medium.png"
+              alt="LingoDesk Logo"
+              className="h-full w-full object-cover scale-150 ml-1 mt-1"
+              onError={(e) => {
+                console.error('Logo failed to load');
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
+          <h1 className="text-2xl font-bold text-white">LingoDesk</h1>
         </div>
 
         {/* Navigation */}
@@ -53,8 +64,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 to={item.href}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                   isActive(item.href)
-                    ? 'bg-primary text-white'
-                    : 'text-gray-700 hover:bg-gray-100'
+                    ? 'bg-white/10 text-white shadow-sm'
+                    : 'text-white/80 hover:bg-white/5 hover:text-white'
                 }`}
               >
                 <Icon className="h-5 w-5" />
@@ -65,23 +76,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </nav>
 
         {/* User section */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-secondary/20 bg-secondary">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold">
                 {user?.firstName?.[0]}
                 {user?.lastName?.[0]}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className="text-sm font-medium text-white truncate">
                   {user?.firstName} {user?.lastName}
                 </p>
-                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                <p className="text-xs text-white/60 truncate">{user?.email}</p>
               </div>
             </div>
             <button
               onClick={logout}
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="p-2 text-white/60 hover:text-white transition-colors"
               title="Wyloguj"
             >
               <LogOut className="h-5 w-5" />

@@ -31,7 +31,20 @@ const LoginPage: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-primary">LingoDesk</h1>
+          <div className="flex items-center justify-center mr-8">
+            <div className="h-20 w-20 flex items-center justify-center">
+              <img
+                src="/lingodesk_logo_medium.png"
+                alt="LingoDesk Logo"
+                className="h-full w-full object-cover scale-150 ml-1 mt-1"
+                onError={(e) => {
+                  console.error('Logo failed to load');
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+            <h1 className="text-4xl font-bold text-secondary">LingoDesk</h1>
+          </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900">
             Zaloguj się do konta
           </h2>
@@ -86,7 +99,7 @@ const LoginPage: React.FC = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-secondary hover:bg-secondary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary disabled:opacity-50"
           >
             {loading ? 'Logowanie...' : 'Zaloguj się'}
           </button>
