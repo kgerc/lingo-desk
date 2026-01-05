@@ -91,4 +91,56 @@ export const studentService = {
     const response = await api.get('/students/stats');
     return response.data.data as { total: number; active: number; lowBudget: number };
   },
+
+  async getEnrollmentBudget(enrollmentId: string) {
+    const response = await api.get(`/students/enrollment/${enrollmentId}/budget`);
+    return response.data.data as {
+      enrollmentId: string;
+      studentName: string;
+      courseName: string;
+      hoursPurchased: number;
+      hoursUsed: number;
+      hoursRemaining: number;
+      lowBudget: boolean;
+      status: string;
+      enrollmentDate: string;
+      expiresAt?: string;
+    };
+  },
+
+  async getStudentsWithLowBudget() {
+    // Get all students with their enrollments
+    const students = await this.getStudents({ isActive: true });
+
+    // For each student, check their enrollments for low budget
+    const lowBudgetAlerts: Array<{
+      studentId: string;
+      studentName: string;
+      enrollmentId: string;
+      courseName: string;
+      hoursRemaining: number;
+    }> = [];
+
+    for (const student of students) {
+      if (student.enrollments) {
+        for (const enrollment: any of student.enrollments) {
+          const hoursPurchased = parseFloat(enrollment.hoursPurchased?.toString() || '0');
+          const hoursUsed = parseFloat(enrollment.hoursUsed?.toString() || '0');
+          const hoursRemaining = hoursPurchased - hoursUsed;
+
+          if (hoursRemaining <= 2 && hoursRemaining > 0 && enrollment.status === 'ACTIVE') {
+            lowBudgetAlerts.push({
+              studentId: student.id,
+              studentName: `${student.user.firstName} ${student.user.lastName}`,
+              enrollmentId: enrollment.id,
+              courseName: enrollment.course?.name || 'N/A',
+              hoursRemaining,
+            });
+          }
+        }
+      }
+    }
+
+    return lowBudgetAlerts;
+  },
 };

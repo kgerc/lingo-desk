@@ -20,6 +20,12 @@ router.get(
   studentController.getStudents.bind(studentController)
 );
 
+// GET /api/students/enrollment/:enrollmentId/budget - Get enrollment budget
+router.get(
+  '/enrollment/:enrollmentId/budget',
+  studentController.getEnrollmentBudget.bind(studentController)
+);
+
 // GET /api/students/:id - Get student by ID
 router.get('/:id', studentController.getStudentById.bind(studentController));
 

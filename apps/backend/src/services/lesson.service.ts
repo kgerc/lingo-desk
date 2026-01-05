@@ -333,6 +333,9 @@ class LessonService {
         id,
         organizationId,
       },
+      include: {
+        enrollment: true,
+      },
     });
 
     if (!existingLesson) {
@@ -345,9 +348,16 @@ class LessonService {
       updateData.cancelledAt = new Date();
     }
 
-    // If completing, set completed timestamp
-    if (data.status === 'COMPLETED' && !existingLesson.completedAt) {
+    // If completing, set completed timestamp and deduct from budget
+    const isCompletingLesson = data.status === 'COMPLETED' && existingLesson.status !== 'COMPLETED';
+    if (isCompletingLesson && !existingLesson.completedAt) {
       updateData.completedAt = new Date();
+
+      // Deduct hours from student budget
+      await this.deductLessonFromBudget(
+        existingLesson.enrollmentId,
+        existingLesson.durationMinutes
+      );
     }
 
     const lesson = await prisma.lesson.update({
@@ -393,6 +403,38 @@ class LessonService {
     });
 
     return lesson;
+  }
+
+  /**
+   * Deduct lesson hours from student budget
+   */
+  private async deductLessonFromBudget(enrollmentId: string, durationMinutes: number) {
+    const hoursToDeduct = durationMinutes / 60;
+
+    // Get current enrollment
+    const enrollment = await prisma.studentEnrollment.findUnique({
+      where: { id: enrollmentId },
+    });
+
+    if (!enrollment) {
+      throw new Error('Enrollment not found');
+    }
+
+    // Check if enough hours available
+    const remainingHours = parseFloat(enrollment.hoursPurchased.toString()) - parseFloat(enrollment.hoursUsed.toString());
+    if (remainingHours < hoursToDeduct) {
+      throw new Error(`Insufficient budget. Remaining hours: ${remainingHours.toFixed(2)}, Required: ${hoursToDeduct.toFixed(2)}`);
+    }
+
+    // Update hoursUsed
+    await prisma.studentEnrollment.update({
+      where: { id: enrollmentId },
+      data: {
+        hoursUsed: {
+          increment: hoursToDeduct,
+        },
+      },
+    });
   }
 
   async deleteLesson(id: string, organizationId: string) {

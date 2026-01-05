@@ -167,11 +167,11 @@
 5. ✅ Drag & drop scheduling z walidacją konfliktów
 6. ✅ Polish localization & color-coded statuses
 
-### **Priorytet 3: Budget & Confirmation (Tydzień 5-6)**
-1. Student budget tracking
-2. Lesson confirmation flow
-3. Auto-deduction of hours
-4. Budget alerts
+### ✅ **Priorytet 3: Budget & Confirmation (UKOŃCZONE)**
+1. ✅ Student budget tracking
+2. ✅ Lesson confirmation flow
+3. ✅ Auto-deduction of hours
+4. ✅ Budget alerts
 
 ### **Priorytet 4: Notifications (Tydzień 7-8)**
 1. Email service integration
@@ -187,7 +187,7 @@
 
 ---
 
-## 🎯 Stan obecny: **Priority 1 & 2 Complete** (60% MVP)
+## 🎯 Stan obecny: **Priority 1, 2 & 3 Complete** (75% MVP)
 
 ### Co działa:
 ✅ Rejestracja użytkownika
@@ -206,13 +206,16 @@
 ✅ **Conflict detection** (real-time API, teacher/student availability)
 ✅ **Recurring lessons generator** (daily/weekly/biweekly/monthly patterns)
 ✅ **Conflict blocking** (form validation before save)
+✅ **Lesson confirmation mechanism** (teacher approval flow, confirm button)
+✅ **Budget tracking** (enrollment hours, auto-deduction when COMPLETED)
+✅ **Budget visualization** (BudgetDisplay component with progress bar)
+✅ **Budget alerts** (Dashboard alerts for < 2h remaining)
+✅ **Status management** (SCHEDULED → CONFIRMED → COMPLETED)
 
 ### Co trzeba dodać:
-🔨 Lesson confirmation mechanism (teacher approval flow)
-🔨 Budget tracking (student hours, auto-deduction)
-🔨 Budget alerts (< 2h remaining)
-🔨 Email notifications
+🔨 Email notifications (lesson reminders, budget alerts)
 🔨 Payments management
+🔨 Advanced reporting
 
 ---
 
@@ -352,4 +355,56 @@ Jeśli masz pytania odnośnie implementacji, sprawdź:
 
 ---
 
-**Status:** ✅ **Priority 1 & 2 Complete** (60% MVP) - Scheduling gotowe, teraz Budget & Confirmation!
+## 🎉 Najnowsze implementacje (5 stycznia 2026 - Priority 3)
+
+### ✅ **System budżetowania godzin**
+**Backend:**
+- Automatyczne odliczanie godzin przy zmianie statusu lekcji na COMPLETED
+- Endpoint `/api/students/enrollment/:enrollmentId/budget` do pobierania info o budżecie
+- Walidacja dostępności godzin przed odliczeniem
+- Service method `deductLessonFromBudget()` w lesson.service
+- Kalkulacja `hoursRemaining = hoursPurchased - hoursUsed` dla enrollments
+
+**Frontend:**
+- Komponent `BudgetDisplay` z wizualizacją:
+  - Progress bar (czerwony < 2h, żółty < 20%, zielony reszta)
+  - Grid z zakupionymi/wykorzystanymi/pozostałymi godzinami
+  - Ostrzeżenie przy niskim stanie konta
+- Integracja w `LessonModal` - pokazuje budżet dla wybranego enrollment
+- Query `getEnrollmentBudget()` w studentService
+
+### ✅ **System potwierdzania lekcji**
+**Backend:**
+- Endpoint `/api/lessons/:id/confirm` (POST) już istniejący
+- Zmiana statusu SCHEDULED → CONFIRMED
+- Timestamp `confirmedByTeacherAt`
+
+**Frontend:**
+- Przycisk "Potwierdź" w LessonsPage dla lekcji SCHEDULED
+- Dodana sekcja "Status lekcji" w LessonModal (tylko edit mode)
+- Dropdown ze wszystkimi statusami:
+  - SCHEDULED, CONFIRMED, COMPLETED, CANCELLED, PENDING_CONFIRMATION, NO_SHOW
+- Ostrzeżenie przy wyborze COMPLETED o odliczeniu godzin
+- Integracja z updateLesson mutation
+
+### ✅ **System alertów budżetowych**
+**Frontend:**
+- Dashboard pokazuje real-time alerty dla enrollments z <= 2h pozostałymi
+- Service method `getStudentsWithLowBudget()` skanuje wszystkie enrollments
+- Alert cards z:
+  - Imieniem i nazwiskiem ucznia
+  - Nazwą kursu
+  - Liczbą pozostałych godzin
+- Auto-refresh co minutę (refetchInterval: 60000)
+- Zielony "Brak alertów" gdy wszystko OK
+
+### 🔧 **Poprawki techniczne**
+- Dodano pole `status` do formData w LessonModal
+- Status przekazywany podczas edycji lekcji
+- Poprawiono `getStudentStats()` do kalkulacji lowBudget bez `hours_remaining` field
+- Import `BudgetDisplay` w LessonModal
+- Import `AlertTriangle` w DashboardPage
+
+---
+
+**Status:** ✅ **Priority 1, 2 & 3 Complete** (75% MVP) - Budget & Confirmation gotowe, teraz Notifications!

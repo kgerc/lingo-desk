@@ -178,6 +178,31 @@ export class StudentController {
       next(error);
     }
   }
+
+  async getEnrollmentBudget(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.organizationId) {
+        return res.status(401).json({
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Organization ID not found',
+          },
+        });
+      }
+
+      const { enrollmentId } = req.params;
+      const budget = await studentService.getEnrollmentBudget(
+        enrollmentId,
+        req.user.organizationId
+      );
+
+      res.json({
+        data: budget,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new StudentController();

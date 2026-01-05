@@ -1,9 +1,18 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
-import { Users, GraduationCap, BookOpen, Calendar } from 'lucide-react';
+import { studentService } from '../services/studentService';
+import { Users, GraduationCap, BookOpen, Calendar, AlertTriangle } from 'lucide-react';
 
 const DashboardPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
+
+  // Fetch low budget alerts
+  const { data: lowBudgetAlerts = [] } = useQuery({
+    queryKey: ['lowBudgetAlerts'],
+    queryFn: () => studentService.getStudentsWithLowBudget(),
+    refetchInterval: 60000, // Refetch every minute
+  });
 
   const stats = [
     { name: 'Uczniowie', value: '156', icon: Users, color: 'bg-secondary' },
@@ -66,17 +75,59 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Alerts */}
-      <div className="mt-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-yellow-900 mb-2">
-          ⚠️ Alerty
-        </h3>
-        <ul className="space-y-2 text-sm text-yellow-800">
-          <li>• 3 uczniów ma końcący się budżet</li>
-          <li>• 5 zajęć oczekuje na potwierdzenie przez lektora</li>
-          <li>• 2 płatności zaległe</li>
-        </ul>
-      </div>
+      {/* Budget Alerts */}
+      {lowBudgetAlerts.length > 0 && (
+        <div className="mt-8 bg-red-50 border border-red-200 rounded-lg p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="h-5 w-5 text-red-600" />
+            <h3 className="text-lg font-semibold text-red-900">
+              Alerty budżetowe ({lowBudgetAlerts.length})
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {lowBudgetAlerts.map((alert) => (
+              <div
+                key={alert.enrollmentId}
+                className="bg-white border border-red-200 rounded-lg p-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {alert.studentName}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Kurs: {alert.courseName}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-red-600">
+                      {alert.hoursRemaining.toFixed(1)}h
+                    </p>
+                    <p className="text-xs text-gray-500">pozostało</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* No Alerts */}
+      {lowBudgetAlerts.length === 0 && (
+        <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-6">
+          <div className="flex items-center gap-2">
+            <div className="text-green-600 text-2xl">✓</div>
+            <div>
+              <h3 className="text-lg font-semibold text-green-900">
+                Brak alertów budżetowych
+              </h3>
+              <p className="text-sm text-green-700 mt-1">
+                Wszyscy uczniowie mają wystarczający budżet godzin
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

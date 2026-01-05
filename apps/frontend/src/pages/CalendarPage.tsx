@@ -79,13 +79,16 @@ const CalendarPage: React.FC = () => {
 
   // Convert lessons to calendar events
   const events = useMemo(() => {
-    return lessons.map((lesson) => ({
+    const mappedEvents = lessons.map((lesson) => ({
       id: lesson.id,
       title: `${lesson.student.user.firstName} ${lesson.student.user.lastName} - ${lesson.title}`,
       start: new Date(lesson.scheduledAt),
       end: new Date(new Date(lesson.scheduledAt).getTime() + lesson.durationMinutes * 60000),
       resource: lesson,
     }));
+    console.log('📅 Calendar events:', mappedEvents.length, 'events');
+    console.log('📅 First event:', mappedEvents[0]);
+    return mappedEvents;
   }, [lessons]);
 
   const handleSelectSlot = useCallback((slotInfo: SlotInfo) => {
@@ -174,6 +177,18 @@ const CalendarPage: React.FC = () => {
     showMore: (total: number) => `+ ${total} więcej`,
   };
 
+  const formats = {
+    monthHeaderFormat: 'MMMM YYYY',
+    dayHeaderFormat: 'dddd, D MMMM',
+    dayRangeHeaderFormat: ({ start, end }: { start: Date; end: Date }) =>
+      `${moment(start).format('D MMMM')} - ${moment(end).format('D MMMM YYYY')}`,
+    agendaHeaderFormat: ({ start, end }: { start: Date; end: Date }) =>
+      `${moment(start).format('D MMMM')} - ${moment(end).format('D MMMM YYYY')}`,
+    eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
+      `${moment(start).format('HH:mm')} - ${moment(end).format('HH:mm')}`,
+    timeGutterFormat: 'HH:mm',
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="mb-6 flex justify-between items-center flex-shrink-0">
@@ -200,6 +215,53 @@ const CalendarPage: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200 mb-6 flex-shrink-0">
         <div className="flex items-center gap-4">
           <Filter className="h-5 w-5 text-gray-400" />
+
+          {/* View selector */}
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setView('month')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                view === 'month'
+                  ? 'bg-white text-secondary shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Miesiąc
+            </button>
+            <button
+              onClick={() => setView('week')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                view === 'week'
+                  ? 'bg-white text-secondary shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Tydzień
+            </button>
+            <button
+              onClick={() => setView('day')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                view === 'day'
+                  ? 'bg-white text-secondary shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Dzień
+            </button>
+            <button
+              onClick={() => setView('agenda')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                view === 'agenda'
+                  ? 'bg-white text-secondary shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Agenda
+            </button>
+          </div>
+
+          <div className="h-6 w-px bg-gray-300"></div>
+
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -259,17 +321,17 @@ const CalendarPage: React.FC = () => {
             onEventDrop={handleEventDrop}
             onEventResize={handleEventResize}
             resizable={false}
-            draggableAccessor={() => true}
+            draggableAccessor={() => view !== 'month'}
             messages={messages}
+            formats={formats}
             eventPropGetter={(event) => ({
               style: getEventStyle(event.resource),
             })}
             step={15}
             timeslots={4}
-            min={new Date(0, 0, 0, 7, 0, 0)}
-            max={new Date(0, 0, 0, 22, 0, 0)}
             defaultView="week"
             views={['month', 'week', 'day', 'agenda']}
+            showMultiDayTimes
           />
         )}
       </div>
@@ -291,6 +353,52 @@ const CalendarPage: React.FC = () => {
         }
         .calendar-container .rbc-event {
           box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+
+        /* Month view specific styles */
+        .calendar-container .rbc-month-view {
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          overflow: hidden;
+          min-height: 500px;
+        }
+        .calendar-container .rbc-month-row {
+          min-height: 80px;
+        }
+        .calendar-container .rbc-month-view .rbc-header {
+          padding: 12px 4px;
+          font-weight: 600;
+          color: #374151;
+          background-color: #f9fafb;
+          border-bottom: 2px solid #e5e7eb;
+        }
+        .calendar-container .rbc-month-view .rbc-day-bg {
+          border-left: 1px solid #e5e7eb;
+        }
+        .calendar-container .rbc-month-view .rbc-day-bg:first-child {
+          border-left: none;
+        }
+        .calendar-container .rbc-month-view .rbc-date-cell {
+          padding: 8px;
+          text-align: right;
+        }
+        .calendar-container .rbc-month-view .rbc-off-range-bg {
+          background-color: #f9fafb;
+        }
+        .calendar-container .rbc-month-view .rbc-today {
+          background-color: #fef3c7;
+        }
+        .calendar-container .rbc-month-view .rbc-event {
+          padding: 2px 6px;
+          margin: 1px 2px;
+          font-size: 0.75rem;
+          border-radius: 4px;
+        }
+        .calendar-container .rbc-show-more {
+          color: #2563eb;
+          font-weight: 500;
+          margin: 2px 4px;
+          font-size: 0.75rem;
         }
         .calendar-container .rbc-event:hover {
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);

@@ -5,6 +5,7 @@ import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
 import { courseService } from '../services/courseService';
 import { X } from 'lucide-react';
+import BudgetDisplay from './BudgetDisplay';
 
 interface LessonModalProps {
   lesson: Lesson | null;
@@ -34,6 +35,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     meetingUrl: lesson?.meetingUrl || '',
     locationId: lesson?.locationId || '',
     classroomId: lesson?.classroomId || '',
+    status: lesson?.status || 'SCHEDULED',
   });
 
   const [isRecurring, setIsRecurring] = useState(false);
@@ -90,6 +92,14 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       return studentEnrollments;
     },
     enabled: !!formData.studentId,
+  });
+
+  // Fetch budget info for selected enrollment
+  const { data: budgetData } = useQuery({
+    queryKey: ['enrollmentBudget', formData.enrollmentId],
+    queryFn: () => studentService.getEnrollmentBudget(formData.enrollmentId),
+    enabled: !!formData.enrollmentId,
+    refetchOnWindowFocus: false,
   });
 
   // Check for conflicts when teacher, student, time, or duration changes
@@ -259,7 +269,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       meetingUrl: formData.meetingUrl || undefined,
       locationId: formData.locationId || undefined,
       classroomId: formData.classroomId || undefined,
-      status: 'SCHEDULED' as const,
+      status: isEdit ? formData.status : 'SCHEDULED' as const,
     };
 
     if (isEdit && lesson) {
@@ -456,6 +466,18 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                 )}
               </div>
             </div>
+
+            {/* Budget Display */}
+            {budgetData && (
+              <div className="mt-4">
+                <BudgetDisplay
+                  hoursPurchased={budgetData.hoursPurchased}
+                  hoursUsed={budgetData.hoursUsed}
+                  hoursRemaining={budgetData.hoursRemaining}
+                  lowBudget={budgetData.lowBudget}
+                />
+              </div>
+            )}
           </div>
 
           {/* Schedule */}
@@ -755,6 +777,41 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
               </div>
             )}
           </div>
+
+          {/* Status (only for edit mode) */}
+          {isEdit && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900">Status lekcji</h3>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status *
+                </label>
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="SCHEDULED">Zaplanowana</option>
+                  <option value="CONFIRMED">Potwierdzona</option>
+                  <option value="COMPLETED">Zakończona (odliczy godziny z budżetu)</option>
+                  <option value="CANCELLED">Anulowana</option>
+                  <option value="PENDING_CONFIRMATION">Oczekująca na potwierdzenie</option>
+                  <option value="NO_SHOW">Nieobecność</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  {formData.status === 'COMPLETED' ? (
+                    <span className="text-amber-600 font-medium">
+                      ⚠️ Oznaczenie lekcji jako zakończonej automatycznie odliczy godziny z budżetu ucznia
+                    </span>
+                  ) : (
+                    'Zmień status lekcji w zależności od jej przebiegu'
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">

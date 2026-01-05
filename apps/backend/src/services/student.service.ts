@@ -348,17 +348,75 @@ export class StudentService {
       },
     });
 
-    const studentsWithLowBudget = await prisma.studentBudget.count({
+    // Count students with low budget by checking enrollments
+    const enrollments = await prisma.studentEnrollment.findMany({
       where: {
-        organizationId,
-        hours_remaining: { lte: 2 },
+        course: { organizationId },
+        status: 'ACTIVE',
       },
     });
+
+    const studentsWithLowBudget = enrollments.filter((enrollment) => {
+      const hoursPurchased = parseFloat(enrollment.hoursPurchased.toString());
+      const hoursUsed = parseFloat(enrollment.hoursUsed.toString());
+      const hoursRemaining = hoursPurchased - hoursUsed;
+      return hoursRemaining <= 2 && hoursRemaining > 0;
+    }).length;
 
     return {
       total: totalStudents,
       active: activeStudents,
       lowBudget: studentsWithLowBudget,
+    };
+  }
+
+  /**
+   * Get enrollment budget information
+   */
+  async getEnrollmentBudget(enrollmentId: string, organizationId: string) {
+    const enrollment = await prisma.studentEnrollment.findFirst({
+      where: {
+        id: enrollmentId,
+        course: { organizationId },
+      },
+      include: {
+        student: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        course: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!enrollment) {
+      throw new Error('Enrollment not found');
+    }
+
+    const hoursPurchased = parseFloat(enrollment.hoursPurchased.toString());
+    const hoursUsed = parseFloat(enrollment.hoursUsed.toString());
+    const hoursRemaining = hoursPurchased - hoursUsed;
+
+    return {
+      enrollmentId: enrollment.id,
+      studentName: `${enrollment.student.user.firstName} ${enrollment.student.user.lastName}`,
+      courseName: enrollment.course?.name || 'N/A',
+      hoursPurchased,
+      hoursUsed,
+      hoursRemaining,
+      lowBudget: hoursRemaining <= 2,
+      status: enrollment.status,
+      enrollmentDate: enrollment.enrollmentDate,
+      expiresAt: enrollment.expiresAt,
     };
   }
 }
