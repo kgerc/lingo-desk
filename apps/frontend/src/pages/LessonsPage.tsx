@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { lessonService, Lesson, LessonStatus } from '../services/lessonService';
 import LessonModal from '../components/LessonModal';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ConfirmDialog from '../components/ConfirmDialog';
 import {
   Calendar,
   Clock,
@@ -28,6 +29,8 @@ const LessonsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<LessonStatus | ''>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; lessonId: string | null }>({ isOpen: false, lessonId: null });
+  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; lessonId: string | null }>({ isOpen: false, lessonId: null });
 
   const { data: lessons = [], isLoading } = useQuery({
     queryKey: ['lessons', searchTerm, statusFilter],
@@ -70,15 +73,23 @@ const LessonsPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDeleteLesson = async (id: string) => {
-    if (window.confirm('Czy na pewno chcesz usunąć tę lekcję?')) {
-      await deleteMutation.mutateAsync(id);
+  const handleDeleteLesson = (id: string) => {
+    setDeleteDialog({ isOpen: true, lessonId: id });
+  };
+
+  const confirmDeleteLesson = async () => {
+    if (deleteDialog.lessonId) {
+      await deleteMutation.mutateAsync(deleteDialog.lessonId);
     }
   };
 
-  const handleConfirmLesson = async (id: string) => {
-    if (window.confirm('Czy na pewno chcesz potwierdzić tę lekcję?')) {
-      await confirmMutation.mutateAsync(id);
+  const handleConfirmLesson = (id: string) => {
+    setConfirmDialog({ isOpen: true, lessonId: id });
+  };
+
+  const confirmLessonStatus = async () => {
+    if (confirmDialog.lessonId) {
+      await confirmMutation.mutateAsync(confirmDialog.lessonId);
     }
   };
 
@@ -332,6 +343,30 @@ const LessonsPage: React.FC = () => {
       {isModalOpen && (
         <LessonModal lesson={selectedLesson} onClose={handleModalClose} onSuccess={handleModalSuccess} />
       )}
+
+      {/* Delete Lesson Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, lessonId: null })}
+        onConfirm={confirmDeleteLesson}
+        title="Usuń lekcję"
+        message="Czy na pewno chcesz usunąć tę lekcję? Ta operacja jest nieodwracalna."
+        confirmText="Usuń"
+        cancelText="Anuluj"
+        variant="danger"
+      />
+
+      {/* Confirm Lesson Status Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, lessonId: null })}
+        onConfirm={confirmLessonStatus}
+        title="Potwierdź lekcję"
+        message="Czy na pewno chcesz potwierdzić tę lekcję?"
+        confirmText="Potwierdź"
+        cancelText="Anuluj"
+        variant="info"
+      />
     </div>
   );
 };

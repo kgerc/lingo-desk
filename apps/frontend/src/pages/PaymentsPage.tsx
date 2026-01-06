@@ -5,6 +5,7 @@ import paymentService, { Payment } from '../services/paymentService';
 import { Plus, Search, Trash2, Edit, DollarSign, Clock, CheckCircle, XCircle } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function PaymentsPage() {
   const queryClient = useQueryClient();
@@ -12,6 +13,7 @@ export default function PaymentsPage() {
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; paymentId: string | null }>({ isOpen: false, paymentId: null });
 
   // Fetch payments
   const { data: payments = [], isLoading } = useQuery({
@@ -38,9 +40,13 @@ export default function PaymentsPage() {
     },
   });
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Czy na pewno chcesz usunąć tę płatność?')) {
-      deleteMutation.mutate(id);
+  const handleDelete = (id: string) => {
+    setConfirmDialog({ isOpen: true, paymentId: id });
+  };
+
+  const confirmDelete = () => {
+    if (confirmDialog.paymentId) {
+      deleteMutation.mutate(confirmDialog.paymentId);
     }
   };
 
@@ -290,6 +296,18 @@ export default function PaymentsPage() {
       {isModalOpen && (
         <PaymentModal payment={selectedPayment} onClose={handleCloseModal} />
       )}
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, paymentId: null })}
+        onConfirm={confirmDelete}
+        title="Usuń płatność"
+        message="Czy na pewno chcesz usunąć tę płatność? Ta operacja jest nieodwracalna."
+        confirmText="Usuń"
+        cancelText="Anuluj"
+        variant="danger"
+      />
     </div>
   );
 }

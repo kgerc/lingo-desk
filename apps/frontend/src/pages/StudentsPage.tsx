@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { studentService, Student } from '../services/studentService';
-import { Plus, Search, Edit, Trash2, Mail, Phone } from 'lucide-react';
+import { Plus, Search, Mail, Phone, MoreVertical } from 'lucide-react';
 import StudentModal from '../components/StudentModal';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const StudentsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; studentId: string | null }>({ isOpen: false, studentId: null });
 
   // Fetch students
   const { data: students = [], isLoading } = useQuery({
@@ -35,9 +38,13 @@ const StudentsPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Czy na pewno chcesz usunąć tego ucznia?')) {
-      await deleteMutation.mutateAsync(id);
+  const handleDelete = (id: string) => {
+    setConfirmDialog({ isOpen: true, studentId: id });
+  };
+
+  const confirmDelete = async () => {
+    if (confirmDialog.studentId) {
+      await deleteMutation.mutateAsync(confirmDialog.studentId);
     }
   };
 
@@ -50,6 +57,15 @@ const StudentsPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['students'] });
     handleCloseModal();
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (openDropdownId) setOpenDropdownId(null);
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openDropdownId]);
 
   const getLanguageLevelBadge = (level: string) => {
     const colors: Record<string, string> = {
@@ -203,22 +219,40 @@ const StudentsPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="relative">
                         <button
-                          onClick={() => handleEdit(student)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Edytuj"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdownId(openDropdownId === student.id ? null : student.id);
+                          }}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="Akcje"
                         >
-                          <Edit className="h-4 w-4" />
+                          <MoreVertical className="h-4 w-4 text-gray-600" />
                         </button>
-                        <button
-                          onClick={() => handleDelete(student.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Usuń"
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {openDropdownId === student.id && (
+                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                            <button
+                              onClick={() => {
+                                handleEdit(student);
+                                setOpenDropdownId(null);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                            >
+                              Edytuj ucznia
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleDelete(student.id);
+                                setOpenDropdownId(null);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                              disabled={deleteMutation.isPending}
+                            >
+                              Usuń ucznia
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -237,6 +271,18 @@ const StudentsPage: React.FC = () => {
           onSuccess={handleSuccess}
         />
       )}
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, studentId: null })}
+        onConfirm={confirmDelete}
+        title="Usuń ucznia"
+        message="Czy na pewno chcesz usunąć tego ucznia? Ta operacja jest nieodwracalna."
+        confirmText="Usuń"
+        cancelText="Anuluj"
+        variant="danger"
+      />
     </div>
   );
 };

@@ -7,9 +7,27 @@ import { Users, GraduationCap, BookOpen, Calendar, AlertTriangle, TrendingUp, Ba
 import NotificationBell from '../components/NotificationBell';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import TeacherDashboard from './TeacherDashboard';
+import StudentDashboard from './StudentDashboard';
 
 const DashboardPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
+
+  // Role-based dashboard rendering
+  if (user?.role === 'TEACHER') {
+    return <TeacherDashboard />;
+  }
+
+  if (user?.role === 'STUDENT') {
+    return <StudentDashboard />;
+  }
+
+  if (user?.role === 'PARENT') {
+    // Parent dashboard can be similar to Student but for multiple children
+    return <StudentDashboard />;
+  }
+
+  // ADMIN and MANAGER see the full dashboard below
 
   // Fetch dashboard stats
   const { data: dashboardStats, isLoading: isLoadingStats } = useQuery({
@@ -23,14 +41,6 @@ const DashboardPage: React.FC = () => {
     queryKey: ['lowBudgetAlerts'],
     queryFn: () => studentService.getStudentsWithLowBudget(),
     refetchInterval: 60000, // Refetch every minute
-  });
-
-  // Fetch teacher reminders (if user is a teacher)
-  const { data: reminders } = useQuery({
-    queryKey: ['teacherReminders'],
-    queryFn: () => dashboardService.getReminders(),
-    enabled: user?.role === 'TEACHER',
-    refetchInterval: 60000,
   });
 
   if (isLoadingStats) {
@@ -214,45 +224,6 @@ const DashboardPage: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* Teacher Reminders */}
-      {user?.role === 'TEACHER' && reminders?.incompleteAttendance && reminders.incompleteAttendance.length > 0 && (
-        <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="h-5 w-5 text-yellow-600" />
-            <h3 className="text-lg font-semibold text-yellow-900">
-              Przypomnienia ({reminders.incompleteAttendance.length})
-            </h3>
-          </div>
-          <div className="space-y-3">
-            {reminders.incompleteAttendance.map((reminder) => (
-              <div
-                key={reminder.id}
-                className="bg-white border border-yellow-200 rounded-lg p-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {reminder.studentName}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      Kurs: {reminder.courseName}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-yellow-700 font-medium">
-                      {reminder.message}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(reminder.scheduledAt).toLocaleDateString('pl-PL')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow p-6 border border-gray-200 mb-8">

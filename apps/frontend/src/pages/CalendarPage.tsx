@@ -6,6 +6,7 @@ import 'moment/locale/pl';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { lessonService, Lesson } from '../services/lessonService';
 import LessonModal from '../components/LessonModal';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -52,6 +53,7 @@ const CalendarPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -71,10 +73,12 @@ const CalendarPage: React.FC = () => {
       lessonService.updateLesson(id, { scheduledAt, durationMinutes }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      setIsDragging(false);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.error?.message || 'Nie można przenieść lekcji');
+      toast.error(error.response?.data?.error?.message || 'Nie można przenieść lekcji');
       queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      setIsDragging(false);
     },
   });
 
@@ -105,6 +109,7 @@ const CalendarPage: React.FC = () => {
   // Handle drag and drop - MOVE event (not resize)
   const handleEventDrop = useCallback(
     async ({ event, start, end }: any) => {
+      setIsDragging(true);
       const lesson: Lesson = event.resource;
       const newDuration = Math.round((end.getTime() - start.getTime()) / 60000);
 
@@ -126,7 +131,8 @@ const CalendarPage: React.FC = () => {
           if (conflicts.studentConflicts.length > 0) {
             conflictMessages.push(`Uczeń jest zajęty w tym terminie`);
           }
-          alert(`Nie można przenieść lekcji:\n${conflictMessages.join('\n')}`);
+          toast.error(`Nie można przenieść lekcji: ${conflictMessages.join(', ')}`);
+          setIsDragging(false);
           return;
         }
 
@@ -138,6 +144,7 @@ const CalendarPage: React.FC = () => {
         });
       } catch (error) {
         console.error('Error checking conflicts:', error);
+        setIsDragging(false);
       }
     },
     [updateLessonMutation]
@@ -298,38 +305,48 @@ const CalendarPage: React.FC = () => {
       </div>
 
       {/* Calendar - grows to fill remaining space */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex-1 min-h-0 calendar-container">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex-1 min-h-0 calendar-container relative">
         {isLoading ? (
           <LoadingSpinner message="Ładowanie kalendarza..." />
         ) : (
-          <DnDCalendar
-            localizer={localizer}
-            events={events}
-            startAccessor="start"
-            endAccessor="end"
-            style={{ height: '100%' }}
-            view={view}
-            onView={setView}
-            date={date}
-            onNavigate={setDate}
-            selectable
-            onSelectSlot={handleSelectSlot}
-            onSelectEvent={handleSelectEvent}
-            onEventDrop={handleEventDrop}
-            onEventResize={handleEventResize}
-            resizable={false}
-            draggableAccessor={() => view !== 'month'}
-            messages={messages}
-            formats={formats}
-            eventPropGetter={(event) => ({
-              style: getEventStyle(event.resource),
-            })}
-            step={15}
-            timeslots={4}
-            defaultView="week"
-            views={['month', 'week', 'day', 'agenda']}
-            showMultiDayTimes
-          />
+          <>
+            {isDragging && (
+              <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-50 rounded-xl">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 border-4 border-secondary border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-sm font-medium text-gray-700">Przenoszenie lekcji...</p>
+                </div>
+              </div>
+            )}
+            <DnDCalendar
+              localizer={localizer}
+              events={events}
+              startAccessor="start"
+              endAccessor="end"
+              style={{ height: '100%' }}
+              view={view}
+              onView={setView}
+              date={date}
+              onNavigate={setDate}
+              selectable
+              onSelectSlot={handleSelectSlot}
+              onSelectEvent={handleSelectEvent}
+              onEventDrop={handleEventDrop}
+              onEventResize={handleEventResize}
+              resizable={false}
+              draggableAccessor={() => view !== 'month'}
+              messages={messages}
+              formats={formats}
+              eventPropGetter={(event) => ({
+                style: getEventStyle(event.resource),
+              })}
+              step={15}
+              timeslots={4}
+              defaultView="week"
+              views={['month', 'week', 'day', 'agenda']}
+              showMultiDayTimes
+            />
+          </>
         )}
       </div>
 

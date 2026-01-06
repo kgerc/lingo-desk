@@ -21,16 +21,64 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuthStore();
   const location = useLocation();
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'Uczniowie', href: '/students', icon: Users },
-    { name: 'Lektorzy', href: '/teachers', icon: GraduationCap },
-    { name: 'Kursy', href: '/courses', icon: BookOpen },
-    { name: 'Lekcje', href: '/lessons', icon: Clock },
-    { name: 'Grafik', href: '/calendar', icon: Calendar },
-    { name: 'Płatności', href: '/payments', icon: CreditCard },
-    { name: 'Ustawienia', href: '/settings', icon: Settings },
-  ];
+  // Role-based navigation
+  const getNavigationForRole = () => {
+    const role = user?.role;
+
+    // Common items for all roles
+    const commonItems = [
+      { name: 'Dashboard', href: '/dashboard', icon: Home },
+    ];
+
+    // Role-specific items
+    switch (role) {
+      case 'ADMIN':
+      case 'MANAGER':
+        return [
+          ...commonItems,
+          { name: 'Uczniowie', href: '/students', icon: Users },
+          { name: 'Lektorzy', href: '/teachers', icon: GraduationCap },
+          { name: 'Kursy', href: '/courses', icon: BookOpen },
+          { name: 'Lekcje', href: '/lessons', icon: Clock },
+          { name: 'Grafik', href: '/calendar', icon: Calendar },
+          { name: 'Płatności', href: '/payments', icon: CreditCard },
+          { name: 'Ustawienia', href: '/settings', icon: Settings },
+        ];
+
+      case 'TEACHER':
+        return [
+          ...commonItems,
+          { name: 'Moje lekcje', href: '/lessons', icon: Clock },
+          { name: 'Grafik', href: '/calendar', icon: Calendar },
+          { name: 'Uczniowie', href: '/students', icon: Users },
+          { name: 'Ustawienia', href: '/settings', icon: Settings },
+        ];
+
+      case 'STUDENT':
+        return [
+          ...commonItems,
+          { name: 'Moje lekcje', href: '/lessons', icon: Clock },
+          { name: 'Moje kursy', href: '/courses', icon: BookOpen },
+          { name: 'Grafik', href: '/calendar', icon: Calendar },
+          { name: 'Płatności', href: '/payments', icon: CreditCard },
+          { name: 'Ustawienia', href: '/settings', icon: Settings },
+        ];
+
+      case 'PARENT':
+        return [
+          ...commonItems,
+          { name: 'Dzieci', href: '/students', icon: Users },
+          { name: 'Lekcje', href: '/lessons', icon: Clock },
+          { name: 'Płatności', href: '/payments', icon: CreditCard },
+          { name: 'Ustawienia', href: '/settings', icon: Settings },
+        ];
+
+      default:
+        return commonItems;
+    }
+  };
+
+  const navigation = getNavigationForRole();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -77,7 +125,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         {/* User section */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-secondary/20 bg-secondary">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold">
                 {user?.firstName?.[0]}
@@ -97,6 +145,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             >
               <LogOut className="h-5 w-5" />
             </button>
+          </div>
+          {/* Role badge */}
+          <div className="flex justify-start">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/20 text-white">
+              {user?.role === 'ADMIN' && 'Administrator'}
+              {user?.role === 'MANAGER' && 'Manager'}
+              {user?.role === 'TEACHER' && 'Lektor'}
+              {user?.role === 'STUDENT' && 'Uczeń'}
+              {user?.role === 'PARENT' && 'Rodzic'}
+            </span>
           </div>
         </div>
       </aside>

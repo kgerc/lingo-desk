@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { teacherService, Teacher } from '../services/teacherService';
-import { Plus, Search, Edit, Trash2, Mail, Phone, BookOpen, Calendar } from 'lucide-react';
+import { Plus, Search, Mail, Phone, BookOpen, Calendar, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import TeacherModal from '../components/TeacherModal';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const TeachersPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; teacherId: string | null }>({ isOpen: false, teacherId: null });
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   // Fetch teachers
   const { data: teachers = [], isLoading } = useQuery({
@@ -35,9 +38,13 @@ const TeachersPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Czy na pewno chcesz usunąć tego lektora?')) {
-      await deleteMutation.mutateAsync(id);
+  const handleDelete = (id: string) => {
+    setConfirmDialog({ isOpen: true, teacherId: id });
+  };
+
+  const confirmDelete = async () => {
+    if (confirmDialog.teacherId) {
+      await deleteMutation.mutateAsync(confirmDialog.teacherId);
     }
   };
 
@@ -50,6 +57,18 @@ const TeachersPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['teachers'] });
     handleCloseModal();
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (openDropdownId) {
+        setOpenDropdownId(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openDropdownId]);
 
   const getContractTypeBadge = (type: string) => {
     const colors: Record<string, string> = {
@@ -236,22 +255,43 @@ const TeachersPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="relative">
                         <button
-                          onClick={() => handleEdit(teacher)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Edytuj"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdownId(openDropdownId === teacher.id ? null : teacher.id);
+                          }}
+                          className="p-1 hover:bg-gray-100 rounded transition-colors"
+                          title="Więcej opcji"
                         >
-                          <Edit className="h-4 w-4" />
+                          <MoreVertical className="h-4 w-4 text-gray-600" />
                         </button>
-                        <button
-                          onClick={() => handleDelete(teacher.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Usuń"
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+
+                        {openDropdownId === teacher.id && (
+                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                            <button
+                              onClick={() => {
+                                handleEdit(teacher);
+                                setOpenDropdownId(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-t-lg"
+                            >
+                              <Edit className="h-4 w-4 text-blue-600" />
+                              Edytuj lektora
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleDelete(teacher.id);
+                                setOpenDropdownId(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 rounded-b-lg"
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Usuń lektora
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -270,6 +310,18 @@ const TeachersPage: React.FC = () => {
           onSuccess={handleSuccess}
         />
       )}
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, teacherId: null })}
+        onConfirm={confirmDelete}
+        title="Usuń lektora"
+        message="Czy na pewno chcesz usunąć tego lektora? Ta operacja jest nieodwracalna."
+        confirmText="Usuń"
+        cancelText="Anuluj"
+        variant="danger"
+      />
     </div>
   );
 };

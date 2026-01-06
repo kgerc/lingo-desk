@@ -1,11 +1,12 @@
 import toast from 'react-hot-toast';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { courseService, Course } from '../services/courseService';
-import { Plus, Search, Edit, Trash2, Users, BookOpen, Calendar, MapPin, Wifi, Home, UserPlus } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Users, BookOpen, Calendar, MapPin, Wifi, Home, UserPlus, MoreVertical } from 'lucide-react';
 import CourseModal from '../components/CourseModal';
 import EnrollStudentModal from '../components/EnrollStudentModal';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const CoursesPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -14,6 +15,8 @@ const CoursesPage: React.FC = () => {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
   const [courseForEnrollment, setCourseForEnrollment] = useState<Course | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; courseId: string | null }>({ isOpen: false, courseId: null });
 
   // Fetch courses
   const { data: courses = [], isLoading } = useQuery({
@@ -38,9 +41,13 @@ const CoursesPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Czy na pewno chcesz usunąć ten kurs?')) {
-      await deleteMutation.mutateAsync(id);
+  const handleDelete = (id: string) => {
+    setConfirmDialog({ isOpen: true, courseId: id });
+  };
+
+  const confirmDelete = async () => {
+    if (confirmDialog.courseId) {
+      await deleteMutation.mutateAsync(confirmDialog.courseId);
     }
   };
 
@@ -63,6 +70,18 @@ const CoursesPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['courses'] });
     handleCloseModal();
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (openDropdownId) {
+        setOpenDropdownId(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openDropdownId]);
 
   const getLanguageLevelBadge = (level: string) => {
     const colors: Record<string, string> = {
@@ -248,29 +267,53 @@ const CoursesPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="relative">
                         <button
-                          onClick={() => handleManageStudents(course)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Zarządzaj uczniami"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdownId(openDropdownId === course.id ? null : course.id);
+                          }}
+                          className="p-1 hover:bg-gray-100 rounded transition-colors"
+                          title="Więcej opcji"
                         >
-                          <UserPlus className="h-4 w-4" />
+                          <MoreVertical className="h-4 w-4 text-gray-600" />
                         </button>
-                        <button
-                          onClick={() => handleEdit(course)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Edytuj"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(course.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Usuń"
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+
+                        {openDropdownId === course.id && (
+                          <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                            <button
+                              onClick={() => {
+                                handleManageStudents(course);
+                                setOpenDropdownId(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-t-lg"
+                            >
+                              <UserPlus className="h-4 w-4 text-green-600" />
+                              Zarządzaj uczniami
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleEdit(course);
+                                setOpenDropdownId(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            >
+                              <Edit className="h-4 w-4 text-blue-600" />
+                              Edytuj kurs
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleDelete(course.id);
+                                setOpenDropdownId(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 rounded-b-lg"
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Usuń kurs
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -297,6 +340,18 @@ const CoursesPage: React.FC = () => {
           onClose={handleCloseEnrollModal}
         />
       )}
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, courseId: null })}
+        onConfirm={confirmDelete}
+        title="Usuń kurs"
+        message="Czy na pewno chcesz usunąć ten kurs? Ta operacja jest nieodwracalna."
+        confirmText="Usuń"
+        cancelText="Anuluj"
+        variant="danger"
+      />
     </div>
   );
 };
