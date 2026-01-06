@@ -2,11 +2,21 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { studentService } from '../services/studentService';
-import { Users, GraduationCap, BookOpen, Calendar, AlertTriangle } from 'lucide-react';
+import { dashboardService } from '../services/dashboardService';
+import { Users, GraduationCap, BookOpen, Calendar, AlertTriangle, TrendingUp, BarChart3 } from 'lucide-react';
 import NotificationBell from '../components/NotificationBell';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const DashboardPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
+
+  // Fetch dashboard stats
+  const { data: dashboardStats, isLoading: isLoadingStats } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: () => dashboardService.getStats(),
+    refetchInterval: 60000, // Refetch every minute
+  });
 
   // Fetch low budget alerts
   const { data: lowBudgetAlerts = [] } = useQuery({
@@ -15,12 +25,59 @@ const DashboardPage: React.FC = () => {
     refetchInterval: 60000, // Refetch every minute
   });
 
+  // Fetch teacher reminders (if user is a teacher)
+  const { data: reminders } = useQuery({
+    queryKey: ['teacherReminders'],
+    queryFn: () => dashboardService.getReminders(),
+    enabled: user?.role === 'TEACHER',
+    refetchInterval: 60000,
+  });
+
+  if (isLoadingStats) {
+    return <LoadingSpinner message="Ładowanie danych dashboardu..." />;
+  }
+
   const stats = [
-    { name: 'Uczniowie', value: '156', icon: Users, color: 'bg-secondary' },
-    { name: 'Lektorzy', value: '12', icon: GraduationCap, color: 'bg-primary' },
-    { name: 'Kursy aktywne', value: '24', icon: BookOpen, color: 'bg-secondary' },
-    { name: 'Zajęcia dzisiaj', value: '18', icon: Calendar, color: 'bg-primary' },
+    {
+      name: 'Uczniowie',
+      value: dashboardStats?.students.active.toString() || '0',
+      total: dashboardStats?.students.total || 0,
+      icon: Users,
+      color: 'bg-secondary'
+    },
+    {
+      name: 'Lektorzy',
+      value: dashboardStats?.teachers.active.toString() || '0',
+      total: dashboardStats?.teachers.total || 0,
+      icon: GraduationCap,
+      color: 'bg-primary'
+    },
+    {
+      name: 'Kursy aktywne',
+      value: dashboardStats?.courses.active.toString() || '0',
+      total: dashboardStats?.courses.total || 0,
+      icon: BookOpen,
+      color: 'bg-secondary'
+    },
+    {
+      name: 'Zajęcia dzisiaj',
+      value: dashboardStats?.lessonsToday.toString() || '0',
+      icon: Calendar,
+      color: 'bg-primary'
+    },
   ];
+
+  // Format revenue data for chart
+  const revenueData = dashboardStats?.revenue.last30Days.map(item => ({
+    date: new Date(item.date).toLocaleDateString('pl-PL', { month: 'short', day: 'numeric' }),
+    amount: item.amount,
+  })) || [];
+
+  // Format lessons data for chart
+  const lessonsData = dashboardStats?.lessonsLast30Days.map(item => ({
+    date: new Date(item.date).toLocaleDateString('pl-PL', { month: 'short', day: 'numeric' }),
+    count: item.count,
+  })) || [];
 
   return (
     <div>
@@ -52,6 +109,9 @@ const DashboardPage: React.FC = () => {
                   <p className="mt-2 text-3xl font-semibold text-gray-900">
                     {stat.value}
                   </p>
+                  {stat.total !== undefined && stat.name !== 'Zajęcia dzisiaj' && (
+                    <p className="text-xs text-gray-500 mt-1">z {stat.total} całkowitych</p>
+                  )}
                 </div>
                 <div className={`${stat.color} p-3 rounded-lg`}>
                   <Icon className="h-6 w-6 text-white" />
@@ -62,8 +122,140 @@ const DashboardPage: React.FC = () => {
         })}
       </div>
 
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Revenue Chart */}
+        <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="h-5 w-5 text-secondary" />
+            <h2 className="text-xl font-semibold text-gray-900">
+              Przychody (ostatnie 30 dni)
+            </h2>
+          </div>
+          {revenueData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={revenueData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 12 }}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip
+                  formatter={(value: number | undefined) => value !== undefined ? `${value.toFixed(2)} PLN` : 'N/A'}
+                  labelStyle={{ color: '#000' }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="amount"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  dot={{ fill: '#10b981', r: 4 }}
+                  activeDot={{ r: 6 }}
+                  name="Przychód"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[250px] flex items-center justify-center text-gray-500">
+              Brak danych o przychodach
+            </div>
+          )}
+          {dashboardStats?.revenue.total !== undefined && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <p className="text-sm text-gray-600">
+                Łączny przychód: <span className="font-bold text-secondary">
+                  {dashboardStats.revenue.total.toFixed(2)} PLN
+                </span>
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Lessons Chart */}
+        <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold text-gray-900">
+              Zajęcia (ostatnie 30 dni)
+            </h2>
+          </div>
+          {lessonsData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={lessonsData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 12 }}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip
+                  formatter={(value: number | undefined) => value !== undefined ? `${value} zajęć` : 'N/A'}
+                  labelStyle={{ color: '#000' }}
+                />
+                <Bar
+                  dataKey="count"
+                  fill="#3b82f6"
+                  radius={[8, 8, 0, 0]}
+                  name="Liczba zajęć"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[250px] flex items-center justify-center text-gray-500">
+              Brak danych o zajęciach
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Teacher Reminders */}
+      {user?.role === 'TEACHER' && reminders?.incompleteAttendance && reminders.incompleteAttendance.length > 0 && (
+        <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="h-5 w-5 text-yellow-600" />
+            <h3 className="text-lg font-semibold text-yellow-900">
+              Przypomnienia ({reminders.incompleteAttendance.length})
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {reminders.incompleteAttendance.map((reminder) => (
+              <div
+                key={reminder.id}
+                className="bg-white border border-yellow-200 rounded-lg p-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {reminder.studentName}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Kurs: {reminder.courseName}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-yellow-700 font-medium">
+                      {reminder.message}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(reminder.scheduledAt).toLocaleDateString('pl-PL')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <div className="bg-white rounded-lg shadow p-6 border border-gray-200 mb-8">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
           Szybkie akcje
         </h2>
@@ -82,7 +274,7 @@ const DashboardPage: React.FC = () => {
 
       {/* Budget Alerts */}
       {lowBudgetAlerts.length > 0 && (
-        <div className="mt-8 bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="h-5 w-5 text-red-600" />
             <h3 className="text-lg font-semibold text-red-900">
@@ -119,7 +311,7 @@ const DashboardPage: React.FC = () => {
 
       {/* No Alerts */}
       {lowBudgetAlerts.length === 0 && (
-        <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-6">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
           <div className="flex items-center gap-2">
             <div className="text-green-600 text-2xl">✓</div>
             <div>

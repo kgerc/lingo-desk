@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { courseService, Course } from '../services/courseService';
@@ -25,6 +26,10 @@ const CoursesPage: React.FC = () => {
     mutationFn: (id: string) => courseService.deleteCourse(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['courses'] });
+      toast.success('Kurs został pomyślnie usunięty');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Błąd usuwania kursu');
     },
   });
 

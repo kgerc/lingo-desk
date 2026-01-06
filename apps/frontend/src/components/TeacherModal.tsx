@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { teacherService, Teacher, CreateTeacherData, UpdateTeacherData } from '../services/teacherService';
 import { X } from 'lucide-react';
 
@@ -36,10 +37,13 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
   const createMutation = useMutation({
     mutationFn: (data: CreateTeacherData) => teacherService.createTeacher(data),
     onSuccess: () => {
+      toast.success('Lektor został pomyślnie utworzony');
       onSuccess();
     },
     onError: (error: any) => {
-      setErrors({ form: error.response?.data?.error?.message || 'Błąd tworzenia lektora' });
+      const errorMessage = error.response?.data?.error?.message || 'Błąd tworzenia lektora';
+      toast.error(errorMessage);
+      setErrors({ form: errorMessage });
     },
   });
 
@@ -47,10 +51,13 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
     mutationFn: ({ id, data }: { id: string; data: UpdateTeacherData }) =>
       teacherService.updateTeacher(id, data),
     onSuccess: () => {
+      toast.success('Dane lektora zostały zaktualizowane');
       onSuccess();
     },
     onError: (error: any) => {
-      setErrors({ form: error.response?.data?.error?.message || 'Błąd aktualizacji lektora' });
+      const errorMessage = error.response?.data?.error?.message || 'Błąd aktualizacji lektora';
+      toast.error(errorMessage);
+      setErrors({ form: errorMessage });
     },
   });
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { studentService, Student } from '../services/studentService';
 import { Plus, Search, Edit, Trash2, Mail, Phone } from 'lucide-react';
 import StudentModal from '../components/StudentModal';
@@ -22,6 +23,10 @@ const StudentsPage: React.FC = () => {
     mutationFn: (id: string) => studentService.deleteStudent(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
+      toast.success('Uczeń został pomyślnie usunięty');
+    },
+    onError: () => {
+      toast.error('Nie udało się usunąć ucznia');
     },
   });
 

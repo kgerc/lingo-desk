@@ -18,6 +18,7 @@ import lessonRoutes from './routes/lesson.routes';
 import paymentRoutes from './routes/payment.routes';
 import organizationRoutes from './routes/organization.routes';
 import notificationRoutes from './routes/notification.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 
 // Import scheduler
 import scheduler from './utils/scheduler';
@@ -82,6 +83,7 @@ app.use('/api/lessons', lessonRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // ============================================
 // ERROR HANDLING

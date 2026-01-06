@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { studentService, Student, CreateStudentData, UpdateStudentData } from '../services/studentService';
 import { X } from 'lucide-react';
 
@@ -32,10 +33,13 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
   const createMutation = useMutation({
     mutationFn: (data: CreateStudentData) => studentService.createStudent(data),
     onSuccess: () => {
+      toast.success('Uczeń został pomyślnie utworzony');
       onSuccess();
     },
     onError: (error: any) => {
-      setErrors({ form: error.response?.data?.error?.message || 'Błąd tworzenia ucznia' });
+      const errorMessage = error.response?.data?.error?.message || 'Błąd tworzenia ucznia';
+      toast.error(errorMessage);
+      setErrors({ form: errorMessage });
     },
   });
 
@@ -43,10 +47,13 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
     mutationFn: ({ id, data }: { id: string; data: UpdateStudentData }) =>
       studentService.updateStudent(id, data),
     onSuccess: () => {
+      toast.success('Dane ucznia zostały zaktualizowane');
       onSuccess();
     },
     onError: (error: any) => {
-      setErrors({ form: error.response?.data?.error?.message || 'Błąd aktualizacji ucznia' });
+      const errorMessage = error.response?.data?.error?.message || 'Błąd aktualizacji ucznia';
+      toast.error(errorMessage);
+      setErrors({ form: errorMessage });
     },
   });
 

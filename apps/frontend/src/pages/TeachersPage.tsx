@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { teacherService, Teacher } from '../services/teacherService';
 import { Plus, Search, Edit, Trash2, Mail, Phone, BookOpen, Calendar } from 'lucide-react';
 import TeacherModal from '../components/TeacherModal';
@@ -22,6 +23,10 @@ const TeachersPage: React.FC = () => {
     mutationFn: (id: string) => teacherService.deleteTeacher(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      toast.success('Lektor został pomyślnie usunięty');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Błąd usuwania lektora');
     },
   });
 
@@ -32,11 +37,7 @@ const TeachersPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Czy na pewno chcesz usunąć tego lektora?')) {
-      try {
-        await deleteMutation.mutateAsync(id);
-      } catch (error: any) {
-        alert(error.response?.data?.error?.message || 'Błąd usuwania lektora');
-      }
+      await deleteMutation.mutateAsync(id);
     }
   };
 
