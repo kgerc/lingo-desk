@@ -89,8 +89,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-secondary border-r border-secondary/20">
         {/* Logo */}
-        <div className="h-16 flex items-center gap-2 px-5 border-b border-secondary/20">
-          <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
+        <div className="h-20 flex items-center gap-2 px-5 border-b border-secondary/20">
+          <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
             <img
               src="/lingodesk_logo_medium.png"
               alt="LingoDesk Logo"
@@ -101,7 +101,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               }}
             />
           </div>
-          <h1 className="text-xl font-bold text-white">LingoDesk</h1>
+          <h1 className="text-2xl font-bold text-white">LingoDesk</h1>
         </div>
 
         {/* Navigation */}
