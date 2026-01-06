@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import NotificationBell from './NotificationBell';
 import {
   Home,
   Users,
@@ -48,8 +49,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       case 'TEACHER':
         return [
           ...commonItems,
-          { name: 'Moje lekcje', href: '/lessons', icon: Clock },
-          { name: 'Grafik', href: '/calendar', icon: Calendar },
+          { name: 'Mój grafik', href: '/teacher/schedule', icon: Calendar },
+          { name: 'Dostępność', href: '/teacher/availability', icon: Clock },
+          { name: 'Moje lekcje', href: '/lessons', icon: BookOpen },
           { name: 'Uczniowie', href: '/students', icon: Users },
           { name: 'Ustawienia', href: '/settings', icon: Settings },
         ];
@@ -87,8 +89,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-secondary border-r border-secondary/20">
         {/* Logo */}
-        <div className="h-24 flex items-center gap-2 px-5 border-b border-secondary/20">
-          <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
+        <div className="h-16 flex items-center gap-2 px-5 border-b border-secondary/20">
+          <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
             <img
               src="/lingodesk_logo_medium.png"
               alt="LingoDesk Logo"
@@ -99,7 +101,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               }}
             />
           </div>
-          <h1 className="text-2xl font-bold text-white">LingoDesk</h1>
+          <h1 className="text-xl font-bold text-white">LingoDesk</h1>
         </div>
 
         {/* Navigation */}
@@ -122,45 +124,49 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             );
           })}
         </nav>
+      </aside>
 
-        {/* User section */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-secondary/20 bg-secondary">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold">
+      {/* Sticky Header */}
+      <header className="fixed top-0 left-64 right-0 z-40 bg-white border-b border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between px-8 py-4">
+          <div className="flex-1"></div>
+
+          <div className="flex items-center gap-4">
+            {/* Notifications */}
+            <NotificationBell />
+
+            {/* User Menu */}
+            <div className="flex items-center gap-3 border-l border-gray-200 pl-4">
+              <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-white font-semibold text-sm">
                 {user?.firstName?.[0]}
                 {user?.lastName?.[0]}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">
+              <div className="flex flex-col">
+                <p className="text-sm font-medium text-gray-900">
                   {user?.firstName} {user?.lastName}
                 </p>
-                <p className="text-xs text-white/60 truncate">{user?.email}</p>
+                <p className="text-xs text-gray-500">
+                  {user?.role === 'ADMIN' && 'Administrator'}
+                  {user?.role === 'MANAGER' && 'Manager'}
+                  {user?.role === 'TEACHER' && 'Lektor'}
+                  {user?.role === 'STUDENT' && 'Uczeń'}
+                  {user?.role === 'PARENT' && 'Rodzic'}
+                </p>
               </div>
+              <button
+                onClick={logout}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Wyloguj"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
             </div>
-            <button
-              onClick={logout}
-              className="p-2 text-white/60 hover:text-white transition-colors"
-              title="Wyloguj"
-            >
-              <LogOut className="h-5 w-5" />
-            </button>
-          </div>
-          {/* Role badge */}
-          <div className="flex justify-start">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/20 text-white">
-              {user?.role === 'ADMIN' && 'Administrator'}
-              {user?.role === 'MANAGER' && 'Manager'}
-              {user?.role === 'TEACHER' && 'Lektor'}
-              {user?.role === 'STUDENT' && 'Uczeń'}
-              {user?.role === 'PARENT' && 'Rodzic'}
-            </span>
           </div>
         </div>
-      </aside>
+      </header>
 
       {/* Main content */}
-      <main className="pl-64">
+      <main className="pl-64 pt-16">
         <div className="p-8">{children}</div>
       </main>
     </div>

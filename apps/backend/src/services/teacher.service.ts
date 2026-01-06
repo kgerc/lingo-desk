@@ -386,6 +386,168 @@ export class TeacherService {
 
     return { success: true, message: 'Availability updated' };
   }
+
+  // ============================================
+  // TEACHER SCHEDULE MANAGEMENT
+  // ============================================
+
+  async getTeacherByUserId(userId: string) {
+    const teacher = await prisma.teacher.findUnique({
+      where: { userId },
+      include: {
+        user: true,
+        availability: true,
+      },
+    });
+
+    return teacher;
+  }
+
+  async getTeacherSchedule(teacherId: string, startDate: Date, endDate: Date) {
+    const lessons = await prisma.lesson.findMany({
+      where: {
+        teacherId,
+        scheduledAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      include: {
+        student: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        course: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        attendances: true,
+      },
+      orderBy: {
+        scheduledAt: 'asc',
+      },
+    });
+
+    return lessons;
+  }
+
+  async getAvailabilityExceptions(teacherId: string, startDate?: Date, endDate?: Date) {
+    const where: any = { teacherId };
+
+    if (startDate || endDate) {
+      where.OR = [];
+      if (startDate) {
+        where.OR.push({ startDate: { gte: startDate } });
+        where.OR.push({ endDate: { gte: startDate } });
+      }
+      if (endDate) {
+        where.OR.push({ startDate: { lte: endDate } });
+      }
+    }
+
+    const exceptions = await prisma.teacherAvailabilityException.findMany({
+      where,
+      orderBy: {
+        startDate: 'asc',
+      },
+    });
+
+    return exceptions;
+  }
+
+  async addAvailabilityException(
+    teacherId: string,
+    startDate: Date,
+    endDate: Date,
+    reason?: string
+  ) {
+    const exception = await prisma.teacherAvailabilityException.create({
+      data: {
+        teacherId,
+        startDate,
+        endDate,
+        reason,
+      },
+    });
+
+    return exception;
+  }
+
+  async deleteAvailabilityException(exceptionId: string) {
+    await prisma.teacherAvailabilityException.delete({
+      where: { id: exceptionId },
+    });
+
+    return { success: true, message: 'Exception deleted' };
+  }
+
+  async getTeacherPreferences(teacherId: string) {
+    let preferences = await prisma.teacherSchedulePreferences.findUnique({
+      where: { teacherId },
+    });
+
+    // If no preferences exist, create default ones
+    if (!preferences) {
+      preferences = await prisma.teacherSchedulePreferences.create({
+        data: {
+          teacherId,
+          timezone: 'Europe/Warsaw',
+          prepTimeMinutes: 0,
+          minBreakBetweenMinutes: 0,
+        },
+      });
+    }
+
+    return preferences;
+  }
+
+  async updateTeacherPreferences(
+    teacherId: string,
+    data: {
+      timezone?: string;
+      prepTimeMinutes?: number;
+      maxLessonsPerDay?: number;
+      minBreakBetweenMinutes?: number;
+    }
+  ) {
+    const preferences = await prisma.teacherSchedulePreferences.upsert({
+      where: { teacherId },
+      update: data,
+      create: {
+        teacherId,
+        ...data,
+      },
+    });
+
+    return preferences;
+  }
+
+  async checkAvailabilityConflicts(teacherId: string, date: Date) {
+    // Check if date falls within any exception
+    const exceptions = await prisma.teacherAvailabilityException.findMany({
+      where: {
+        teacherId,
+        startDate: { lte: date },
+        endDate: { gte: date },
+      },
+    });
+
+    return {
+      hasConflict: exceptions.length > 0,
+      exceptions,
+    };
+  }
 }
 
 export default new TeacherService();

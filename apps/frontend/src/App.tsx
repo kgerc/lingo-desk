@@ -10,6 +10,8 @@ import CoursesPage from './pages/CoursesPage'
 import LessonsPage from './pages/LessonsPage'
 import CalendarPage from './pages/CalendarPage'
 import PaymentsPage from './pages/PaymentsPage'
+import TeacherSchedulePage from './pages/TeacherSchedulePage'
+import TeacherAvailabilityPage from './pages/TeacherAvailabilityPage'
 import Layout from './components/Layout'
 
 function App() {
@@ -151,6 +153,32 @@ function App() {
             isAuthenticated ? (
               <Layout>
                 <PaymentsPage />
+              </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/teacher/schedule"
+          element={
+            isAuthenticated ? (
+              <Layout>
+                <TeacherSchedulePage />
+              </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/teacher/availability"
+          element={
+            isAuthenticated ? (
+              <Layout>
+                <TeacherAvailabilityPage />
               </Layout>
             ) : (
               <Navigate to="/login" />

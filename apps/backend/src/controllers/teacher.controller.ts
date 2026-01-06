@@ -220,6 +220,126 @@ export class TeacherController {
       next(error);
     }
   }
+
+  // ============================================
+  // TEACHER SCHEDULE MANAGEMENT
+  // ============================================
+
+  async getMe(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user?.id || !req.user?.organizationId) {
+        res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'User not authenticated' } });
+        return;
+      }
+
+      // Get teacher by userId with full details
+      const teacher = await teacherService.getTeacherByUserId(req.user.id);
+      if (!teacher) {
+        res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Teacher not found' } });
+        return;
+      }
+
+      // Verify teacher belongs to user's organization
+      if (teacher.organizationId !== req.user.organizationId) {
+        res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Access denied' } });
+        return;
+      }
+
+      res.json({ data: teacher });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getMySchedule(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'User not authenticated' } });
+        return;
+      }
+
+      // Get teacher by userId
+      const teacher = await teacherService.getTeacherByUserId(req.user.id);
+      if (!teacher) {
+        res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Teacher not found' } });
+        return;
+      }
+
+      const { startDate, endDate } = req.query;
+      const start = startDate ? new Date(startDate as string) : new Date();
+      const end = endDate ? new Date(endDate as string) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+
+      const schedule = await teacherService.getTeacherSchedule(teacher.id, start, end);
+      res.json({ data: schedule });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getAvailabilityExceptions(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { startDate, endDate } = req.query;
+
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+
+      const exceptions = await teacherService.getAvailabilityExceptions(id, start, end);
+      res.json({ data: exceptions });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addAvailabilityException(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { startDate, endDate, reason } = req.body;
+
+      const exception = await teacherService.addAvailabilityException(
+        id,
+        new Date(startDate),
+        new Date(endDate),
+        reason
+      );
+
+      res.json({ data: exception });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteAvailabilityException(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id, exceptionId } = req.params;
+      const result = await teacherService.deleteAvailabilityException(exceptionId);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getPreferences(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const preferences = await teacherService.getTeacherPreferences(id);
+      res.json({ data: preferences });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updatePreferences(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const data = req.body;
+
+      const preferences = await teacherService.updateTeacherPreferences(id, data);
+      res.json({ data: preferences });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new TeacherController();

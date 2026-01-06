@@ -1,17 +1,25 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { studentService } from '../services/studentService';
 import { dashboardService } from '../services/dashboardService';
 import { Users, GraduationCap, BookOpen, Calendar, AlertTriangle, TrendingUp, BarChart3 } from 'lucide-react';
-import NotificationBell from '../components/NotificationBell';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import TeacherDashboard from './TeacherDashboard';
 import StudentDashboard from './StudentDashboard';
+import StudentModal from '../components/StudentModal';
+import CourseModal from '../components/CourseModal';
+import LessonModal from '../components/LessonModal';
 
 const DashboardPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
+  const queryClient = useQueryClient();
+
+  // Modals state
+  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+  const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
+  const [isLessonModalOpen, setIsLessonModalOpen] = useState(false);
 
   // Role-based dashboard rendering
   if (user?.role === 'TEACHER') {
@@ -91,17 +99,14 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div>
-      {/* Header with NotificationBell */}
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Witaj, {user?.firstName}! 👋
-          </h1>
-          <p className="mt-2 text-gray-600">
-            Oto podsumowanie Twojej szkoły językowej
-          </p>
-        </div>
-        <NotificationBell />
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">
+          Witaj, {user?.firstName}! 👋
+        </h1>
+        <p className="mt-2 text-gray-600">
+          Oto podsumowanie Twojej szkoły językowej
+        </p>
       </div>
 
       {/* Stats Grid */}
@@ -231,13 +236,22 @@ const DashboardPage: React.FC = () => {
           Szybkie akcje
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <button className="px-4 py-3 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm">
+          <button
+            onClick={() => setIsStudentModalOpen(true)}
+            className="px-4 py-3 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm"
+          >
             + Dodaj ucznia
           </button>
-          <button className="px-4 py-3 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm">
+          <button
+            onClick={() => setIsLessonModalOpen(true)}
+            className="px-4 py-3 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm"
+          >
             + Dodaj zajęcia
           </button>
-          <button className="px-4 py-3 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm">
+          <button
+            onClick={() => setIsCourseModalOpen(true)}
+            className="px-4 py-3 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm"
+          >
             + Dodaj kurs
           </button>
         </div>
@@ -295,6 +309,40 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modals */}
+      {isStudentModalOpen && (
+        <StudentModal
+          student={null}
+          onClose={() => setIsStudentModalOpen(false)}
+          onSuccess={() => {
+            setIsStudentModalOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+          }}
+        />
+      )}
+
+      {isCourseModalOpen && (
+        <CourseModal
+          course={null}
+          onClose={() => setIsCourseModalOpen(false)}
+          onSuccess={() => {
+            setIsCourseModalOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+          }}
+        />
+      )}
+
+      {isLessonModalOpen && (
+        <LessonModal
+          lesson={null}
+          onClose={() => setIsLessonModalOpen(false)}
+          onSuccess={() => {
+            setIsLessonModalOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+          }}
+        />
       )}
     </div>
   );

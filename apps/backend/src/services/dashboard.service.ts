@@ -118,8 +118,10 @@ export class DashboardService {
    * Get recent payments grouped by day
    */
   private async getRecentPayments(organizationId: string, days: number) {
+    const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
 
     const payments = await prisma.payment.findMany({
       where: {
@@ -148,11 +150,17 @@ export class DashboardService {
       paymentsByDay.set(date, currentAmount + parseFloat(payment.amount.toString()));
     });
 
-    // Convert to array format for chart
-    const chartData = Array.from(paymentsByDay.entries()).map(([date, amount]) => ({
-      date,
-      amount,
-    }));
+    // Create array with ALL days in range (including days with 0 payments)
+    const chartData = [];
+    for (let i = 0; i < days; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      const dateStr = date.toISOString().split('T')[0];
+      chartData.push({
+        date: dateStr,
+        amount: paymentsByDay.get(dateStr) || 0,
+      });
+    }
 
     return chartData;
   }
@@ -191,11 +199,17 @@ export class DashboardService {
       lessonsByDay.set(date, currentCount + 1);
     });
 
-    // Convert to array format for chart
-    const chartData = Array.from(lessonsByDay.entries()).map(([date, count]) => ({
-      date,
-      count,
-    }));
+    // Create array with ALL days in range (including days with 0 lessons)
+    const chartData = [];
+    for (let i = 0; i < days; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      const dateStr = date.toISOString().split('T')[0];
+      chartData.push({
+        date: dateStr,
+        count: lessonsByDay.get(dateStr) || 0,
+      });
+    }
 
     return chartData;
   }

@@ -59,6 +59,11 @@ export interface UpdateTeacherData {
 }
 
 export const teacherService = {
+  async getMe() {
+    const response = await api.get('/teachers/me');
+    return response.data.data as Teacher;
+  },
+
   async getTeachers(filters?: {
     search?: string;
     isActive?: boolean;

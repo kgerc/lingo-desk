@@ -29,7 +29,6 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
     contractType: teacher?.contractType || 'B2B',
     specializations: teacher?.specializations.join(', ') || '',
     languages: teacher?.languages.join(', ') || '',
-    bio: teacher?.bio || '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -103,7 +102,6 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
           contractType: formData.contractType as 'B2B' | 'EMPLOYMENT' | 'CIVIL',
           specializations: specializationsArray,
           languages: languagesArray,
-          bio: formData.bio || undefined,
         },
       });
     } else {
@@ -114,7 +112,6 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
         contractType: formData.contractType as 'B2B' | 'EMPLOYMENT' | 'CIVIL',
         specializations: specializationsArray,
         languages: languagesArray,
-        bio: formData.bio || undefined,
       });
     }
   };
@@ -291,18 +288,6 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
                   onChange={handleChange}
                   placeholder="np. Angielski, Polski, Niemiecki"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-                <textarea
-                  name="bio"
-                  value={formData.bio}
-                  onChange={handleChange}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Krótki opis lektora..."
                 />
               </div>
             </div>

@@ -18,6 +18,7 @@ interface LessonModalProps {
 
 const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialDuration, onClose, onSuccess }) => {
   const isEdit = !!lesson;
+  const [isParticipantsExpanded, setIsParticipantsExpanded] = useState(true);
 
   const [formData, setFormData] = useState({
     courseId: lesson?.courseId || '',

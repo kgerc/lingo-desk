@@ -7,7 +7,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { lessonService, Lesson } from '../services/lessonService';
+import { lessonService, Lesson, LessonStatus } from '../services/lessonService';
 import LessonModal from '../components/LessonModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Plus, Filter } from 'lucide-react';
@@ -16,6 +16,15 @@ import { Plus, Filter } from 'lucide-react';
 moment.locale('pl');
 const localizer = momentLocalizer(moment);
 const DnDCalendar = withDragAndDrop(Calendar);
+
+// Calendar event type
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  resource: Lesson;
+}
 
 // Map lesson status to colors
 const getEventStyle = (lesson: Lesson) => {
@@ -56,7 +65,7 @@ const CalendarPage: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<LessonStatus | ''>('');
 
   // Fetch lessons
   const { data: lessons = [], isLoading } = useQuery({
@@ -83,8 +92,8 @@ const CalendarPage: React.FC = () => {
   });
 
   // Convert lessons to calendar events
-  const events = useMemo(() => {
-    const mappedEvents = lessons.map((lesson) => ({
+  const events = useMemo<CalendarEvent[]>(() => {
+    const mappedEvents: CalendarEvent[] = lessons.map((lesson) => ({
       id: lesson.id,
       title: `${lesson.student.user.firstName} ${lesson.student.user.lastName} - ${lesson.title}`,
       start: new Date(lesson.scheduledAt),
@@ -100,7 +109,7 @@ const CalendarPage: React.FC = () => {
     setIsModalOpen(true);
   }, []);
 
-  const handleSelectEvent = useCallback((event: any) => {
+  const handleSelectEvent = useCallback((event: CalendarEvent) => {
     setSelectedLesson(event.resource);
     setSelectedSlot(null);
     setIsModalOpen(true);
@@ -337,7 +346,7 @@ const CalendarPage: React.FC = () => {
               draggableAccessor={() => view !== 'month'}
               messages={messages}
               formats={formats}
-              eventPropGetter={(event) => ({
+              eventPropGetter={(event: CalendarEvent) => ({
                 style: getEventStyle(event.resource),
               })}
               step={15}

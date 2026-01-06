@@ -1,11 +1,12 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { dashboardService } from '../services/dashboardService';
-import { lessonService } from '../services/lessonService';
-import { Calendar, Clock, Users, AlertTriangle, CheckCircle } from 'lucide-react';
+import teacherScheduleService from '../services/teacherScheduleService';
+import { Calendar, Clock, Users, AlertTriangle, CheckCircle, BookOpen, ArrowRight } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { format } from 'date-fns';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
 const TeacherDashboard: React.FC = () => {
@@ -18,14 +19,33 @@ const TeacherDashboard: React.FC = () => {
     refetchInterval: 60000,
   });
 
-  // Fetch today's lessons
-  const { data: todayLessons = [], isLoading } = useQuery({
-    queryKey: ['todayLessons'],
-    queryFn: () => lessonService.getLessons({
-      teacherId: user?.id,
-      // You might want to add date filter for today
-    }),
+  // Fetch this week's lessons
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
+
+  const { data: weekLessons = [], isLoading } = useQuery({
+    queryKey: ['teacherWeekSchedule'],
+    queryFn: () =>
+      teacherScheduleService.getMySchedule({
+        startDate: weekStart.toISOString(),
+        endDate: weekEnd.toISOString(),
+      }),
   });
+
+  // Filter today's lessons
+  const today = new Date();
+  const todayLessons = weekLessons.filter((lesson: any) => {
+    const lessonDate = new Date(lesson.scheduledAt);
+    return lessonDate.toDateString() === today.toDateString();
+  });
+
+  // Calculate week stats
+  const weekStats = {
+    totalLessons: weekLessons.length,
+    totalHours: weekLessons.reduce((acc: number, lesson: any) => acc + lesson.durationMinutes / 60, 0),
+    uniqueStudents: new Set(weekLessons.map((lesson: any) => lesson.student.id)).size,
+    completedLessons: weekLessons.filter((lesson: any) => lesson.status === 'COMPLETED').length,
+  };
 
   if (isLoading) {
     return <LoadingSpinner message="Ładowanie danych..." />;
@@ -42,46 +62,85 @@ const TeacherDashboard: React.FC = () => {
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
-        <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
+      {/* Week Summary Stats */}
+      <div className="mb-6 bg-white rounded-lg shadow border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Podsumowanie tygodnia</h2>
+          <Link
+            to="/teacher/schedule"
+            className="text-sm text-primary hover:text-primary/80 flex items-center gap-1"
+          >
+            Zobacz pełny grafik
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-100 p-2 rounded-lg">
+              <BookOpen className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Lekcje w tym tygodniu</p>
+              <p className="text-xl font-semibold text-gray-900">{weekStats.totalLessons}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="bg-green-100 p-2 rounded-lg">
+              <Clock className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Godziny</p>
+              <p className="text-xl font-semibold text-gray-900">{weekStats.totalHours.toFixed(1)}h</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="bg-purple-100 p-2 rounded-lg">
+              <Users className="h-5 w-5 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Uczniowie</p>
+              <p className="text-xl font-semibold text-gray-900">{weekStats.uniqueStudents}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="bg-gray-100 p-2 rounded-lg">
+              <CheckCircle className="h-5 w-5 text-gray-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Zrealizowane</p>
+              <p className="text-xl font-semibold text-gray-900">{weekStats.completedLessons}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <Link
+          to="/teacher/availability"
+          className="bg-white rounded-lg shadow border border-gray-200 p-6 hover:shadow-lg transition-shadow"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Lekcje dzisiaj</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">
-                {todayLessons.length}
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Zarządzaj dostępnością</h3>
+              <p className="text-sm text-gray-600">
+                Ustaw swoją tygodniową dostępność i wyjątki
+              </p>
+            </div>
+            <Calendar className="h-8 w-8 text-primary" />
+          </div>
+        </Link>
+
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Dzisiaj</h3>
+              <p className="text-sm text-gray-600">
+                {todayLessons.length} {todayLessons.length === 1 ? 'lekcja' : 'lekcji'}
               </p>
             </div>
             <div className="bg-primary p-3 rounded-lg">
-              <Calendar className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Przypomnienia</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">
-                {reminders?.incompleteAttendance?.length || 0}
-              </p>
-            </div>
-            <div className="bg-yellow-500 p-3 rounded-lg">
-              <AlertTriangle className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Aktywni uczniowie</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">
-                {new Set(todayLessons.map(l => l.studentId)).size}
-              </p>
-            </div>
-            <div className="bg-secondary p-3 rounded-lg">
-              <Users className="h-6 w-6 text-white" />
+              <Clock className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
