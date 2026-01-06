@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import paymentService, { Payment, CreatePaymentData, UpdatePaymentData } from '../services/paymentService';
 import { studentService } from '../services/studentService';
 import { X } from 'lucide-react';
@@ -40,9 +41,13 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
   const createMutation = useMutation({
     mutationFn: (data: CreatePaymentData) => paymentService.createPayment(data),
     onSuccess: () => {
+      toast.success('Płatność została pomyślnie utworzona');
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payment-stats'] });
       onClose();
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Błąd tworzenia płatności');
     },
   });
 
@@ -50,9 +55,13 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
     mutationFn: (data: UpdatePaymentData) =>
       paymentService.updatePayment(payment!.id, data),
     onSuccess: () => {
+      toast.success('Płatność została pomyślnie zaktualizowana');
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payment-stats'] });
       onClose();
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Błąd aktualizacji płatności');
     },
   });
 

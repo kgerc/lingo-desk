@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { lessonService, Lesson, CreateLessonData, LessonDeliveryMode } from '../services/lessonService';
 import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
@@ -132,12 +133,13 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
   const createMutation = useMutation({
     mutationFn: (data: CreateLessonData) => lessonService.createLesson(data),
     onSuccess: () => {
+      toast.success('Lekcja została pomyślnie utworzona');
       onSuccess();
     },
     onError: (error: any) => {
-      setErrors({
-        form: error.response?.data?.error?.message || 'Wystąpił błąd podczas tworzenia lekcji',
-      });
+      const errorMessage = error.response?.data?.error?.message || 'Wystąpił błąd podczas tworzenia lekcji';
+      toast.error(errorMessage);
+      setErrors({ form: errorMessage });
     },
   });
 
@@ -154,13 +156,13 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       };
     }) => lessonService.createRecurringLessons(data.lessonData, data.pattern),
     onSuccess: (result) => {
-      alert(`Utworzono ${result.totalCreated} cyklicznych lekcji${result.totalErrors > 0 ? ` (pominięto ${result.totalErrors} z powodu konfliktów)` : ''}`);
+      toast.success(`Utworzono ${result.totalCreated} cyklicznych lekcji${result.totalErrors > 0 ? ` (pominięto ${result.totalErrors} z powodu konfliktów)` : ''}`);
       onSuccess();
     },
     onError: (error: any) => {
-      setErrors({
-        form: error.response?.data?.error?.message || 'Wystąpił błąd podczas tworzenia cyklicznych lekcji',
-      });
+      const errorMessage = error.response?.data?.error?.message || 'Wystąpił błąd podczas tworzenia cyklicznych lekcji';
+      toast.error(errorMessage);
+      setErrors({ form: errorMessage });
     },
   });
 
@@ -168,12 +170,13 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     mutationFn: (data: { id: string; updates: any }) =>
       lessonService.updateLesson(data.id, data.updates),
     onSuccess: () => {
+      toast.success('Lekcja została pomyślnie zaktualizowana');
       onSuccess();
     },
     onError: (error: any) => {
-      setErrors({
-        form: error.response?.data?.error?.message || 'Wystąpił błąd podczas aktualizacji lekcji',
-      });
+      const errorMessage = error.response?.data?.error?.message || 'Wystąpił błąd podczas aktualizacji lekcji';
+      toast.error(errorMessage);
+      setErrors({ form: errorMessage });
     },
   });
 

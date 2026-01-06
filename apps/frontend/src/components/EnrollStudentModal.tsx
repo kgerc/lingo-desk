@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { courseService, Course } from '../services/courseService';
 import { studentService } from '../services/studentService';
 import { X, UserPlus, UserMinus } from 'lucide-react';
@@ -40,13 +41,16 @@ const EnrollStudentModal: React.FC<EnrollStudentModalProps> = ({ course, onClose
   const enrollMutation = useMutation({
     mutationFn: (studentId: string) => courseService.enrollStudent(course.id, studentId),
     onSuccess: () => {
+      toast.success('Uczeń został pomyślnie zapisany na kurs');
       queryClient.invalidateQueries({ queryKey: ['courses'] });
       queryClient.invalidateQueries({ queryKey: ['course', course.id] });
       setSelectedStudentId('');
       setError('');
     },
     onError: (error: any) => {
-      setError(error.response?.data?.error?.message || 'Wystąpił błąd podczas zapisywania ucznia');
+      const errorMessage = error.response?.data?.error?.message || 'Wystąpił błąd podczas zapisywania ucznia';
+      toast.error(errorMessage);
+      setError(errorMessage);
     },
   });
 
@@ -54,11 +58,14 @@ const EnrollStudentModal: React.FC<EnrollStudentModalProps> = ({ course, onClose
   const unenrollMutation = useMutation({
     mutationFn: (enrollmentId: string) => courseService.unenrollStudent(enrollmentId),
     onSuccess: () => {
+      toast.success('Uczeń został pomyślnie wypisany z kursu');
       queryClient.invalidateQueries({ queryKey: ['courses'] });
       queryClient.invalidateQueries({ queryKey: ['course', course.id] });
     },
     onError: (error: any) => {
-      setError(error.response?.data?.error?.message || 'Wystąpił błąd podczas wypisywania ucznia');
+      const errorMessage = error.response?.data?.error?.message || 'Wystąpił błąd podczas wypisywania ucznia';
+      toast.error(errorMessage);
+      setError(errorMessage);
     },
   });
 

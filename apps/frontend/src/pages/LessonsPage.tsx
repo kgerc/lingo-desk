@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { lessonService, Lesson, LessonStatus } from '../services/lessonService';
 import LessonModal from '../components/LessonModal';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -41,6 +42,10 @@ const LessonsPage: React.FC = () => {
     mutationFn: (id: string) => lessonService.deleteLesson(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      toast.success('Lekcja została pomyślnie usunięta');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Błąd usuwania lekcji');
     },
   });
 
@@ -48,6 +53,10 @@ const LessonsPage: React.FC = () => {
     mutationFn: (id: string) => lessonService.confirmLesson(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      toast.success('Lekcja została potwierdzona');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Błąd potwierdzania lekcji');
     },
   });
 

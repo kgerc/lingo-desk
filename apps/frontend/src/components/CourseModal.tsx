@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { courseService, Course, CreateCourseData } from '../services/courseService';
 import { teacherService } from '../services/teacherService';
 import { courseTypeService } from '../services/courseTypeService';
@@ -41,12 +42,13 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
   const createMutation = useMutation({
     mutationFn: (data: CreateCourseData) => courseService.createCourse(data),
     onSuccess: () => {
+      toast.success('Kurs został pomyślnie utworzony');
       onSuccess();
     },
     onError: (error: any) => {
-      setErrors({
-        form: error.response?.data?.error?.message || 'Wystąpił błąd podczas tworzenia kursu',
-      });
+      const errorMessage = error.response?.data?.error?.message || 'Wystąpił błąd podczas tworzenia kursu';
+      toast.error(errorMessage);
+      setErrors({ form: errorMessage });
     },
   });
 
@@ -54,12 +56,13 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
     mutationFn: (data: { id: string; updates: any }) =>
       courseService.updateCourse(data.id, data.updates),
     onSuccess: () => {
+      toast.success('Kurs został pomyślnie zaktualizowany');
       onSuccess();
     },
     onError: (error: any) => {
-      setErrors({
-        form: error.response?.data?.error?.message || 'Wystąpił błąd podczas aktualizacji kursu',
-      });
+      const errorMessage = error.response?.data?.error?.message || 'Wystąpił błąd podczas aktualizacji kursu';
+      toast.error(errorMessage);
+      setErrors({ form: errorMessage });
     },
   });
 

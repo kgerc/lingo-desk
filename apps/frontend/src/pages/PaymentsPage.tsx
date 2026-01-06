@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import paymentService, { Payment } from '../services/paymentService';
 import { Plus, Search, Trash2, Edit, DollarSign, Clock, CheckCircle, XCircle } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal';
@@ -30,6 +31,10 @@ export default function PaymentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payment-stats'] });
+      toast.success('Płatność została pomyślnie usunięta');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Błąd usuwania płatności');
     },
   });
 
