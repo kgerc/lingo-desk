@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { studentService, Student } from '../services/studentService';
@@ -6,6 +6,7 @@ import { Plus, Search, Mail, Phone, MoreVertical } from 'lucide-react';
 import StudentModal from '../components/StudentModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Dropdown from '../components/Dropdown';
 
 const StudentsPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -14,6 +15,7 @@ const StudentsPage: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; studentId: string | null }>({ isOpen: false, studentId: null });
+  const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   // Fetch students
   const { data: students = [], isLoading } = useQuery({
@@ -57,15 +59,6 @@ const StudentsPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['students'] });
     handleCloseModal();
   };
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = () => {
-      if (openDropdownId) setOpenDropdownId(null);
-    };
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [openDropdownId]);
 
   const getLanguageLevelBadge = (level: string) => {
     const colors: Record<string, string> = {
@@ -142,9 +135,6 @@ const StudentsPage: React.FC = () => {
                     Poziom
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Budżet (h)
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -193,20 +183,6 @@ const StudentsPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getLanguageLevelBadge(student.languageLevel)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {student.budget ? (
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {student.budget.totalHoursPurchased - student.budget.totalHoursUsed}h
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            z {student.budget.totalHoursPurchased}h
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -219,41 +195,37 @@ const StudentsPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="relative">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenDropdownId(openDropdownId === student.id ? null : student.id);
-                          }}
-                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                          title="Akcje"
-                        >
-                          <MoreVertical className="h-4 w-4 text-gray-600" />
-                        </button>
-                        {openDropdownId === student.id && (
-                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                            <button
-                              onClick={() => {
-                                handleEdit(student);
-                                setOpenDropdownId(null);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                            >
-                              Edytuj ucznia
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleDelete(student.id);
-                                setOpenDropdownId(null);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                              disabled={deleteMutation.isPending}
-                            >
-                              Usuń ucznia
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      <button
+                        ref={(el) => {
+                          if (el) {
+                            dropdownTriggerRefs.current.set(student.id, el);
+                          }
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenDropdownId(openDropdownId === student.id ? null : student.id);
+                        }}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="Akcje"
+                      >
+                        <MoreVertical className="h-4 w-4 text-gray-600" />
+                      </button>
+                      <Dropdown
+                        isOpen={openDropdownId === student.id}
+                        onClose={() => setOpenDropdownId(null)}
+                        triggerRef={{ current: dropdownTriggerRefs.current.get(student.id) || null }}
+                        items={[
+                          {
+                            label: 'Edytuj ucznia',
+                            onClick: () => handleEdit(student),
+                          },
+                          {
+                            label: 'Usuń ucznia',
+                            onClick: () => handleDelete(student.id),
+                            variant: 'danger',
+                          },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}

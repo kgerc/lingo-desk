@@ -19,6 +19,7 @@ import paymentRoutes from './routes/payment.routes';
 import organizationRoutes from './routes/organization.routes';
 import notificationRoutes from './routes/notification.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import alertRoutes from './routes/alert.routes';
 
 // Import scheduler
 import scheduler from './utils/scheduler';
@@ -84,6 +85,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/alerts', alertRoutes);
 
 // ============================================
 // ERROR HANDLING

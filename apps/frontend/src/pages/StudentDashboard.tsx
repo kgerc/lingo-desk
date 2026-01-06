@@ -92,19 +92,6 @@ const StudentDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Budżet godzin</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">
-                {studentData?.budget?.balance?.toFixed(1) || '0.0'}h
-              </p>
-            </div>
-            <div className="bg-yellow-500 p-3 rounded-lg">
-              <Clock className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Upcoming Lessons */}

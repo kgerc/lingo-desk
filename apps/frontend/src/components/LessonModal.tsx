@@ -5,8 +5,7 @@ import { lessonService, Lesson, CreateLessonData, LessonDeliveryMode } from '../
 import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
 import { courseService } from '../services/courseService';
-import { X } from 'lucide-react';
-import BudgetDisplay from './BudgetDisplay';
+import { X, ChevronDown } from 'lucide-react';
 
 interface LessonModalProps {
   lesson: Lesson | null;
@@ -94,14 +93,6 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       return studentEnrollments;
     },
     enabled: !!formData.studentId,
-  });
-
-  // Fetch budget info for selected enrollment
-  const { data: budgetData } = useQuery({
-    queryKey: ['enrollmentBudget', formData.enrollmentId],
-    queryFn: () => studentService.getEnrollmentBudget(formData.enrollmentId),
-    enabled: !!formData.enrollmentId,
-    refetchOnWindowFocus: false,
   });
 
   // Check for conflicts when teacher, student, time, or duration changes
@@ -360,9 +351,21 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
 
           {/* Participants */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Uczestnicy</h3>
+            <button
+              type="button"
+              onClick={() => setIsParticipantsExpanded(!isParticipantsExpanded)}
+              className="w-full flex items-center justify-between text-lg font-semibold text-gray-900 hover:text-primary transition-colors"
+            >
+              <span>Uczestnicy</span>
+              <ChevronDown
+                className={`h-5 w-5 transition-transform ${
+                  isParticipantsExpanded ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {isParticipantsExpanded && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Teacher */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -469,17 +472,6 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                   </p>
                 )}
               </div>
-            </div>
-
-            {/* Budget Display */}
-            {budgetData && (
-              <div className="mt-4">
-                <BudgetDisplay
-                  hoursPurchased={budgetData.hoursPurchased}
-                  hoursUsed={budgetData.hoursUsed}
-                  hoursRemaining={budgetData.hoursRemaining}
-                  lowBudget={budgetData.lowBudget}
-                />
               </div>
             )}
           </div>

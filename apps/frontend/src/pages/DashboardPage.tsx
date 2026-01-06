@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { studentService } from '../services/studentService';
 import { dashboardService } from '../services/dashboardService';
+import alertService from '../services/alertService';
 import { Users, GraduationCap, BookOpen, Calendar, AlertTriangle, TrendingUp, BarChart3 } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -11,6 +12,7 @@ import StudentDashboard from './StudentDashboard';
 import StudentModal from '../components/StudentModal';
 import CourseModal from '../components/CourseModal';
 import LessonModal from '../components/LessonModal';
+import Alert from '../components/Alert';
 
 const DashboardPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
@@ -44,12 +46,13 @@ const DashboardPage: React.FC = () => {
     refetchInterval: 60000, // Refetch every minute
   });
 
-  // Fetch low budget alerts
-  const { data: lowBudgetAlerts = [] } = useQuery({
-    queryKey: ['lowBudgetAlerts'],
-    queryFn: () => studentService.getStudentsWithLowBudget(),
+  // Fetch alerts
+  const { data: alerts, isLoading: isLoadingAlerts } = useQuery({
+    queryKey: ['alerts'],
+    queryFn: () => alertService.getAlerts(),
     refetchInterval: 60000, // Refetch every minute
   });
+
 
   if (isLoadingStats) {
     return <LoadingSpinner message="Ładowanie danych dashboardu..." />;
@@ -108,6 +111,20 @@ const DashboardPage: React.FC = () => {
           Oto podsumowanie Twojej szkoły językowej
         </p>
       </div>
+
+      {/* Alerts Section */}
+      {!isLoadingAlerts && alerts && alerts.length > 0 && (
+        <div className="mb-8 space-y-3">
+          {alerts.map((alert) => (
+            <Alert
+              key={alert.id}
+              variant={alert.type.toLowerCase() as 'error' | 'warning' | 'info' | 'success'}
+              title={alert.title}
+              message={alert.message}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
@@ -257,59 +274,6 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Budget Alerts */}
-      {lowBudgetAlerts.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="h-5 w-5 text-red-600" />
-            <h3 className="text-lg font-semibold text-red-900">
-              Alerty budżetowe ({lowBudgetAlerts.length})
-            </h3>
-          </div>
-          <div className="space-y-3">
-            {lowBudgetAlerts.map((alert) => (
-              <div
-                key={alert.enrollmentId}
-                className="bg-white border border-red-200 rounded-lg p-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {alert.studentName}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      Kurs: {alert.courseName}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-red-600">
-                      {alert.hoursRemaining.toFixed(1)}h
-                    </p>
-                    <p className="text-xs text-gray-500">pozostało</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* No Alerts */}
-      {lowBudgetAlerts.length === 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-          <div className="flex items-center gap-2">
-            <div className="text-green-600 text-2xl">✓</div>
-            <div>
-              <h3 className="text-lg font-semibold text-green-900">
-                Brak alertów budżetowych
-              </h3>
-              <p className="text-sm text-green-700 mt-1">
-                Wszyscy uczniowie mają wystarczający budżet godzin
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modals */}
       {isStudentModalOpen && (

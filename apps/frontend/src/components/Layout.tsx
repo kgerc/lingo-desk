@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { useSidebarStore } from '../stores/sidebarStore';
 import NotificationBell from './NotificationBell';
 import {
   Home,
@@ -12,6 +13,8 @@ import {
   CreditCard,
   Settings,
   LogOut,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -20,9 +23,10 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuthStore();
+  const { isCollapsed, toggleSidebar } = useSidebarStore();
   const location = useLocation();
 
-  // Role-based navigation
+  // Role-based navigation (without Settings)
   const getNavigationForRole = () => {
     const role = user?.role;
 
@@ -31,7 +35,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       { name: 'Dashboard', href: '/dashboard', icon: Home },
     ];
 
-    // Role-specific items
+    // Role-specific items (Settings moved to bottom)
     switch (role) {
       case 'ADMIN':
       case 'MANAGER':
@@ -43,7 +47,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { name: 'Lekcje', href: '/lessons', icon: Clock },
           { name: 'Grafik', href: '/calendar', icon: Calendar },
           { name: 'Płatności', href: '/payments', icon: CreditCard },
-          { name: 'Ustawienia', href: '/settings', icon: Settings },
         ];
 
       case 'TEACHER':
@@ -53,7 +56,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { name: 'Dostępność', href: '/teacher/availability', icon: Clock },
           { name: 'Moje lekcje', href: '/lessons', icon: BookOpen },
           { name: 'Uczniowie', href: '/students', icon: Users },
-          { name: 'Ustawienia', href: '/settings', icon: Settings },
         ];
 
       case 'STUDENT':
@@ -63,7 +65,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { name: 'Moje kursy', href: '/courses', icon: BookOpen },
           { name: 'Grafik', href: '/calendar', icon: Calendar },
           { name: 'Płatności', href: '/payments', icon: CreditCard },
-          { name: 'Ustawienia', href: '/settings', icon: Settings },
         ];
 
       case 'PARENT':
@@ -72,7 +73,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { name: 'Dzieci', href: '/students', icon: Users },
           { name: 'Lekcje', href: '/lessons', icon: Clock },
           { name: 'Płatności', href: '/payments', icon: CreditCard },
-          { name: 'Ustawienia', href: '/settings', icon: Settings },
         ];
 
       default:
@@ -87,10 +87,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-secondary border-r border-secondary/20">
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 bg-secondary border-r border-secondary/20 transition-all duration-300 flex flex-col ${
+          isCollapsed ? 'w-20' : 'w-64'
+        }`}
+      >
         {/* Logo */}
-        <div className="h-20 flex items-center gap-2 px-5 border-b border-secondary/20">
-          <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
+        <div className={`h-20 flex items-center border-b border-secondary/20 flex-shrink-0 ${isCollapsed ? 'justify-center px-2' : 'gap-2 px-5'}`}>
+          <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
             <img
               src="/lingodesk_logo_medium.png"
               alt="LingoDesk Logo"
@@ -101,33 +105,73 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               }}
             />
           </div>
-          <h1 className="text-2xl font-bold text-white">LingoDesk</h1>
+          {!isCollapsed && <h1 className="text-2xl font-bold text-white">LingoDesk</h1>}
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-1">
+        <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
           {navigation.map((item) => {
             const Icon = item.icon;
             return (
               <Link
                 key={item.name}
                 to={item.href}
+                title={isCollapsed ? item.name : ''}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                   isActive(item.href)
                     ? 'bg-white/10 text-white shadow-sm'
                     : 'text-white/80 hover:bg-white/5 hover:text-white'
-                }`}
+                } ${isCollapsed ? 'justify-center' : ''}`}
               >
-                <Icon className="h-5 w-5" />
-                <span className="font-medium">{item.name}</span>
+                <Icon className="h-5 w-5 flex-shrink-0" />
+                {!isCollapsed && <span className="font-medium">{item.name}</span>}
               </Link>
             );
           })}
         </nav>
+
+        {/* Bottom Section: Settings + Toggle */}
+        <div className="p-4 border-t border-secondary/20 space-y-1 flex-shrink-0">
+          {/* Settings Link */}
+          <Link
+            to="/settings"
+            title={isCollapsed ? 'Ustawienia' : ''}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              isActive('/settings')
+                ? 'bg-white/10 text-white shadow-sm'
+                : 'text-white/80 hover:bg-white/5 hover:text-white'
+            } ${isCollapsed ? 'justify-center' : ''}`}
+          >
+            <Settings className="h-5 w-5 flex-shrink-0" />
+            {!isCollapsed && <span className="font-medium">Ustawienia</span>}
+          </Link>
+
+          {/* Toggle Button */}
+          <button
+            onClick={toggleSidebar}
+            title={isCollapsed ? 'Rozwiń sidebar' : 'Zwiń sidebar'}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-white/80 hover:bg-white/5 hover:text-white ${
+              isCollapsed ? 'justify-center' : ''
+            }`}
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-5 w-5 flex-shrink-0" />
+            ) : (
+              <>
+                <ChevronLeft className="h-5 w-5 flex-shrink-0" />
+                <span className="font-medium">Zwiń</span>
+              </>
+            )}
+          </button>
+        </div>
       </aside>
 
       {/* Sticky Header */}
-      <header className="fixed top-0 left-64 right-0 z-40 bg-white border-b border-gray-200 shadow-sm">
+      <header
+        className={`fixed top-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm transition-all duration-300 ${
+          isCollapsed ? 'left-20' : 'left-64'
+        }`}
+      >
         <div className="flex items-center justify-between px-8 py-4">
           <div className="flex-1"></div>
 
@@ -166,7 +210,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </header>
 
       {/* Main content */}
-      <main className="pl-64 pt-16">
+      <main
+        className={`pt-16 transition-all duration-300 ${
+          isCollapsed ? 'pl-20' : 'pl-64'
+        }`}
+      >
         <div className="p-8">{children}</div>
       </main>
     </div>

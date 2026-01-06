@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { teacherService, Teacher } from '../services/teacherService';
@@ -6,6 +6,7 @@ import { Plus, Search, Mail, Phone, BookOpen, Calendar, MoreVertical, Edit, Tras
 import TeacherModal from '../components/TeacherModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Dropdown from '../components/Dropdown';
 
 const TeachersPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -14,6 +15,7 @@ const TeachersPage: React.FC = () => {
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; teacherId: string | null }>({ isOpen: false, teacherId: null });
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   // Fetch teachers
   const { data: teachers = [], isLoading } = useQuery({
@@ -57,18 +59,6 @@ const TeachersPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['teachers'] });
     handleCloseModal();
   };
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = () => {
-      if (openDropdownId) {
-        setOpenDropdownId(null);
-      }
-    };
-
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [openDropdownId]);
 
   const getContractTypeBadge = (type: string) => {
     const colors: Record<string, string> = {
@@ -255,44 +245,37 @@ const TeachersPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="relative">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenDropdownId(openDropdownId === teacher.id ? null : teacher.id);
-                          }}
-                          className="p-1 hover:bg-gray-100 rounded transition-colors"
-                          title="Więcej opcji"
-                        >
-                          <MoreVertical className="h-4 w-4 text-gray-600" />
-                        </button>
-
-                        {openDropdownId === teacher.id && (
-                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                            <button
-                              onClick={() => {
-                                handleEdit(teacher);
-                                setOpenDropdownId(null);
-                              }}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-t-lg"
-                            >
-                              <Edit className="h-4 w-4 text-blue-600" />
-                              Edytuj lektora
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleDelete(teacher.id);
-                                setOpenDropdownId(null);
-                              }}
-                              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 rounded-b-lg"
-                              disabled={deleteMutation.isPending}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Usuń lektora
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      <button
+                        ref={(el) => {
+                          if (el) {
+                            dropdownTriggerRefs.current.set(teacher.id, el);
+                          }
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenDropdownId(openDropdownId === teacher.id ? null : teacher.id);
+                        }}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                        title="Więcej opcji"
+                      >
+                        <MoreVertical className="h-4 w-4 text-gray-600" />
+                      </button>
+                      <Dropdown
+                        isOpen={openDropdownId === teacher.id}
+                        onClose={() => setOpenDropdownId(null)}
+                        triggerRef={{ current: dropdownTriggerRefs.current.get(teacher.id) || null }}
+                        items={[
+                          {
+                            label: 'Edytuj lektora',
+                            onClick: () => handleEdit(teacher),
+                          },
+                          {
+                            label: 'Usuń lektora',
+                            onClick: () => handleDelete(teacher.id),
+                            variant: 'danger',
+                          },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}
