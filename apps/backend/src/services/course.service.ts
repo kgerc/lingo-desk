@@ -380,7 +380,13 @@ class CourseService {
   }
 
   // Enroll student in course
-  async enrollStudent(courseId: string, studentId: string, organizationId: string) {
+  async enrollStudent(
+    courseId: string,
+    studentId: string,
+    organizationId: string,
+    paymentMode?: 'PACKAGE' | 'PER_LESSON',
+    hoursPurchased?: number
+  ) {
     // Verify course exists and is active
     const course = await prisma.course.findFirst({
       where: {
@@ -439,7 +445,8 @@ class CourseService {
         studentId,
         enrollmentDate: new Date(),
         status: 'ACTIVE',
-        hoursPurchased: 0,
+        paymentMode: paymentMode || 'PACKAGE',
+        hoursPurchased: hoursPurchased || 0,
         hoursUsed: 0,
       },
       include: {

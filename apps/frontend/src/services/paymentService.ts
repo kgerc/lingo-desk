@@ -5,6 +5,7 @@ export interface Payment {
   organizationId: string;
   studentId: string;
   enrollmentId?: string;
+  lessonId?: string;
   amount: number;
   currency: string;
   status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
@@ -28,6 +29,11 @@ export interface Payment {
     course: {
       name: string;
     };
+  };
+  lesson?: {
+    id: string;
+    title: string;
+    scheduledAt: string;
   };
   invoice?: {
     id: string;
@@ -136,6 +142,36 @@ const paymentService = {
     errors: Array<{ row: number; error: string; data: string }>;
   }> {
     const response = await api.post('/payments/import', { csvData });
+    return response.data.data;
+  },
+
+  /**
+   * Get debtors - students with pending payments
+   */
+  async getDebtors(): Promise<Array<{
+    student: {
+      id: string;
+      userId: string;
+      user: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        phone?: string;
+      };
+    };
+    totalDebt: number;
+    paymentsCount: number;
+    oldestPaymentDate: string;
+    daysSinceOldest: number;
+    payments: Array<{
+      id: string;
+      amount: number;
+      createdAt: string;
+      notes?: string;
+    }>;
+  }>> {
+    const response = await api.get('/payments/debtors');
     return response.data.data;
   },
 };

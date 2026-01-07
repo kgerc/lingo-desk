@@ -15,6 +15,7 @@ import PaymentsPage from './pages/PaymentsPage'
 import TeacherSchedulePage from './pages/TeacherSchedulePage'
 import TeacherAvailabilityPage from './pages/TeacherAvailabilityPage'
 import OrganizationSettingsPage from './pages/OrganizationSettingsPage'
+import DebtorsPage from './pages/DebtorsPage'
 import Layout from './components/Layout'
 
 function App() {
@@ -221,6 +222,19 @@ function App() {
             isAuthenticated ? (
               <Layout>
                 <OrganizationSettingsPage />
+              </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/debtors"
+          element={
+            isAuthenticated ? (
+              <Layout>
+                <DebtorsPage />
               </Layout>
             ) : (
               <Navigate to="/login" />

@@ -44,6 +44,9 @@ export interface Course {
     id: string;
     studentId: string;
     status: string;
+    paymentMode: 'PACKAGE' | 'PER_LESSON';
+    hoursPurchased: number;
+    hoursUsed: number;
   }>;
   lessons?: Array<{
     id: string;
@@ -112,8 +115,17 @@ export const courseService = {
     return response.data;
   },
 
-  async enrollStudent(courseId: string, studentId: string) {
-    const response = await api.post(`/courses/${courseId}/enroll`, { studentId });
+  async enrollStudent(
+    courseId: string,
+    studentId: string,
+    paymentMode?: 'PACKAGE' | 'PER_LESSON',
+    hoursPurchased?: number
+  ) {
+    const response = await api.post(`/courses/${courseId}/enroll`, {
+      studentId,
+      paymentMode,
+      hoursPurchased,
+    });
     return response.data.data;
   },
 

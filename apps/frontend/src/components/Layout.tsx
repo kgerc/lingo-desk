@@ -17,6 +17,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  AlertCircle,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -51,6 +52,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { name: 'Lekcje', href: '/lessons', icon: Clock },
           { name: 'Grafik', href: '/calendar', icon: Calendar },
           { name: 'Płatności', href: '/payments', icon: CreditCard },
+          { name: 'Dłużnicy', href: '/debtors', icon: AlertCircle },
         ];
 
       case 'TEACHER':

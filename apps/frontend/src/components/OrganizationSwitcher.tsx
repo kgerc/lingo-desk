@@ -68,15 +68,6 @@ const OrganizationSwitcher: React.FC = () => {
           <span className="text-sm font-medium text-gray-900">
             {currentOrg?.organization.name || 'Wybierz szkołę'}
           </span>
-          {currentOrg?.role && (
-            <span className="text-xs text-gray-500">
-              {currentOrg.role === 'ADMIN' && 'Administrator'}
-              {currentOrg.role === 'MANAGER' && 'Manager'}
-              {currentOrg.role === 'TEACHER' && 'Lektor'}
-              {currentOrg.role === 'STUDENT' && 'Uczeń'}
-              {currentOrg.role === 'PARENT' && 'Rodzic'}
-            </span>
-          )}
         </div>
         <ChevronDown
           className={`h-4 w-4 text-gray-500 transition-transform ${
@@ -116,13 +107,6 @@ const OrganizationSwitcher: React.FC = () => {
                   >
                     <div className="flex-1 text-left">
                       <div className="font-medium">{userOrg.organization.name}</div>
-                      <div className="text-xs text-gray-500">
-                        {userOrg.role === 'ADMIN' && 'Administrator'}
-                        {userOrg.role === 'MANAGER' && 'Manager'}
-                        {userOrg.role === 'TEACHER' && 'Lektor'}
-                        {userOrg.role === 'STUDENT' && 'Uczeń'}
-                        {userOrg.role === 'PARENT' && 'Rodzic'}
-                      </div>
                     </div>
                     {isActive && <Check className="h-5 w-5 flex-shrink-0" />}
                   </button>

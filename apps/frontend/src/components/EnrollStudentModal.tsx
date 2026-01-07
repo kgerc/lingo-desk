@@ -13,6 +13,8 @@ interface EnrollStudentModalProps {
 const EnrollStudentModal: React.FC<EnrollStudentModalProps> = ({ course, onClose }) => {
   const queryClient = useQueryClient();
   const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [paymentMode, setPaymentMode] = useState<'PACKAGE' | 'PER_LESSON'>('PACKAGE');
+  const [hoursPurchased, setHoursPurchased] = useState<number>(0);
   const [error, setError] = useState('');
 
   // Fetch all active students
@@ -39,12 +41,15 @@ const EnrollStudentModal: React.FC<EnrollStudentModalProps> = ({ course, onClose
 
   // Enroll mutation
   const enrollMutation = useMutation({
-    mutationFn: (studentId: string) => courseService.enrollStudent(course.id, studentId),
+    mutationFn: (data: { studentId: string; paymentMode: 'PACKAGE' | 'PER_LESSON'; hoursPurchased: number }) =>
+      courseService.enrollStudent(course.id, data.studentId, data.paymentMode, data.hoursPurchased),
     onSuccess: () => {
       toast.success('Uczeń został pomyślnie zapisany na kurs');
       queryClient.invalidateQueries({ queryKey: ['courses'] });
       queryClient.invalidateQueries({ queryKey: ['course', course.id] });
       setSelectedStudentId('');
+      setPaymentMode('PACKAGE');
+      setHoursPurchased(0);
       setError('');
     },
     onError: (error: any) => {
@@ -81,7 +86,13 @@ const EnrollStudentModal: React.FC<EnrollStudentModalProps> = ({ course, onClose
       return;
     }
 
-    await enrollMutation.mutateAsync(selectedStudentId);
+    // Validate hours for PACKAGE mode
+    if (paymentMode === 'PACKAGE' && hoursPurchased <= 0) {
+      setError('Dla trybu pakietowego należy podać liczbę zakupionych godzin');
+      return;
+    }
+
+    await enrollMutation.mutateAsync({ studentId: selectedStudentId, paymentMode, hoursPurchased });
   };
 
   const handleUnenroll = async (studentId: string) => {
@@ -141,12 +152,15 @@ const EnrollStudentModal: React.FC<EnrollStudentModalProps> = ({ course, onClose
           {/* Add student */}
           <div className="space-y-3">
             <h3 className="text-lg font-semibold text-gray-900">Dodaj ucznia</h3>
-            <div className="flex gap-2">
+
+            {/* Student selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Wybierz ucznia</label>
               <select
                 value={selectedStudentId}
                 onChange={(e) => setSelectedStudentId(e.target.value)}
                 disabled={isFull || availableStudents.length === 0}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100"
               >
                 <option value="">
                   {isFull
@@ -161,15 +175,72 @@ const EnrollStudentModal: React.FC<EnrollStudentModalProps> = ({ course, onClose
                   </option>
                 ))}
               </select>
-              <button
-                onClick={handleEnroll}
-                disabled={!selectedStudentId || enrollMutation.isPending || isFull}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <UserPlus className="h-5 w-5" />
-                Zapisz
-              </button>
             </div>
+
+            {/* Payment mode selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tryb płatności</label>
+              <select
+                value={paymentMode}
+                onChange={(e) => setPaymentMode(e.target.value as 'PACKAGE' | 'PER_LESSON')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="PACKAGE">Pakiet godzin (uczeń kupuje godziny z góry)</option>
+                <option value="PER_LESSON">Płatność za lekcję (każda lekcja wymaga osobnej płatności)</option>
+              </select>
+            </div>
+
+            {/* Hours purchased - only for PACKAGE mode */}
+            {paymentMode === 'PACKAGE' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Liczba zakupionych godzin
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={hoursPurchased}
+                  onChange={(e) => setHoursPurchased(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="np. 10"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Liczba godzin, które uczeń zakupił w ramach pakietu
+                </p>
+              </div>
+            )}
+
+            {/* Info box about payment mode */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm">
+              {paymentMode === 'PACKAGE' ? (
+                <>
+                  <p className="font-medium text-gray-900 mb-1">Tryb pakietowy:</p>
+                  <p className="text-gray-600">
+                    Przy oznaczaniu lekcji jako zakończonej system sprawdzi, czy uczeń ma wystarczającą liczbę godzin.
+                    Godziny będą automatycznie odliczane z pakietu.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium text-gray-900 mb-1">Płatność za lekcję:</p>
+                  <p className="text-gray-600">
+                    Przy oznaczaniu lekcji jako zakończonej system utworzy oczekującą płatność za tę lekcję.
+                    Uczeń będzie widoczny w zakładce "Dłużnicy" do czasu opłacenia.
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Submit button */}
+            <button
+              onClick={handleEnroll}
+              disabled={!selectedStudentId || enrollMutation.isPending || isFull}
+              className="w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <UserPlus className="h-5 w-5" />
+              {enrollMutation.isPending ? 'Zapisywanie...' : 'Zapisz ucznia na kurs'}
+            </button>
           </div>
 
           {/* Enrolled students list */}
@@ -185,33 +256,54 @@ const EnrollStudentModal: React.FC<EnrollStudentModalProps> = ({ course, onClose
               </div>
             ) : (
               <div className="space-y-2">
-                {enrolledStudents.map((student) => (
-                  <div
-                    key={student.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold">
-                        {student.user.firstName[0]}
-                        {student.user.lastName[0]}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {student.user.firstName} {student.user.lastName}
-                        </p>
-                        <p className="text-sm text-gray-500">{student.user.email}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleUnenroll(student.id)}
-                      disabled={unenrollMutation.isPending}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                      title="Wypisz z kursu"
+                {enrolledStudents.map((student) => {
+                  const enrollment = currentCourse.enrollments?.find((e) => e.studentId === student.id);
+                  return (
+                    <div
+                      key={student.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                     >
-                      <UserMinus className="h-5 w-5" />
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold">
+                          {student.user.firstName[0]}
+                          {student.user.lastName[0]}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">
+                            {student.user.firstName} {student.user.lastName}
+                          </p>
+                          <p className="text-sm text-gray-500">{student.user.email}</p>
+                          {enrollment && (
+                            <div className="flex items-center gap-2 mt-1 text-xs">
+                              <span
+                                className={`px-2 py-0.5 rounded ${
+                                  enrollment.paymentMode === 'PACKAGE'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-purple-100 text-purple-800'
+                                }`}
+                              >
+                                {enrollment.paymentMode === 'PACKAGE' ? 'Pakiet' : 'Za lekcję'}
+                              </span>
+                              {enrollment.paymentMode === 'PACKAGE' && (
+                                <span className="text-gray-600">
+                                  {enrollment.hoursUsed}/{enrollment.hoursPurchased} godz.
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleUnenroll(student.id)}
+                        disabled={unenrollMutation.isPending}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        title="Wypisz z kursu"
+                      >
+                        <UserMinus className="h-5 w-5" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

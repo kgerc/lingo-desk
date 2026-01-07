@@ -207,6 +207,28 @@ class PaymentController {
   }
 
   /**
+   * Get debtors - students with pending payments
+   * GET /api/payments/debtors
+   */
+  async getDebtors(req: Request, res: Response) {
+    try {
+      const organizationId = req.user!.organizationId;
+      const debtors = await paymentService.getDebtors(organizationId);
+
+      res.json({
+        success: true,
+        data: debtors,
+      });
+    } catch (error) {
+      console.error('Error fetching debtors:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch debtors',
+      });
+    }
+  }
+
+  /**
    * Import payments from CSV
    * POST /api/payments/import
    */

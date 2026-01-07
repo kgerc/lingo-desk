@@ -310,6 +310,88 @@ class PaymentService {
   }
 
   /**
+   * Get debtors - students with pending payments
+   * Groups by student and shows total debt
+   */
+  async getDebtors(organizationId: string) {
+    // Get all pending payments grouped by student
+    const pendingPayments = await prisma.payment.findMany({
+      where: {
+        organizationId,
+        status: PaymentStatus.PENDING,
+      },
+      include: {
+        student: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    // Group payments by student
+    const debtorsMap = new Map<string, {
+      student: any;
+      totalDebt: number;
+      paymentsCount: number;
+      oldestPaymentDate: Date;
+      payments: any[];
+    }>();
+
+    for (const payment of pendingPayments) {
+      const studentId = payment.studentId;
+
+      if (!debtorsMap.has(studentId)) {
+        debtorsMap.set(studentId, {
+          student: payment.student,
+          totalDebt: 0,
+          paymentsCount: 0,
+          oldestPaymentDate: payment.createdAt,
+          payments: [],
+        });
+      }
+
+      const debtor = debtorsMap.get(studentId)!;
+      debtor.totalDebt += Number(payment.amount);
+      debtor.paymentsCount += 1;
+      debtor.payments.push({
+        id: payment.id,
+        amount: Number(payment.amount),
+        createdAt: payment.createdAt,
+        notes: payment.notes,
+      });
+
+      // Track oldest payment
+      if (payment.createdAt < debtor.oldestPaymentDate) {
+        debtor.oldestPaymentDate = payment.createdAt;
+      }
+    }
+
+    // Convert map to array and sort by total debt (highest first)
+    const debtors = Array.from(debtorsMap.values())
+      .map(debtor => ({
+        ...debtor,
+        daysSinceOldest: Math.floor(
+          (Date.now() - debtor.oldestPaymentDate.getTime()) / (1000 * 60 * 60 * 24)
+        ),
+      }))
+      .sort((a, b) => b.totalDebt - a.totalDebt);
+
+    return debtors;
+  }
+
+  /**
    * Import payments from CSV data
    * Supports flexible column names (case-insensitive)
    * Expected columns: date/data, email, amount/kwota, paymentMethod/metodaPlatnosci, status (optional), notes/notatki (optional)

@@ -81,6 +81,11 @@ enum PaymentMethod {
   BANK_TRANSFER
 }
 
+enum PaymentMode {
+  PACKAGE
+  PER_LESSON
+}
+
 enum ContractType {
   B2B
   EMPLOYMENT
@@ -451,6 +456,7 @@ model StudentEnrollment {
   subscriptionId   String?          @map("subscription_id")
   enrollmentDate   DateTime         @default(now()) @map("enrollment_date")
   status           EnrollmentStatus
+  paymentMode      PaymentMode      @default(PACKAGE) @map("payment_mode")
   hoursPurchased   Decimal          @map("hours_purchased") @db.Decimal(10, 2)
   hoursUsed        Decimal          @default(0) @map("hours_used") @db.Decimal(10, 2)
   expiresAt        DateTime?        @map("expires_at")
@@ -511,6 +517,7 @@ model Lesson {
   classroom         Classroom?         @relation(fields: [classroomId], references: [id])
   recurringPattern  RecurringPattern?  @relation(fields: [recurringPatternId], references: [id])
   attendances       LessonAttendance[]
+  payments          Payment[]
 
   @@index([organizationId])
   @@index([teacherId])
@@ -569,6 +576,7 @@ model Payment {
   organizationId        String        @map("organization_id")
   studentId             String        @map("student_id")
   enrollmentId          String?       @map("enrollment_id")
+  lessonId              String?       @map("lesson_id")
   amount                Decimal       @db.Decimal(10, 2)
   currency              String        @default("PLN")
   status                PaymentStatus
@@ -583,10 +591,12 @@ model Payment {
   organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   student      Student            @relation(fields: [studentId], references: [id])
   enrollment   StudentEnrollment? @relation(fields: [enrollmentId], references: [id])
+  lesson       Lesson?            @relation(fields: [lessonId], references: [id])
   invoice      Invoice?
 
   @@index([organizationId])
   @@index([studentId])
+  @@index([lessonId])
   @@index([status])
   @@index([paidAt])
   @@map("payments")

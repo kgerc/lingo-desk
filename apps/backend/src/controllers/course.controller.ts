@@ -37,6 +37,8 @@ const updateCourseSchema = z.object({
 
 const enrollStudentSchema = z.object({
   studentId: z.string().uuid(),
+  paymentMode: z.enum(['PACKAGE', 'PER_LESSON']).optional(),
+  hoursPurchased: z.number().min(0).optional(),
 });
 
 class CourseController {
@@ -113,11 +115,13 @@ class CourseController {
   async enrollStudent(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id: courseId } = req.params;
-      const { studentId } = enrollStudentSchema.parse(req.body);
+      const { studentId, paymentMode, hoursPurchased } = enrollStudentSchema.parse(req.body);
       const enrollment = await courseService.enrollStudent(
         courseId,
         studentId,
-        req.user.organizationId
+        req.user.organizationId,
+        paymentMode,
+        hoursPurchased
       );
       res.status(201).json({ message: 'Student enrolled successfully', data: enrollment });
     } catch (error) {

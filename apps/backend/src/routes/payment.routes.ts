@@ -10,6 +10,9 @@ router.use(authenticate);
 // Statistics (must be before /:id route)
 router.get('/stats', paymentController.getPaymentStats);
 
+// Debtors list
+router.get('/debtors', paymentController.getDebtors);
+
 // Student payment history
 router.get('/student/:studentId', paymentController.getStudentPaymentHistory);
 

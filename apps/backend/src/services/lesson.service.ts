@@ -353,10 +353,11 @@ class LessonService {
     if (isCompletingLesson && !existingLesson.completedAt) {
       updateData.completedAt = new Date();
 
-      // Deduct hours from student budget
+      // Deduct hours from student budget or create payment for per-lesson mode
       await this.deductLessonFromBudget(
         existingLesson.enrollmentId,
-        existingLesson.durationMinutes
+        existingLesson.durationMinutes,
+        existingLesson.id
       );
     }
 
@@ -406,35 +407,75 @@ class LessonService {
   }
 
   /**
-   * Deduct lesson hours from student budget
+   * Deduct lesson hours from student budget or create payment for per-lesson mode
    */
-  private async deductLessonFromBudget(enrollmentId: string, durationMinutes: number) {
+  private async deductLessonFromBudget(enrollmentId: string, durationMinutes: number, lessonId?: string) {
     const hoursToDeduct = durationMinutes / 60;
 
-    // Get current enrollment
+    // Get current enrollment with student and course info
     const enrollment = await prisma.studentEnrollment.findUnique({
       where: { id: enrollmentId },
+      include: {
+        student: true,
+        course: {
+          include: {
+            courseType: true,
+          },
+        },
+      },
     });
 
     if (!enrollment) {
       throw new Error('Enrollment not found');
     }
 
-    // Check if enough hours available
-    const remainingHours = parseFloat(enrollment.hoursPurchased.toString()) - parseFloat(enrollment.hoursUsed.toString());
-    if (remainingHours < hoursToDeduct) {
-      throw new Error(`Insufficient budget. Remaining hours: ${remainingHours.toFixed(2)}, Required: ${hoursToDeduct.toFixed(2)}`);
-    }
+    // Handle based on payment mode
+    if (enrollment.paymentMode === 'PACKAGE') {
+      // PACKAGE mode: Check and deduct from hoursPurchased/hoursUsed
+      const remainingHours = parseFloat(enrollment.hoursPurchased.toString()) - parseFloat(enrollment.hoursUsed.toString());
+      if (remainingHours < hoursToDeduct) {
+        throw new Error(`Insufficient budget. Remaining hours: ${remainingHours.toFixed(2)}, Required: ${hoursToDeduct.toFixed(2)}`);
+      }
 
-    // Update hoursUsed
-    await prisma.studentEnrollment.update({
-      where: { id: enrollmentId },
-      data: {
-        hoursUsed: {
-          increment: hoursToDeduct,
+      // Update hoursUsed
+      await prisma.studentEnrollment.update({
+        where: { id: enrollmentId },
+        data: {
+          hoursUsed: {
+            increment: hoursToDeduct,
+          },
         },
-      },
-    });
+      });
+    } else if (enrollment.paymentMode === 'PER_LESSON') {
+      // PER_LESSON mode: Check if payment exists for this lesson
+      if (lessonId) {
+        const existingPayment = await prisma.payment.findFirst({
+          where: {
+            lessonId,
+            status: 'COMPLETED',
+          },
+        });
+
+        // If no completed payment exists, create a pending payment
+        if (!existingPayment) {
+          const pricePerLesson = enrollment.course?.courseType?.pricePerLesson || 0;
+
+          await prisma.payment.create({
+            data: {
+              organizationId: enrollment.student.organizationId,
+              studentId: enrollment.studentId,
+              enrollmentId: enrollment.id,
+              lessonId: lessonId,
+              amount: pricePerLesson,
+              currency: 'PLN',
+              status: 'PENDING',
+              paymentMethod: 'CASH',
+              notes: 'Płatność za lekcję - utworzona automatycznie po zakończeniu lekcji',
+            },
+          });
+        }
+      }
+    }
   }
 
   async deleteLesson(id: string, organizationId: string) {
