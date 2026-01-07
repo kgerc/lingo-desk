@@ -8,6 +8,7 @@ import {
   Users,
   GraduationCap,
   BookOpen,
+  FileText,
   Calendar,
   Clock,
   CreditCard,
@@ -44,6 +45,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { name: 'Uczniowie', href: '/students', icon: Users },
           { name: 'Lektorzy', href: '/teachers', icon: GraduationCap },
           { name: 'Kursy', href: '/courses', icon: BookOpen },
+          // { name: 'Grupy', href: '/groups', icon: Users2 }, // Hidden temporarily
+          { name: 'Materiały', href: '/materials', icon: FileText },
           { name: 'Lekcje', href: '/lessons', icon: Clock },
           { name: 'Grafik', href: '/calendar', icon: Calendar },
           { name: 'Płatności', href: '/payments', icon: CreditCard },
@@ -85,31 +88,43 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 bg-secondary border-r border-secondary/20 transition-all duration-300 flex flex-col ${
+        className={`fixed inset-y-0 left-0 z-50 bg-secondary border-r border-secondary/20 flex flex-col transition-[width] duration-300 ease-in-out ${
           isCollapsed ? 'w-20' : 'w-64'
         }`}
+        style={{ willChange: 'width' }}
       >
         {/* Logo */}
-        <div className={`h-20 flex items-center border-b border-secondary/20 flex-shrink-0 ${isCollapsed ? 'justify-center px-2' : 'gap-2 px-5'}`}>
-          <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
-            <img
-              src="/lingodesk_logo_medium.png"
-              alt="LingoDesk Logo"
-              className="h-full w-full object-cover scale-150 ml-1 mt-1"
-              onError={(e) => {
-                console.error('Logo failed to load');
-                e.currentTarget.style.display = 'none';
-              }}
-            />
+        <div className="h-20 flex items-center border-b border-secondary/20 flex-shrink-0 px-3.5">
+          <div className="flex items-center gap-3">
+            {/* Stały kontener logo */}
+            <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+              <img
+                src="/lingodesk_logo_medium.png"
+                alt="LingoDesk Logo"
+                className="h-full w-full object-cover scale-150 ml-1 mt-1"
+                onError={(e) => {
+                  console.error('Logo failed to load');
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+
+            {/* Nazwa – tylko opacity */}
+            <h1
+              className={`text-2xl font-bold text-white whitespace-nowrap transition-opacity duration-200 ${
+                isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+              }`}
+            >
+              LingoDesk
+            </h1>
           </div>
-          {!isCollapsed && <h1 className="text-2xl font-bold text-white">LingoDesk</h1>}
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
+        <nav className="p-4 space-y-1 flex-1 overflow-y-auto overflow-x-hidden">
           {navigation.map((item) => {
             const Icon = item.icon;
             return (
@@ -117,60 +132,94 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 key={item.name}
                 to={item.href}
                 title={isCollapsed ? item.name : ''}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`flex items-center px-2 py-3 rounded-lg transition-colors ${
                   isActive(item.href)
                     ? 'bg-white/10 text-white shadow-sm'
                     : 'text-white/80 hover:bg-white/5 hover:text-white'
-                } ${isCollapsed ? 'justify-center' : ''}`}
+                }`}
               >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                {!isCollapsed && <span className="font-medium">{item.name}</span>}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 flex justify-center">
+                    <Icon className="h-5 w-5" />
+                  </div>
+
+                  <span
+                    className={`font-medium whitespace-nowrap transition-opacity duration-200 ${
+                      isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                    }`}
+                  >
+                    {item.name}
+                  </span>
+                </div>
               </Link>
             );
           })}
         </nav>
 
         {/* Bottom Section: Settings + Toggle */}
-        <div className="p-4 border-t border-secondary/20 space-y-1 flex-shrink-0">
+        <div className="p-4 border-t border-secondary/20 space-y-1 flex-shrink-0 overflow-x-hidden">
           {/* Settings Link */}
           <Link
             to="/settings"
             title={isCollapsed ? 'Ustawienia' : ''}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+            className={`flex items-center px-2 py-3 rounded-lg transition-colors ${
               isActive('/settings')
                 ? 'bg-white/10 text-white shadow-sm'
                 : 'text-white/80 hover:bg-white/5 hover:text-white'
-            } ${isCollapsed ? 'justify-center' : ''}`}
+            }`}
           >
-            <Settings className="h-5 w-5 flex-shrink-0" />
-            {!isCollapsed && <span className="font-medium">Ustawienia</span>}
+            <div className="flex items-center gap-3">
+              {/* Stała kolumna na ikonę – brak jumpów */}
+              <div className="w-8 flex justify-center">
+                <Settings className="h-5 w-5" />
+              </div>
+
+              {/* Tekst – tylko opacity */}
+              <span
+                className={`font-medium whitespace-nowrap transition-opacity duration-200 ${
+                  isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                }`}
+              >
+                Ustawienia
+              </span>
+            </div>
           </Link>
 
           {/* Toggle Button */}
           <button
             onClick={toggleSidebar}
             title={isCollapsed ? 'Rozwiń sidebar' : 'Zwiń sidebar'}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-white/80 hover:bg-white/5 hover:text-white ${
-              isCollapsed ? 'justify-center' : ''
-            }`}
+            className="w-full flex items-center px-2 py-3 rounded-lg transition-colors text-white/80 hover:bg-white/5 hover:text-white"
           >
-            {isCollapsed ? (
-              <ChevronRight className="h-5 w-5 flex-shrink-0" />
-            ) : (
-              <>
-                <ChevronLeft className="h-5 w-5 flex-shrink-0" />
-                <span className="font-medium">Zwiń</span>
-              </>
-            )}
+            <div className="flex items-center gap-3">
+              {/* Stała kolumna na ikonę */}
+              <div className="w-8 flex justify-center">
+                {isCollapsed ? (
+                  <ChevronRight className="h-5 w-5" />
+                ) : (
+                  <ChevronLeft className="h-5 w-5" />
+                )}
+              </div>
+
+              {/* Tekst – tylko opacity */}
+              <span
+                className={`font-medium whitespace-nowrap transition-opacity duration-200 ${
+                  isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                }`}
+              >
+                Zwiń
+              </span>
+            </div>
           </button>
         </div>
       </aside>
 
       {/* Sticky Header */}
       <header
-        className={`fixed top-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm transition-all duration-300 ${
+        className={`fixed top-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm transition-[left] duration-300 ease-in-out ${
           isCollapsed ? 'left-20' : 'left-64'
         }`}
+        style={{ willChange: 'left' }}
       >
         <div className="flex items-center justify-between px-8 py-4">
           <div className="flex-1"></div>
@@ -211,9 +260,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Main content */}
       <main
-        className={`pt-16 transition-all duration-300 ${
+        className={`pt-16 transition-[padding-left] duration-300 ease-in-out ${
           isCollapsed ? 'pl-20' : 'pl-64'
         }`}
+        style={{ willChange: 'padding-left' }}
       >
         <div className="p-8">{children}</div>
       </main>

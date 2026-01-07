@@ -47,6 +47,8 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     endDate: '',
     occurrencesCount: '',
   });
+  const [recurringType, setRecurringType] = useState<'weeks' | 'months'>('weeks');
+  const [recurringCount, setRecurringCount] = useState<string>('4');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [conflicts, setConflicts] = useState<any>(null);
@@ -270,16 +272,17 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     if (isEdit && lesson) {
       await updateMutation.mutateAsync({ id: lesson.id, updates: data });
     } else if (isRecurring) {
-      // Create recurring lessons
+      // Create recurring lessons with simplified pattern
+      const count = parseInt(recurringCount) || 1;
+      const frequency = recurringType === 'weeks' ? 'WEEKLY' : 'MONTHLY';
+
       await createRecurringMutation.mutateAsync({
         lessonData: data,
         pattern: {
-          frequency: recurringPattern.frequency,
-          interval: recurringPattern.interval,
-          daysOfWeek: recurringPattern.daysOfWeek.length > 0 ? recurringPattern.daysOfWeek : undefined,
+          frequency: frequency as 'WEEKLY' | 'MONTHLY',
+          interval: 1,
           startDate: new Date(formData.scheduledAt).toISOString(),
-          endDate: recurringPattern.endDate ? new Date(recurringPattern.endDate).toISOString() : undefined,
-          occurrencesCount: recurringPattern.occurrencesCount ? parseInt(recurringPattern.occurrencesCount) : undefined,
+          occurrencesCount: count,
         },
       });
     } else {
@@ -599,131 +602,44 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
               {isRecurring && (
                 <div className="space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="grid grid-cols-2 gap-4">
-                    {/* Frequency */}
+                    {/* Count */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Częstotliwość
+                        Liczba
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="52"
+                        value={recurringCount}
+                        onChange={(e) => setRecurringCount(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="np. 4"
+                      />
+                    </div>
+
+                    {/* Type */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Okres
                       </label>
                       <select
-                        value={recurringPattern.frequency}
-                        onChange={(e) =>
-                          setRecurringPattern({
-                            ...recurringPattern,
-                            frequency: e.target.value as any,
-                          })
-                        }
+                        value={recurringType}
+                        onChange={(e) => setRecurringType(e.target.value as 'weeks' | 'months')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       >
-                        <option value="WEEKLY">Co tydzień</option>
-                        <option value="BIWEEKLY">Co dwa tygodnie</option>
-                        <option value="MONTHLY">Co miesiąc</option>
-                        <option value="DAILY">Codziennie</option>
+                        <option value="weeks">Tygodni</option>
+                        <option value="months">Miesięcy</option>
                       </select>
-                    </div>
-
-                    {/* Interval */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Interwał
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={recurringPattern.interval}
-                        onChange={(e) =>
-                          setRecurringPattern({
-                            ...recurringPattern,
-                            interval: parseInt(e.target.value) || 1,
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Days of week (for weekly/biweekly) */}
-                  {(recurringPattern.frequency === 'WEEKLY' || recurringPattern.frequency === 'BIWEEKLY') && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Dni tygodnia
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Ndz'].map((day, index) => {
-                          const dayValue = index + 1 === 7 ? 0 : index + 1; // Sunday = 0
-                          const isSelected = recurringPattern.daysOfWeek.includes(dayValue);
-                          return (
-                            <button
-                              key={index}
-                              type="button"
-                              onClick={() => {
-                                const newDays = isSelected
-                                  ? recurringPattern.daysOfWeek.filter((d) => d !== dayValue)
-                                  : [...recurringPattern.daysOfWeek, dayValue].sort();
-                                setRecurringPattern({
-                                  ...recurringPattern,
-                                  daysOfWeek: newDays,
-                                });
-                              }}
-                              className={`px-3 py-1 text-sm rounded-lg border transition-colors ${
-                                isSelected
-                                  ? 'bg-primary text-white border-primary'
-                                  : 'bg-white text-gray-700 border-gray-300 hover:border-primary'
-                              }`}
-                            >
-                              {day}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* End date */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Data zakończenia (opcjonalnie)
-                      </label>
-                      <input
-                        type="date"
-                        value={recurringPattern.endDate}
-                        onChange={(e) =>
-                          setRecurringPattern({
-                            ...recurringPattern,
-                            endDate: e.target.value,
-                            occurrencesCount: '', // Clear occurrences if end date is set
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-
-                    {/* Occurrences count */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Liczba powtórzeń (opcjonalnie)
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={recurringPattern.occurrencesCount}
-                        onChange={(e) =>
-                          setRecurringPattern({
-                            ...recurringPattern,
-                            occurrencesCount: e.target.value,
-                            endDate: '', // Clear end date if occurrences is set
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                        placeholder="np. 10"
-                      />
                     </div>
                   </div>
 
                   <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded p-3">
                     <p className="font-medium text-blue-800">Informacja:</p>
                     <p className="mt-1">
-                      System automatycznie pominie terminy, w których wykryje konflikt harmonogramu lektora lub ucznia.
+                      System utworzy {recurringCount || '0'} {recurringType === 'weeks' ? 'tygodni' : 'miesięcy'} lekcji
+                      w tym samym dniu tygodnia i o tej samej godzinie.
+                      Lekcje z konfliktami harmonogramu zostaną automatycznie pominięte.
                     </p>
                   </div>
                 </div>

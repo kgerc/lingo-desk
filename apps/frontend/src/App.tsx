@@ -7,6 +7,8 @@ import DashboardPage from './pages/DashboardPage'
 import StudentsPage from './pages/StudentsPage'
 import TeachersPage from './pages/TeachersPage'
 import CoursesPage from './pages/CoursesPage'
+import GroupsPage from './pages/GroupsPage'
+import MaterialsPage from './pages/MaterialsPage'
 import LessonsPage from './pages/LessonsPage'
 import CalendarPage from './pages/CalendarPage'
 import PaymentsPage from './pages/PaymentsPage'
@@ -114,6 +116,32 @@ function App() {
             isAuthenticated ? (
               <Layout>
                 <CoursesPage />
+              </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/groups"
+          element={
+            isAuthenticated ? (
+              <Layout>
+                <GroupsPage />
+              </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/materials"
+          element={
+            isAuthenticated ? (
+              <Layout>
+                <MaterialsPage />
               </Layout>
             ) : (
               <Navigate to="/login" />

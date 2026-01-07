@@ -20,9 +20,12 @@ import organizationRoutes from './routes/organization.routes';
 import notificationRoutes from './routes/notification.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import alertRoutes from './routes/alert.routes';
+import materialRoutes from './routes/material.routes';
+import fileRoutes from './routes/file.routes';
 
 // Import scheduler
 import scheduler from './utils/scheduler';
+import { initializeStorage } from './utils/supabase';
 
 // Load environment variables
 dotenv.config();
@@ -86,6 +89,8 @@ app.use('/api/organizations', organizationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/alerts', alertRoutes);
+app.use('/api/materials', materialRoutes);
+app.use('/api/files', fileRoutes);
 
 // ============================================
 // ERROR HANDLING
@@ -98,11 +103,14 @@ app.use(errorHandler);
 // START SERVER
 // ============================================
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV}`);
   console.log(`🔗 API: http://localhost:${PORT}`);
   console.log(`💚 Health check: http://localhost:${PORT}/health`);
+
+  // Initialize Supabase Storage
+  await initializeStorage();
 
   // Start scheduled tasks
   if (process.env.NODE_ENV !== 'test') {

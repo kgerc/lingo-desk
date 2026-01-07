@@ -316,10 +316,10 @@ class CourseService {
     }
 
     // Check for active enrollments
-    const activeEnrollments = await prisma.enrollment.count({
+    const activeEnrollments = await prisma.studentEnrollment.count({
       where: {
         courseId: id,
-        isActive: true,
+        status: 'ACTIVE',
       },
     });
 
