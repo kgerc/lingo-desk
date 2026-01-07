@@ -6,6 +6,7 @@ import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
 import { courseService } from '../services/courseService';
 import { X, ChevronDown } from 'lucide-react';
+import AttendanceSection from './AttendanceSection';
 
 interface LessonModalProps {
   lesson: Lesson | null;
@@ -723,6 +724,11 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                 </p>
               </div>
             </div>
+          )}
+
+          {/* Attendance (only for edit mode) */}
+          {isEdit && lesson && (
+            <AttendanceSection lesson={lesson} />
           )}
 
           {/* Actions */}

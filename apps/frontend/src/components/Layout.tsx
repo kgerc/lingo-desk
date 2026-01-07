@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
+  Bell,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -161,32 +162,55 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         {/* Bottom Section: Settings + Toggle */}
         <div className="p-4 border-t border-secondary/20 space-y-1 flex-shrink-0 overflow-x-hidden">
-          {/* Settings Link */}
-          <Link
-            to="/settings"
-            title={isCollapsed ? 'Ustawienia' : ''}
-            className={`flex items-center px-2 py-3 rounded-lg transition-colors ${
-              isActive('/settings')
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-white/80 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              {/* Stała kolumna na ikonę – brak jumpów */}
-              <div className="w-8 flex justify-center">
-                <Settings className="h-5 w-5" />
+          {/* Settings - ADMIN/MANAGER mają dostęp do pełnych ustawień z zakładkami */}
+          {(user?.role === 'ADMIN' || user?.role === 'MANAGER') ? (
+            <Link
+              to="/settings"
+              title={isCollapsed ? 'Ustawienia' : ''}
+              className={`flex items-center px-2 py-3 rounded-lg transition-colors ${
+                isActive('/settings')
+                  ? 'bg-white/10 text-white shadow-sm'
+                  : 'text-white/80 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 flex justify-center">
+                  <Settings className="h-5 w-5" />
+                </div>
+                <span
+                  className={`font-medium whitespace-nowrap transition-opacity duration-200 ${
+                    isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                  }`}
+                >
+                  Ustawienia
+                </span>
               </div>
-
-              {/* Tekst – tylko opacity */}
-              <span
-                className={`font-medium whitespace-nowrap transition-opacity duration-200 ${
-                  isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
-                }`}
-              >
-                Ustawienia
-              </span>
-            </div>
-          </Link>
+            </Link>
+          ) : (
+            /* Dla innych ról - tylko link do powiadomień */
+            <Link
+              to="/settings/notifications"
+              title={isCollapsed ? 'Powiadomienia' : ''}
+              className={`flex items-center px-2 py-3 rounded-lg transition-colors ${
+                isActive('/settings/notifications')
+                  ? 'bg-white/10 text-white shadow-sm'
+                  : 'text-white/80 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 flex justify-center">
+                  <Bell className="h-5 w-5" />
+                </div>
+                <span
+                  className={`font-medium whitespace-nowrap transition-opacity duration-200 ${
+                    isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                  }`}
+                >
+                  Powiadomienia
+                </span>
+              </div>
+            </Link>
+          )}
 
           {/* Toggle Button */}
           <button

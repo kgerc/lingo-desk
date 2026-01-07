@@ -14,8 +14,9 @@ import CalendarPage from './pages/CalendarPage'
 import PaymentsPage from './pages/PaymentsPage'
 import TeacherSchedulePage from './pages/TeacherSchedulePage'
 import TeacherAvailabilityPage from './pages/TeacherAvailabilityPage'
-import OrganizationSettingsPage from './pages/OrganizationSettingsPage'
+import SettingsPage from './pages/SettingsPage'
 import DebtorsPage from './pages/DebtorsPage'
+import NotificationSettingsPage from './pages/NotificationSettingsPage'
 import Layout from './components/Layout'
 
 function App() {
@@ -220,9 +221,13 @@ function App() {
           path="/settings"
           element={
             isAuthenticated ? (
-              <Layout>
-                <OrganizationSettingsPage />
-              </Layout>
+              useAuthStore.getState().user?.role === 'ADMIN' || useAuthStore.getState().user?.role === 'MANAGER' ? (
+                <Layout>
+                  <SettingsPage />
+                </Layout>
+              ) : (
+                <Navigate to="/dashboard" />
+              )
             ) : (
               <Navigate to="/login" />
             )
@@ -235,6 +240,19 @@ function App() {
             isAuthenticated ? (
               <Layout>
                 <DebtorsPage />
+              </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/settings/notifications"
+          element={
+            isAuthenticated ? (
+              <Layout>
+                <NotificationSettingsPage />
               </Layout>
             ) : (
               <Navigate to="/login" />

@@ -247,6 +247,176 @@ class EmailService {
       html,
     });
   }
+
+  /**
+   * Send lesson cancellation email
+   */
+  async sendLessonCancellation(data: {
+    recipientEmail: string;
+    recipientName: string;
+    otherPersonName: string;
+    otherPersonRole: 'lektor' | 'uczeń';
+    lessonTitle: string;
+    lessonDate: Date;
+    cancellationReason?: string;
+  }) {
+    const { recipientEmail, recipientName, otherPersonName, otherPersonRole, lessonTitle, lessonDate, cancellationReason } = data;
+
+    const formattedDate = new Date(lessonDate).toLocaleString('pl-PL', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626;">❌ Zajęcia odwołane</h2>
+        <p>Dzień dobry ${recipientName},</p>
+        <p>Informujemy, że następujące zajęcia zostały odwołane:</p>
+        <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 20px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>${otherPersonRole === 'lektor' ? 'Lektor' : 'Uczeń'}:</strong> ${otherPersonName}</p>
+          <p style="margin: 5px 0;"><strong>Temat:</strong> ${lessonTitle}</p>
+          <p style="margin: 5px 0;"><strong>Data:</strong> ${formattedDate}</p>
+          ${cancellationReason ? `<p style="margin: 5px 0;"><strong>Powód:</strong> ${cancellationReason}</p>` : ''}
+        </div>
+        <p>Prosimy o kontakt w celu ustalenia nowego terminu.</p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
+      </div>
+    `;
+
+    return await this.sendEmail({
+      to: recipientEmail,
+      subject: `❌ Odwołane: Zajęcia z ${otherPersonName}`,
+      html,
+    });
+  }
+
+  /**
+   * Send enrollment confirmation email
+   */
+  async sendEnrollmentConfirmation(data: {
+    studentEmail: string;
+    studentName: string;
+    courseName: string;
+    courseType: string;
+    startDate: Date;
+  }) {
+    const { studentEmail, studentName, courseName, courseType, startDate } = data;
+
+    const formattedDate = new Date(startDate).toLocaleDateString('pl-PL', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #3b82f6;">🎓 Witamy na kursie!</h2>
+        <p>Dzień dobry ${studentName},</p>
+        <p>Gratulujemy! Zostałeś/aś pomyślnie zapisany/a na kurs:</p>
+        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Nazwa kursu:</strong> ${courseName}</p>
+          <p style="margin: 5px 0;"><strong>Typ:</strong> ${courseType}</p>
+          <p style="margin: 5px 0;"><strong>Data rozpoczęcia:</strong> ${formattedDate}</p>
+        </div>
+        <p>Życzymy powodzenia w nauce!</p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
+      </div>
+    `;
+
+    return await this.sendEmail({
+      to: studentEmail,
+      subject: `🎓 Potwierdzenie zapisu: ${courseName}`,
+      html,
+    });
+  }
+
+  /**
+   * Send payment confirmation email
+   */
+  async sendPaymentConfirmation(data: {
+    studentEmail: string;
+    studentName: string;
+    amount: number;
+    currency: string;
+    paymentMethod: string;
+    courseName?: string;
+    invoiceUrl?: string;
+  }) {
+    const { studentEmail, studentName, amount, currency, paymentMethod, courseName, invoiceUrl } = data;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #10b981;">✓ Płatność potwierdzona</h2>
+        <p>Dzień dobry ${studentName},</p>
+        <p>Otrzymaliśmy Twoją płatność:</p>
+        <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Kwota:</strong> <span style="font-size: 24px; color: #10b981;">${amount.toFixed(2)} ${currency}</span></p>
+          <p style="margin: 5px 0;"><strong>Metoda płatności:</strong> ${paymentMethod}</p>
+          ${courseName ? `<p style="margin: 5px 0;"><strong>Kurs:</strong> ${courseName}</p>` : ''}
+        </div>
+        ${invoiceUrl ? `<p><a href="${invoiceUrl}" style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">Pobierz fakturę</a></p>` : ''}
+        <p>Dziękujemy!</p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
+      </div>
+    `;
+
+    return await this.sendEmail({
+      to: studentEmail,
+      subject: `✓ Potwierdzenie płatności: ${amount.toFixed(2)} ${currency}`,
+      html,
+    });
+  }
+
+  /**
+   * Send welcome email to new user
+   */
+  async sendWelcomeEmail(data: {
+    userEmail: string;
+    userName: string;
+    role: string;
+    organizationName: string;
+    loginUrl: string;
+  }) {
+    const { userEmail, userName, role, organizationName, loginUrl } = data;
+
+    const roleNames: Record<string, string> = {
+      ADMIN: 'Administrator',
+      MANAGER: 'Manager',
+      TEACHER: 'Lektor',
+      STUDENT: 'Uczeń',
+      PARENT: 'Rodzic',
+    };
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #3b82f6;">👋 Witamy w LingoDesk!</h2>
+        <p>Dzień dobry ${userName},</p>
+        <p>Twoje konto zostało utworzone pomyślnie!</p>
+        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Organizacja:</strong> ${organizationName}</p>
+          <p style="margin: 5px 0;"><strong>Rola:</strong> ${roleNames[role] || role}</p>
+          <p style="margin: 5px 0;"><strong>Email:</strong> ${userEmail}</p>
+        </div>
+        <p>
+          <a href="${loginUrl}" style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
+            Zaloguj się
+          </a>
+        </p>
+        <p style="margin-top: 20px;">Jeśli masz jakiekolwiek pytania, skontaktuj się z nami.</p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
+      </div>
+    `;
+
+    return await this.sendEmail({
+      to: userEmail,
+      subject: `👋 Witamy w LingoDesk - ${organizationName}`,
+      html,
+    });
+  }
 }
 
 export default new EmailService();

@@ -1,5 +1,6 @@
 import { PrismaClient, PaymentStatus, PaymentMethod } from '@prisma/client';
 import prisma from '../utils/prisma';
+import emailService from './email.service';
 
 export interface CreatePaymentData {
   organizationId: string;
@@ -181,7 +182,7 @@ class PaymentService {
    */
   async updatePayment(id: string, organizationId: string, data: UpdatePaymentData) {
     // Check if payment exists
-    await this.getPaymentById(id, organizationId);
+    const existingPayment = await this.getPaymentById(id, organizationId);
 
     const payment = await prisma.payment.update({
       where: { id },
@@ -204,8 +205,47 @@ class PaymentService {
             },
           },
         },
+        enrollment: {
+          include: {
+            course: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        invoice: {
+          select: {
+            fileUrl: true,
+          },
+        },
       },
     });
+
+    // Send payment confirmation email if status changed to COMPLETED
+    const isPaymentCompleted = data.status === 'COMPLETED' && existingPayment.status !== 'COMPLETED';
+    if (isPaymentCompleted) {
+      try {
+        const paymentMethodNames: Record<string, string> = {
+          STRIPE: 'Stripe',
+          CASH: 'Gotówka',
+          BANK_TRANSFER: 'Przelew bankowy',
+        };
+
+        await emailService.sendPaymentConfirmation({
+          studentEmail: payment.student.user.email,
+          studentName: `${payment.student.user.firstName} ${payment.student.user.lastName}`,
+          amount: Number(payment.amount),
+          currency: payment.currency,
+          paymentMethod: paymentMethodNames[payment.paymentMethod] || payment.paymentMethod,
+          courseName: payment.enrollment?.course?.name,
+          invoiceUrl: payment.invoice?.fileUrl,
+        });
+      } catch (emailError) {
+        console.error('Failed to send payment confirmation email:', emailError);
+        // Don't fail the update if email fails
+      }
+    }
 
     return payment;
   }

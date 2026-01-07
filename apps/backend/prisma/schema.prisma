@@ -120,6 +120,22 @@ enum AttendanceStatus {
   EXCUSED
 }
 
+enum MessageStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+}
+
+enum MessageRecipientType {
+  ALL_STUDENTS
+  COURSE_STUDENTS
+  INDIVIDUAL_STUDENTS
+  ALL_TEACHERS
+  INDIVIDUAL_TEACHERS
+}
+
 // ============================================
 // CORE MODELS
 // ============================================

@@ -22,6 +22,8 @@ import dashboardRoutes from './routes/dashboard.routes';
 import alertRoutes from './routes/alert.routes';
 import materialRoutes from './routes/material.routes';
 import fileRoutes from './routes/file.routes';
+import attendanceRoutes from './routes/attendance.routes';
+import userProfileRoutes from './routes/userProfile.routes';
 
 // Import scheduler
 import scheduler from './utils/scheduler';
@@ -91,6 +93,8 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/materials', materialRoutes);
 app.use('/api/files', fileRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/profile', userProfileRoutes);
 
 // ============================================
 // ERROR HANDLING

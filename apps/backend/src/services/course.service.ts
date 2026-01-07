@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import emailService from './email.service';
 
 const prisma = new PrismaClient();
 
@@ -469,6 +470,20 @@ class CourseService {
         },
       },
     });
+
+    // Send enrollment confirmation email
+    try {
+      await emailService.sendEnrollmentConfirmation({
+        studentEmail: enrollment.student.user.email,
+        studentName: `${enrollment.student.user.firstName} ${enrollment.student.user.lastName}`,
+        courseName: enrollment.course.name,
+        courseType: `${enrollment.course.courseType.name} - ${enrollment.course.courseType.language} ${enrollment.course.courseType.level}`,
+        startDate: enrollment.course.startDate,
+      });
+    } catch (emailError) {
+      console.error('Failed to send enrollment confirmation email:', emailError);
+      // Don't fail the enrollment if email fails
+    }
 
     return enrollment;
   }

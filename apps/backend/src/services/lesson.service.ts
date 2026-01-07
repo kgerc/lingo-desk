@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import emailService from './email.service';
 
 const prisma = new PrismaClient();
 
@@ -344,7 +345,8 @@ class LessonService {
 
     // If cancelling, set cancelled timestamp
     const updateData: any = { ...data };
-    if (data.status === 'CANCELLED' && !existingLesson.cancelledAt) {
+    const isCancellingLesson = data.status === 'CANCELLED' && existingLesson.status !== 'CANCELLED' && !existingLesson.cancelledAt;
+    if (isCancellingLesson) {
       updateData.cancelledAt = new Date();
     }
 
@@ -402,6 +404,36 @@ class LessonService {
         attendances: true,
       },
     });
+
+    // Send cancellation emails if lesson was cancelled
+    if (isCancellingLesson) {
+      try {
+        // Email to teacher
+        await emailService.sendLessonCancellation({
+          recipientEmail: lesson.teacher.user.email,
+          recipientName: `${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}`,
+          otherPersonName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
+          otherPersonRole: 'uczeń',
+          lessonTitle: lesson.title,
+          lessonDate: lesson.scheduledAt,
+          cancellationReason: data.cancellationReason,
+        });
+
+        // Email to student
+        await emailService.sendLessonCancellation({
+          recipientEmail: lesson.student.user.email,
+          recipientName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
+          otherPersonName: `${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}`,
+          otherPersonRole: 'lektor',
+          lessonTitle: lesson.title,
+          lessonDate: lesson.scheduledAt,
+          cancellationReason: data.cancellationReason,
+        });
+      } catch (emailError) {
+        console.error('Failed to send lesson cancellation emails:', emailError);
+        // Don't fail the update if email fails
+      }
+    }
 
     return lesson;
   }
