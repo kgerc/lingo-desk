@@ -205,6 +205,38 @@ class PaymentController {
       });
     }
   }
+
+  /**
+   * Import payments from CSV
+   * POST /api/payments/import
+   */
+  async importPayments(req: Request, res: Response) {
+    try {
+      const organizationId = req.user!.organizationId;
+      const { csvData } = req.body;
+
+      if (!csvData) {
+        return res.status(400).json({
+          success: false,
+          message: 'CSV data is required',
+        });
+      }
+
+      const results = await paymentService.importPayments(csvData, organizationId);
+
+      res.json({
+        success: true,
+        data: results,
+        message: `Import zakończony: ${results.success} sukces, ${results.failed} błędów`,
+      });
+    } catch (error) {
+      console.error('Error importing payments:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to import payments',
+      });
+    }
+  }
 }
 
 export default new PaymentController();

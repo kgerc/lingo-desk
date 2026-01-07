@@ -128,11 +128,20 @@ model Organization {
   timezone             String   @default("Europe/Warsaw")
   currency             String   @default("PLN")
   country              String   @default("PL")
+  address              String?
+  city                 String?
+  postalCode           String?  @map("postal_code")
+  phone                String?
+  email                String?
+  website              String?
+  taxId                String?  @map("tax_id") // NIP for Poland
+  description          String?
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   // Relations
-  users                User[]
+  users                User[] @relation("PrimaryOrganization")
+  userOrganizations    UserOrganization[]
   students             Student[]
   teachers             Teacher[]
   courses              Course[]
@@ -168,14 +177,15 @@ model User {
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  profile          UserProfile?
-  teacher          Teacher?
-  student          Student?
-  parentRelations  ParentStudentRelation[] @relation("ParentRelations")
-  notifications    Notification[]
-  filesUploaded    File[]
-  notesCreated     Note[]
+  organization       Organization @relation("PrimaryOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  organizations      UserOrganization[]
+  profile            UserProfile?
+  teacher            Teacher?
+  student            Student?
+  parentRelations    ParentStudentRelation[] @relation("ParentRelations")
+  notifications      Notification[]
+  filesUploaded      File[]
+  notesCreated       Note[]
 
   @@index([organizationId])
   @@index([email])
@@ -816,4 +826,29 @@ model OrganizationSettings {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("organization_settings")
+}
+
+// ============================================
+// USER ORGANIZATIONS (Many-to-Many)
+// ============================================
+
+model UserOrganization {
+  id               String       @id @default(uuid())
+  userId           String       @map("user_id")
+  organizationId   String       @map("organization_id")
+  role             UserRole
+  isActive         Boolean      @default(true) @map("is_active")
+  isPrimary        Boolean      @default(false) @map("is_primary") // Primary organization for user
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([role])
+  @@map("user_organizations")
 }

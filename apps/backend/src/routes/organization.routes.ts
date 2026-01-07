@@ -1,24 +1,45 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth';
 import { UserRole } from '@prisma/client';
+import { organizationController } from '../controllers/organization.controller';
 
 const router = Router();
 router.use(authenticate);
 
-router.get('/', authorize(UserRole.ADMIN), (req, res) => {
-  res.json({ message: 'Get organization - TODO' });
-});
+// Get current organization
+router.get('/', organizationController.getOrganization.bind(organizationController));
 
-router.put('/', authorize(UserRole.ADMIN), (req, res) => {
-  res.json({ message: 'Update organization - TODO' });
-});
+// Get all organizations user has access to
+router.get('/my-organizations', organizationController.getUserOrganizations.bind(organizationController));
 
-router.get('/settings', authorize(UserRole.ADMIN), (req, res) => {
-  res.json({ message: 'Get settings - TODO' });
-});
+// Update organization (ADMIN or MANAGER only)
+router.put(
+  '/',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  organizationController.updateOrganization.bind(organizationController)
+);
 
-router.put('/settings', authorize(UserRole.ADMIN), (req, res) => {
-  res.json({ message: 'Update settings - TODO' });
-});
+// Create new organization
+router.post(
+  '/',
+  organizationController.createOrganization.bind(organizationController)
+);
+
+// Switch active organization
+router.post('/switch', organizationController.switchOrganization.bind(organizationController));
+
+// Add user to organization (ADMIN or MANAGER only)
+router.post(
+  '/users',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  organizationController.addUserToOrganization.bind(organizationController)
+);
+
+// Remove user from organization (ADMIN or MANAGER only)
+router.delete(
+  '/users/:userId',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  organizationController.removeUserFromOrganization.bind(organizationController)
+);
 
 export default router;

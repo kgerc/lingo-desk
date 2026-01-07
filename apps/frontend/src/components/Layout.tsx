@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSidebarStore } from '../stores/sidebarStore';
 import NotificationBell from './NotificationBell';
+import OrganizationSwitcher from './OrganizationSwitcher';
 import {
   Home,
   Users,
@@ -227,6 +228,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex items-center gap-4">
             {/* Notifications */}
             <NotificationBell />
+            <div className="h-9 w-px bg-gray-200" />
+            {/* 🔽 Organization Switcher */}
+            <OrganizationSwitcher />
 
             {/* User Menu */}
             <div className="flex items-center gap-3 border-l border-gray-200 pl-4">
@@ -234,6 +238,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 {user?.firstName?.[0]}
                 {user?.lastName?.[0]}
               </div>
+
               <div className="flex flex-col">
                 <p className="text-sm font-medium text-gray-900">
                   {user?.firstName} {user?.lastName}
@@ -246,6 +251,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   {user?.role === 'PARENT' && 'Rodzic'}
                 </p>
               </div>
+
               <button
                 onClick={logout}
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"

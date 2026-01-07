@@ -14,6 +14,7 @@ import CalendarPage from './pages/CalendarPage'
 import PaymentsPage from './pages/PaymentsPage'
 import TeacherSchedulePage from './pages/TeacherSchedulePage'
 import TeacherAvailabilityPage from './pages/TeacherAvailabilityPage'
+import OrganizationSettingsPage from './pages/OrganizationSettingsPage'
 import Layout from './components/Layout'
 
 function App() {
@@ -207,6 +208,19 @@ function App() {
             isAuthenticated ? (
               <Layout>
                 <TeacherAvailabilityPage />
+              </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/settings"
+          element={
+            isAuthenticated ? (
+              <Layout>
+                <OrganizationSettingsPage />
               </Layout>
             ) : (
               <Navigate to="/login" />

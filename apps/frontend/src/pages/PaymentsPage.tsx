@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import paymentService, { Payment } from '../services/paymentService';
-import { Plus, Search, Trash2, Edit, DollarSign, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, DollarSign, Clock, CheckCircle, XCircle, Upload } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal';
+import ImportPaymentsModal from '../components/ImportPaymentsModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function PaymentsPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -106,13 +108,22 @@ export default function PaymentsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Płatności</h1>
           <p className="text-gray-600 mt-1">Zarządzaj płatnościami uczniów</p>
         </div>
-        <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Dodaj płatność
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors border border-gray-300"
+          >
+            <Upload className="w-5 h-5" />
+            Import CSV
+          </button>
+          <button
+            onClick={handleCreate}
+            className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Dodaj płatność
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -295,6 +306,11 @@ export default function PaymentsPage() {
       {/* Payment Modal */}
       {isModalOpen && (
         <PaymentModal payment={selectedPayment} onClose={handleCloseModal} />
+      )}
+
+      {/* Import Payments Modal */}
+      {isImportModalOpen && (
+        <ImportPaymentsModal onClose={() => setIsImportModalOpen(false)} />
       )}
 
       {/* Confirm Delete Dialog */}

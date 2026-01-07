@@ -126,6 +126,18 @@ const paymentService = {
     const response = await api.get(`/payments/student/${studentId}`);
     return response.data.data;
   },
+
+  /**
+   * Import payments from CSV
+   */
+  async importPayments(csvData: string): Promise<{
+    success: number;
+    failed: number;
+    errors: Array<{ row: number; error: string; data: string }>;
+  }> {
+    const response = await api.post('/payments/import', { csvData });
+    return response.data.data;
+  },
 };
 
 export default paymentService;
