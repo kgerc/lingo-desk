@@ -43,12 +43,12 @@ const RegisterPage: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="flex items-center justify-center gap-4 mb-6">
-            <div className="h-24 w-24 bg-white rounded-2xl flex items-center justify-center p-4 shadow-lg border border-gray-200">
+          <div className="flex items-center justify-center mr-8">
+            <div className="h-20 w-20 flex items-center justify-center">
               <img
-                src="/lingodesk_logo.png"
+                src="/lingodesk_logo_medium.png"
                 alt="LingoDesk Logo"
-                className="h-full w-full object-contain"
+                className="h-full w-full object-cover scale-150 ml-1 mt-1"
                 onError={(e) => {
                   console.error('Logo failed to load');
                   e.currentTarget.style.display = 'none';
