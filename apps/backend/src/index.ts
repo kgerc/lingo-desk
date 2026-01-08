@@ -24,6 +24,7 @@ import materialRoutes from './routes/material.routes';
 import fileRoutes from './routes/file.routes';
 import attendanceRoutes from './routes/attendance.routes';
 import userProfileRoutes from './routes/userProfile.routes';
+import mailingRoutes from './routes/mailing.routes';
 
 // Import scheduler
 import scheduler from './utils/scheduler';
@@ -69,7 +70,7 @@ app.use('/api/', rateLimiter);
 // ============================================
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -95,6 +96,7 @@ app.use('/api/materials', materialRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/profile', userProfileRoutes);
+app.use('/api/mailings', mailingRoutes);
 
 // ============================================
 // ERROR HANDLING
