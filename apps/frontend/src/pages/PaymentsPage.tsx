@@ -136,7 +136,7 @@ export default function PaymentsPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Całkowity przychód</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalRevenue.toFixed(2)} PLN</p>
+                <p className="text-2xl font-bold text-gray-900">{Number(stats.totalRevenue).toFixed(2)} PLN</p>
               </div>
             </div>
           </div>
@@ -148,7 +148,7 @@ export default function PaymentsPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Oczekujące</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.pendingRevenue.toFixed(2)} PLN</p>
+                <p className="text-2xl font-bold text-gray-900">{Number(stats.pendingRevenue).toFixed(2)} PLN</p>
               </div>
             </div>
           </div>

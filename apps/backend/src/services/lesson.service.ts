@@ -50,7 +50,8 @@ class LessonService {
     const { organizationId, enrollmentId, teacherId, studentId, courseId, ...lessonData } = data;
 
     // Verify enrollment exists and belongs to organization
-    const enrollment = await prisma.studentEnrollment.findFirst({
+    let contractEnrollmentId = enrollmentId;
+    let enrollment = await prisma.studentEnrollment.findFirst({
       where: {
         id: enrollmentId,
         course: { organizationId },
@@ -62,7 +63,37 @@ class LessonService {
     });
 
     if (!enrollment) {
-      throw new Error('Enrollment not found');
+    enrollment = await prisma.studentEnrollment.create({
+        data: {
+          courseId,
+          studentId,
+          enrollmentDate: new Date(),
+          status: 'ACTIVE',
+          paymentMode: 'PER_LESSON',
+          hoursPurchased: 0,
+          hoursUsed: 0
+        },
+        include: {
+          student: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          },
+          course: {
+            include: {
+              courseType: true,
+            },
+          },
+        },
+      });
+      contractEnrollmentId = enrollment.id;
     }
 
     // Verify teacher exists and belongs to organization
@@ -94,7 +125,7 @@ class LessonService {
       data: {
         organizationId,
         courseId: courseId || enrollment.courseId,
-        enrollmentId,
+        enrollmentId: contractEnrollmentId,
         teacherId,
         studentId,
         status: data.status || 'SCHEDULED',

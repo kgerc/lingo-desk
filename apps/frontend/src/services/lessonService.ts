@@ -92,7 +92,7 @@ export interface Lesson {
 
 export interface CreateLessonData {
   courseId?: string;
-  enrollmentId: string;
+  enrollmentId?: string;
   teacherId: string;
   studentId: string;
   title: string;

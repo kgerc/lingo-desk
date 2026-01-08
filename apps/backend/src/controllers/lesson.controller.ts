@@ -5,7 +5,7 @@ import { AuthRequest } from '../middleware/auth';
 
 const createLessonSchema = z.object({
   courseId: z.string().uuid().optional(),
-  enrollmentId: z.string().uuid(),
+  enrollmentId: z.string().optional(),
   teacherId: z.string().uuid(),
   studentId: z.string().uuid(),
   title: z.string().min(2),

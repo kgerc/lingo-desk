@@ -151,7 +151,7 @@ class PaymentService {
       data: {
         organizationId: data.organizationId,
         studentId: data.studentId,
-        enrollmentId: data.enrollmentId,
+        enrollmentId: data.enrollmentId || null,
         amount: data.amount,
         currency: data.currency || 'PLN',
         status: data.status,

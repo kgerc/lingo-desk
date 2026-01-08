@@ -10,10 +10,10 @@ export default function NotificationBell() {
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Fetch unread count on mount and every 30 seconds
+  // Fetch unread count on mount and every 5 minutes
   useEffect(() => {
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
+    const interval = setInterval(fetchUnreadCount, 300000);
     return () => clearInterval(interval);
   }, []);
 

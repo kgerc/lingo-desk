@@ -49,7 +49,10 @@ class AlertService {
     });
 
     if (pendingPayments.length > 0) {
-      const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
+      const totalPending = pendingPayments.reduce(
+        (sum, p) => sum + Number(p.amount),
+        0
+      );
       alerts.push({
         id: 'pending-payments',
         type: 'INFO',

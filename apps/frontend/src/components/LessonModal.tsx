@@ -245,7 +245,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
 
     const lessonData: CreateLessonData = {
       courseId: formData.courseId || undefined,
-      enrollmentId: '', // Will be set per student
+      enrollmentId: undefined, // Will be set per student
       teacherId: formData.teacherId,
       studentId: '', // Will be set per student
       title: formData.title,
