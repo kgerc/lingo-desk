@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { lessonService, Lesson, CreateLessonData, LessonDeliveryMode } from '../services/lessonService';
 import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
 import { courseService } from '../services/courseService';
-import { X, ChevronDown } from 'lucide-react';
+import { X, Calendar, Users as UsersIcon } from 'lucide-react';
 import AttendanceSection from './AttendanceSection';
 
 interface LessonModalProps {
@@ -16,15 +16,16 @@ interface LessonModalProps {
   onSuccess: () => void;
 }
 
+type TabType = 'basic' | 'participants';
+
 const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialDuration, onClose, onSuccess }) => {
   const isEdit = !!lesson;
-  const [isParticipantsExpanded, setIsParticipantsExpanded] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>('basic');
 
   const [formData, setFormData] = useState({
     courseId: lesson?.courseId || '',
-    enrollmentId: lesson?.enrollmentId || '',
     teacherId: lesson?.teacherId || '',
-    studentId: lesson?.studentId || '',
+    studentIds: lesson ? [lesson.studentId] : [] as string[],
     title: lesson?.title || '',
     description: lesson?.description || '',
     scheduledAt: lesson?.scheduledAt
@@ -41,94 +42,67 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
   });
 
   const [isRecurring, setIsRecurring] = useState(false);
-  const [recurringPattern, setRecurringPattern] = useState({
-    frequency: 'WEEKLY' as 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY',
-    interval: 1,
-    daysOfWeek: [] as number[],
-    endDate: '',
-    occurrencesCount: '',
-  });
   const [recurringType, setRecurringType] = useState<'weeks' | 'months'>('weeks');
   const [recurringCount, setRecurringCount] = useState<string>('4');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [conflicts, setConflicts] = useState<any>(null);
 
-  // Fetch teachers for dropdown
+  // Fetch teachers
   const { data: teachers = [] } = useQuery({
     queryKey: ['teachers'],
     queryFn: () => teacherService.getTeachers({ isActive: true }),
   });
 
-  // Fetch students for dropdown
+  // Fetch students
   const { data: students = [] } = useQuery({
     queryKey: ['students'],
     queryFn: () => studentService.getStudents({ isActive: true }),
   });
 
-  // Fetch courses for dropdown
+  // Fetch courses
   const { data: courses = [] } = useQuery({
     queryKey: ['courses'],
     queryFn: () => courseService.getCourses({ isActive: true }),
   });
 
-  // Fetch enrollments for selected student
-  const { data: enrollments = [] } = useQuery({
-    queryKey: ['enrollments', formData.studentId],
-    queryFn: async () => {
-      if (!formData.studentId) return [];
-      const allCourses = await courseService.getCourses({ isActive: true });
-      const studentEnrollments: any[] = [];
+  // When course is selected, auto-populate students from that course
+  useEffect(() => {
+    if (formData.courseId && !isEdit) {
+      const selectedCourse = courses.find(c => c.id === formData.courseId);
+      if (selectedCourse?.enrollments) {
+        const courseStudentIds = selectedCourse.enrollments
+          .filter(e => e.status === 'ACTIVE')
+          .map(e => e.studentId);
+        setFormData(prev => ({ ...prev, studentIds: courseStudentIds }));
+      }
+    }
+  }, [formData.courseId, courses, isEdit]);
 
-      allCourses.forEach(course => {
-        course.enrollments?.forEach(enrollment => {
-          if (enrollment.studentId === formData.studentId && enrollment.status === 'ACTIVE') {
-            studentEnrollments.push({
-              id: enrollment.id,
-              courseId: course.id,
-              courseName: course.name,
-              courseType: course.courseType,
-            });
-          }
+  const createMutation = useMutation({
+    mutationFn: async (data: { lessonData: CreateLessonData; studentIds: string[] }) => {
+      // Create multiple lessons, one for each student
+      const promises = data.studentIds.map(studentId => {
+        // Find enrollment for this student in the selected course
+        let enrollmentId = '';
+        if (formData.courseId) {
+          const course = courses.find(c => c.id === formData.courseId);
+          const enrollment = course?.enrollments?.find(
+            e => e.studentId === studentId && e.status === 'ACTIVE'
+          );
+          enrollmentId = enrollment?.id || '';
+        }
+
+        return lessonService.createLesson({
+          ...data.lessonData,
+          studentId,
+          enrollmentId,
         });
       });
 
-      return studentEnrollments;
+      return Promise.all(promises);
     },
-    enabled: !!formData.studentId,
-  });
-
-  // Check for conflicts when teacher, student, time, or duration changes
-  const { data: conflictData, isLoading: isCheckingConflicts } = useQuery({
-    queryKey: ['conflicts', formData.teacherId, formData.studentId, formData.scheduledAt, formData.durationMinutes],
-    queryFn: async () => {
-      if (!formData.teacherId || !formData.studentId || !formData.scheduledAt || !formData.durationMinutes) {
-        return null;
-      }
-
-      try {
-        const conflicts = await lessonService.checkConflicts(
-          formData.teacherId,
-          formData.studentId,
-          formData.scheduledAt,
-          Number(formData.durationMinutes),
-          lesson?.id
-        );
-        setConflicts(conflicts);
-        return conflicts;
-      } catch (error) {
-        console.error('Error checking conflicts:', error);
-        return null;
-      }
-    },
-    enabled: !!(formData.teacherId && formData.studentId && formData.scheduledAt && formData.durationMinutes),
-    refetchOnWindowFocus: false,
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (data: CreateLessonData) => lessonService.createLesson(data),
-    onSuccess: () => {
-      toast.success('Lekcja została pomyślnie utworzona');
+    onSuccess: (results) => {
+      toast.success(`Utworzono ${results.length} ${results.length === 1 ? 'lekcję' : 'lekcji'}`);
       onSuccess();
     },
     onError: (error: any) => {
@@ -139,17 +113,38 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
   });
 
   const createRecurringMutation = useMutation({
-    mutationFn: (data: {
+    mutationFn: async (data: {
       lessonData: CreateLessonData;
-      pattern: {
-        frequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
-        interval?: number;
-        daysOfWeek?: number[];
-        startDate: string;
-        endDate?: string;
-        occurrencesCount?: number;
-      };
-    }) => lessonService.createRecurringLessons(data.lessonData, data.pattern),
+      pattern: any;
+      studentIds: string[];
+    }) => {
+      // Create recurring lessons for each student
+      const promises = data.studentIds.map(studentId => {
+        let enrollmentId = '';
+        if (formData.courseId) {
+          const course = courses.find(c => c.id === formData.courseId);
+          const enrollment = course?.enrollments?.find(
+            e => e.studentId === studentId && e.status === 'ACTIVE'
+          );
+          enrollmentId = enrollment?.id || '';
+        }
+
+        return lessonService.createRecurringLessons(
+          {
+            ...data.lessonData,
+            studentId,
+            enrollmentId,
+          },
+          data.pattern
+        );
+      });
+
+      const results = await Promise.all(promises);
+      const totalCreated = results.reduce((sum, r) => sum + r.totalCreated, 0);
+      const totalErrors = results.reduce((sum, r) => sum + r.totalErrors, 0);
+
+      return { totalCreated, totalErrors };
+    },
     onSuccess: (result) => {
       toast.success(`Utworzono ${result.totalCreated} cyklicznych lekcji${result.totalErrors > 0 ? ` (pominięto ${result.totalErrors} z powodu konfliktów)` : ''}`);
       onSuccess();
@@ -181,23 +176,18 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    // Clear error for this field
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
     }
+  };
 
-    // Auto-fill enrollment when student and course are selected
-    if (name === 'studentId' || name === 'courseId') {
-      const studentId = name === 'studentId' ? value : formData.studentId;
-      const courseId = name === 'courseId' ? value : formData.courseId;
-
-      if (studentId && courseId && enrollments.length > 0) {
-        const enrollment = enrollments.find((e: any) => e.courseId === courseId);
-        if (enrollment) {
-          setFormData((prev) => ({ ...prev, enrollmentId: enrollment.id }));
-        }
-      }
-    }
+  const toggleStudent = (studentId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      studentIds: prev.studentIds.includes(studentId)
+        ? prev.studentIds.filter(id => id !== studentId)
+        : [...prev.studentIds, studentId]
+    }));
   };
 
   const validate = () => {
@@ -211,12 +201,8 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       newErrors.teacherId = 'Lektor jest wymagany';
     }
 
-    if (!formData.studentId) {
-      newErrors.studentId = 'Uczeń jest wymagany';
-    }
-
-    if (!formData.enrollmentId) {
-      newErrors.enrollmentId = 'Wybierz kurs dla ucznia';
+    if (formData.studentIds.length === 0) {
+      newErrors.studentIds = 'Wybierz co najmniej jednego ucznia';
     }
 
     if (!formData.scheduledAt) {
@@ -229,11 +215,6 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
 
     if (formData.deliveryMode === 'ONLINE' && formData.meetingUrl && !isValidUrl(formData.meetingUrl)) {
       newErrors.meetingUrl = 'Podaj prawidłowy URL spotkania';
-    }
-
-    // Check for scheduling conflicts
-    if (conflicts && conflicts.hasConflicts) {
-      newErrors.form = 'Nie można zapisać lekcji - wykryto konflikt terminów. Zmień termin lub czas trwania.';
     }
 
     setErrors(newErrors);
@@ -252,511 +233,497 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validate()) return;
+    if (!validate()) {
+      // Switch to the tab with error
+      if (errors.title || errors.scheduledAt || errors.durationMinutes || errors.deliveryMode) {
+        setActiveTab('basic');
+      } else if (errors.teacherId || errors.studentIds) {
+        setActiveTab('participants');
+      }
+      return;
+    }
 
-    const data: any = {
+    const lessonData: CreateLessonData = {
       courseId: formData.courseId || undefined,
-      enrollmentId: formData.enrollmentId,
+      enrollmentId: '', // Will be set per student
       teacherId: formData.teacherId,
-      studentId: formData.studentId,
+      studentId: '', // Will be set per student
       title: formData.title,
       description: formData.description || undefined,
-      scheduledAt: new Date(formData.scheduledAt).toISOString(),
-      durationMinutes: parseInt(formData.durationMinutes),
+      scheduledAt: formData.scheduledAt,
+      durationMinutes: Number(formData.durationMinutes),
       deliveryMode: formData.deliveryMode,
-      meetingUrl: formData.meetingUrl || undefined,
-      locationId: formData.locationId || undefined,
-      classroomId: formData.classroomId || undefined,
-      status: isEdit ? formData.status : 'SCHEDULED' as const,
+      meetingUrl: formData.deliveryMode === 'ONLINE' ? formData.meetingUrl || undefined : undefined,
+      locationId: formData.deliveryMode === 'IN_PERSON' ? formData.locationId || undefined : undefined,
+      classroomId: formData.deliveryMode === 'IN_PERSON' ? formData.classroomId || undefined : undefined,
+      status: formData.status as any,
     };
 
     if (isEdit && lesson) {
-      await updateMutation.mutateAsync({ id: lesson.id, updates: data });
-    } else if (isRecurring) {
-      // Create recurring lessons with simplified pattern
-      const count = parseInt(recurringCount) || 1;
-      const frequency = recurringType === 'weeks' ? 'WEEKLY' : 'MONTHLY';
-
-      await createRecurringMutation.mutateAsync({
-        lessonData: data,
-        pattern: {
-          frequency: frequency as 'WEEKLY' | 'MONTHLY',
-          interval: 1,
-          startDate: new Date(formData.scheduledAt).toISOString(),
-          occurrencesCount: count,
+      // For edit mode, only update the single lesson
+      updateMutation.mutate({
+        id: lesson.id,
+        updates: {
+          ...lessonData,
+          studentId: formData.studentIds[0], // In edit mode we only have one student
+          enrollmentId: lesson.enrollmentId,
         },
       });
     } else {
-      await createMutation.mutateAsync(data);
+      // For create mode
+      if (isRecurring) {
+        const scheduledDate = new Date(formData.scheduledAt);
+        const endDate = new Date(scheduledDate);
+
+        if (recurringType === 'weeks') {
+          endDate.setDate(endDate.getDate() + (Number(recurringCount) * 7));
+        } else {
+          endDate.setMonth(endDate.getMonth() + Number(recurringCount));
+        }
+
+        const pattern = {
+          frequency: recurringType === 'weeks' ? 'WEEKLY' as const : 'MONTHLY' as const,
+          interval: 1,
+          startDate: formData.scheduledAt,
+          endDate: endDate.toISOString(),
+        };
+
+        createRecurringMutation.mutate({
+          lessonData,
+          pattern,
+          studentIds: formData.studentIds,
+        });
+      } else {
+        createMutation.mutate({
+          lessonData,
+          studentIds: formData.studentIds,
+        });
+      }
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">
-            {isEdit ? 'Edytuj lekcję' : 'Dodaj nową lekcję'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+  const tabs = [
+    {
+      id: 'basic' as TabType,
+      name: 'Podstawowe',
+      icon: Calendar,
+    },
+    {
+      id: 'participants' as TabType,
+      name: 'Uczestnicy',
+      icon: UsersIcon,
+    },
+  ];
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {errors.form && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {errors.form}
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+
+        <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <h2 className="text-2xl font-bold text-gray-900">
+              {isEdit ? 'Edytuj lekcję' : 'Dodaj nową lekcję'}
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+
+          {/* Tabs */}
+          {!isEdit && (
+            <div className="border-b border-gray-200 bg-gray-50">
+              <nav className="flex gap-6 px-6">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                        isActive
+                          ? 'border-primary text-primary'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                      {tab.name}
+                    </button>
+                  );
+                })}
+              </nav>
             </div>
           )}
 
-          {/* Basic Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Podstawowe informacje</h3>
-
-            {/* Title */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tytuł lekcji *
-              </label>
-              <input
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                  errors.title ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="np. Lekcja angielskiego - gramatyka"
-              />
-              {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title}</p>}
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Opis (opcjonalnie)
-              </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Opis lekcji, tematy do omówienia..."
-              />
-            </div>
-          </div>
-
-          {/* Participants */}
-          <div className="space-y-4">
-            <button
-              type="button"
-              onClick={() => setIsParticipantsExpanded(!isParticipantsExpanded)}
-              className="w-full flex items-center justify-between text-lg font-semibold text-gray-900 hover:text-primary transition-colors"
-            >
-              <span>Uczestnicy</span>
-              <ChevronDown
-                className={`h-5 w-5 transition-transform ${
-                  isParticipantsExpanded ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
-
-            {isParticipantsExpanded && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Teacher */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Lektor *
-                </label>
-                <select
-                  name="teacherId"
-                  value={formData.teacherId}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                    errors.teacherId ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                >
-                  <option value="">Wybierz lektora</option>
-                  {teachers.map((teacher) => (
-                    <option key={teacher.id} value={teacher.id}>
-                      {teacher.user.firstName} {teacher.user.lastName}
-                    </option>
-                  ))}
-                </select>
-                {errors.teacherId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.teacherId}</p>
-                )}
-              </div>
-
-              {/* Student */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Uczeń *
-                </label>
-                <select
-                  name="studentId"
-                  value={formData.studentId}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                    errors.studentId ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                >
-                  <option value="">Wybierz ucznia</option>
-                  {students.map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.user.firstName} {student.user.lastName}
-                    </option>
-                  ))}
-                </select>
-                {errors.studentId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.studentId}</p>
-                )}
-              </div>
-
-              {/* Course (optional) */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Kurs (opcjonalnie)
-                </label>
-                <select
-                  name="courseId"
-                  value={formData.courseId}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="">Wybierz kurs</option>
-                  {courses.map((course) => (
-                    <option key={course.id} value={course.id}>
-                      {course.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Enrollment */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Zapisy ucznia *
-                </label>
-                <select
-                  name="enrollmentId"
-                  value={formData.enrollmentId}
-                  onChange={handleChange}
-                  disabled={!formData.studentId}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100 ${
-                    errors.enrollmentId ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                >
-                  <option value="">
-                    {!formData.studentId
-                      ? 'Najpierw wybierz ucznia'
-                      : enrollments.length === 0
-                      ? 'Brak aktywnych zapisów na kursy'
-                      : 'Wybierz kurs'}
-                  </option>
-                  {enrollments.map((enrollment: any) => (
-                    <option key={enrollment.id} value={enrollment.id}>
-                      {enrollment.courseName}
-                    </option>
-                  ))}
-                </select>
-                {errors.enrollmentId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.enrollmentId}</p>
-                )}
-                {formData.studentId && enrollments.length === 0 && (
-                  <p className="mt-1 text-sm text-amber-600">
-                    Ten uczeń nie ma aktywnych zapisów na żaden kurs. Najpierw zapisz ucznia na kurs.
-                  </p>
-                )}
-              </div>
-              </div>
-            )}
-          </div>
-
-          {/* Schedule */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Harmonogram</h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Scheduled At */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Data i godzina *
-                </label>
-                <input
-                  type="datetime-local"
-                  name="scheduledAt"
-                  value={formData.scheduledAt}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                    errors.scheduledAt ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {errors.scheduledAt && (
-                  <p className="mt-1 text-sm text-red-600">{errors.scheduledAt}</p>
-                )}
-              </div>
-
-              {/* Duration */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Czas trwania (minuty) *
-                </label>
-                <input
-                  type="number"
-                  name="durationMinutes"
-                  value={formData.durationMinutes}
-                  onChange={handleChange}
-                  min="15"
-                  step="15"
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                    errors.durationMinutes ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {errors.durationMinutes && (
-                  <p className="mt-1 text-sm text-red-600">{errors.durationMinutes}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Conflict Warnings */}
-            {isCheckingConflicts && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-700">Sprawdzanie dostępności...</p>
-              </div>
-            )}
-
-            {conflicts && conflicts.hasConflicts && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
-                <div className="flex items-start gap-2">
-                  <svg className="w-5 h-5 text-red-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <div className="flex-1">
-                    <p className="font-medium text-red-800">Wykryto konflikt terminów!</p>
-
-                    {conflicts.teacherConflicts.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-sm font-medium text-red-700">Lektor jest zajęty:</p>
-                        <ul className="mt-1 space-y-1">
-                          {conflicts.teacherConflicts.map((conflict: any) => (
-                            <li key={conflict.id} className="text-sm text-red-600">
-                              • {new Date(conflict.scheduledAt).toLocaleString('pl-PL')} ({conflict.durationMinutes} min) - {conflict.studentName}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {conflicts.studentConflicts.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-sm font-medium text-red-700">Uczeń jest zajęty:</p>
-                        <ul className="mt-1 space-y-1">
-                          {conflicts.studentConflicts.map((conflict: any) => (
-                            <li key={conflict.id} className="text-sm text-red-600">
-                              • {new Date(conflict.scheduledAt).toLocaleString('pl-PL')} ({conflict.durationMinutes} min) - {conflict.teacherName}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+            <div className="p-6 space-y-6">
+              {errors.form && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-800">{errors.form}</p>
                 </div>
-              </div>
-            )}
+              )}
 
-            {conflicts && !conflicts.hasConflicts && formData.teacherId && formData.studentId && formData.scheduledAt && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <p className="text-sm text-green-700 font-medium">Termin dostępny ✓</p>
-                </div>
-              </div>
-            )}
-          </div>
+              {/* Tab: Basic Information */}
+              {(activeTab === 'basic' || isEdit) && (
+                <>
+                  {/* Basic Info */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Podstawowe informacje</h3>
 
-          {/* Recurring Lessons - only show for new lessons */}
-          {!isEdit && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Lekcje cykliczne</h3>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isRecurring}
-                    onChange={(e) => setIsRecurring(e.target.checked)}
-                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                  />
-                  <span className="text-sm text-gray-700">Utwórz serię lekcji</span>
-                </label>
-              </div>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Tytuł lekcji *
+                        </label>
+                        <input
+                          type="text"
+                          name="title"
+                          value={formData.title}
+                          onChange={handleChange}
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                            errors.title ? 'border-red-500' : 'border-gray-300'
+                          }`}
+                          placeholder="np. Lekcja konwersacyjna"
+                        />
+                        {errors.title && (
+                          <p className="mt-1 text-sm text-red-600">{errors.title}</p>
+                        )}
+                      </div>
 
-              {isRecurring && (
-                <div className="space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Count */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Liczba
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="52"
-                        value={recurringCount}
-                        onChange={(e) => setRecurringCount(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                        placeholder="np. 4"
-                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Opis (opcjonalnie)
+                        </label>
+                        <textarea
+                          name="description"
+                          value={formData.description}
+                          onChange={handleChange}
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="Opis lekcji, tematy do omówienia..."
+                        />
+                      </div>
                     </div>
+                  </div>
 
-                    {/* Type */}
+                  {/* Delivery Mode */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Sposób przeprowadzenia</h3>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Okres
+                        Tryb *
                       </label>
                       <select
-                        value={recurringType}
-                        onChange={(e) => setRecurringType(e.target.value as 'weeks' | 'months')}
+                        name="deliveryMode"
+                        value={formData.deliveryMode}
+                        onChange={handleChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       >
-                        <option value="weeks">Tygodni</option>
-                        <option value="months">Miesięcy</option>
+                        <option value="IN_PERSON">Stacjonarne</option>
+                        <option value="ONLINE">Online</option>
                       </select>
                     </div>
+
+                    {formData.deliveryMode === 'ONLINE' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Link do spotkania
+                        </label>
+                        <input
+                          type="url"
+                          name="meetingUrl"
+                          value={formData.meetingUrl}
+                          onChange={handleChange}
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                            errors.meetingUrl ? 'border-red-500' : 'border-gray-300'
+                          }`}
+                          placeholder="https://meet.google.com/..."
+                        />
+                        {errors.meetingUrl && (
+                          <p className="mt-1 text-sm text-red-600">{errors.meetingUrl}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded p-3">
-                    <p className="font-medium text-blue-800">Informacja:</p>
-                    <p className="mt-1">
-                      System utworzy {recurringCount || '0'} {recurringType === 'weeks' ? 'tygodni' : 'miesięcy'} lekcji
-                      w tym samym dniu tygodnia i o tej samej godzinie.
-                      Lekcje z konfliktami harmonogramu zostaną automatycznie pominięte.
-                    </p>
+                  {/* Schedule */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Harmonogram</h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Data i godzina *
+                        </label>
+                        <input
+                          type="datetime-local"
+                          name="scheduledAt"
+                          value={formData.scheduledAt}
+                          onChange={handleChange}
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                            errors.scheduledAt ? 'border-red-500' : 'border-gray-300'
+                          }`}
+                        />
+                        {errors.scheduledAt && (
+                          <p className="mt-1 text-sm text-red-600">{errors.scheduledAt}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Czas trwania (minuty) *
+                        </label>
+                        <input
+                          type="number"
+                          name="durationMinutes"
+                          value={formData.durationMinutes}
+                          onChange={handleChange}
+                          min="15"
+                          step="15"
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                            errors.durationMinutes ? 'border-red-500' : 'border-gray-300'
+                          }`}
+                        />
+                        {errors.durationMinutes && (
+                          <p className="mt-1 text-sm text-red-600">{errors.durationMinutes}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Recurring Lessons - only show for new lessons */}
+                    {!isEdit && (
+                      <div className="pt-4 border-t border-gray-200">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isRecurring}
+                            onChange={(e) => setIsRecurring(e.target.checked)}
+                            className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                          />
+                          <span className="text-sm font-medium text-gray-700">Utwórz serię lekcji</span>
+                        </label>
+
+                        {isRecurring && (
+                          <div className="mt-4 space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Liczba
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="52"
+                                  value={recurringCount}
+                                  onChange={(e) => setRecurringCount(e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                  placeholder="np. 4"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Okres
+                                </label>
+                                <select
+                                  value={recurringType}
+                                  onChange={(e) => setRecurringType(e.target.value as 'weeks' | 'months')}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                  <option value="weeks">Tygodni</option>
+                                  <option value="months">Miesięcy</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded p-3">
+                              <p className="font-medium text-blue-800">Informacja:</p>
+                              <p className="mt-1">
+                                System utworzy {recurringCount || '0'} {recurringType === 'weeks' ? 'tygodni' : 'miesięcy'} lekcji
+                                w tym samym dniu tygodnia i o tej samej godzinie.
+                                Lekcje z konfliktami harmonogramu zostaną automatycznie pominięte.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Tab: Participants */}
+              {(activeTab === 'participants' || isEdit) && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Uczestnicy</h3>
+
+                  {/* Teacher */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Lektor *
+                    </label>
+                    <select
+                      name="teacherId"
+                      value={formData.teacherId}
+                      onChange={handleChange}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                        errors.teacherId ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    >
+                      <option value="">Wybierz lektora</option>
+                      {teachers.map((teacher) => (
+                        <option key={teacher.id} value={teacher.id}>
+                          {teacher.user.firstName} {teacher.user.lastName}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.teacherId && (
+                      <p className="mt-1 text-sm text-red-600">{errors.teacherId}</p>
+                    )}
+                  </div>
+
+                  {/* Course (optional) */}
+                  {!isEdit && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Kurs (opcjonalnie)
+                      </label>
+                      <select
+                        name="courseId"
+                        value={formData.courseId}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="">Wybierz kurs (załaduje uczniów z kursu)</option>
+                        {courses.map((course) => (
+                          <option key={course.id} value={course.id}>
+                            {course.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Wybranie kursu automatycznie załaduje uczniów zapisanych na ten kurs
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Students List */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Uczniowie * {!isEdit && `(${formData.studentIds.length} wybranych)`}
+                    </label>
+
+                    {isEdit ? (
+                      <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <p className="text-sm text-gray-700">
+                          {lesson?.student?.user.firstName} {lesson?.student?.user.lastName}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          W trybie edycji nie można zmienić ucznia
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="max-h-64 overflow-y-auto border border-gray-300 rounded-lg">
+                        {students.length === 0 ? (
+                          <div className="p-4 text-center text-gray-500">
+                            Brak uczniów w szkole
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-gray-200">
+                            {students.map((student) => (
+                              <label
+                                key={student.id}
+                                className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={formData.studentIds.includes(student.id)}
+                                  onChange={() => toggleStudent(student.id)}
+                                  className="w-4 h-4 text-primary focus:ring-primary rounded"
+                                />
+                                <div className="flex-1">
+                                  <div className="font-medium text-gray-900">
+                                    {student.user.firstName} {student.user.lastName}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {student.user.email}
+                                  </div>
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {errors.studentIds && (
+                      <p className="mt-1 text-sm text-red-600">{errors.studentIds}</p>
+                    )}
                   </div>
                 </div>
               )}
+
+              {/* Attendance (only for edit mode) */}
+              {isEdit && lesson && (
+                <AttendanceSection lesson={lesson} />
+              )}
             </div>
-          )}
 
-          {/* Delivery */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Sposób przeprowadzenia</h3>
-
-            {/* Delivery Mode */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tryb *
-              </label>
-              <select
-                name="deliveryMode"
-                value={formData.deliveryMode}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            {/* Footer */}
+            <div className="border-t border-gray-200 p-6 bg-gray-50 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
               >
-                <option value="IN_PERSON">Stacjonarne</option>
-                <option value="ONLINE">Online</option>
-              </select>
-            </div>
+                Anuluj
+              </button>
 
-            {/* Meeting URL (for online lessons) */}
-            {formData.deliveryMode === 'ONLINE' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Link do spotkania
-                </label>
-                <input
-                  type="url"
-                  name="meetingUrl"
-                  value={formData.meetingUrl}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                    errors.meetingUrl ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="https://zoom.us/j/..."
-                />
-                {errors.meetingUrl && (
-                  <p className="mt-1 text-sm text-red-600">{errors.meetingUrl}</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Status (only for edit mode) */}
-          {isEdit && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">Status lekcji</h3>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status *
-                </label>
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              {!isEdit && activeTab === 'basic' && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('participants')}
+                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                 >
-                  <option value="SCHEDULED">Zaplanowana</option>
-                  <option value="CONFIRMED">Potwierdzona</option>
-                  <option value="COMPLETED">Zakończona (odliczy godziny z budżetu)</option>
-                  <option value="CANCELLED">Anulowana</option>
-                  <option value="PENDING_CONFIRMATION">Oczekująca na potwierdzenie</option>
-                  <option value="NO_SHOW">Nieobecność</option>
-                </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  {formData.status === 'COMPLETED' ? (
-                    <span className="text-amber-600 font-medium">
-                      ⚠️ Oznaczenie lekcji jako zakończonej automatycznie odliczy godziny z budżetu ucznia
-                    </span>
-                  ) : (
-                    'Zmień status lekcji w zależności od jej przebiegu'
+                  Dalej: Uczestnicy
+                </button>
+              )}
+
+              {(isEdit || activeTab === 'participants') && (
+                <div className="flex gap-2">
+                  {!isEdit && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('basic')}
+                      className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                      Wstecz
+                    </button>
                   )}
-                </p>
-              </div>
+                  <button
+                    type="submit"
+                    disabled={createMutation.isPending || createRecurringMutation.isPending || updateMutation.isPending}
+                    className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {createMutation.isPending || createRecurringMutation.isPending || updateMutation.isPending
+                      ? 'Zapisywanie...'
+                      : isEdit
+                      ? 'Zapisz zmiany'
+                      : 'Utwórz lekcję'}
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-
-          {/* Attendance (only for edit mode) */}
-          {isEdit && lesson && (
-            <AttendanceSection lesson={lesson} />
-          )}
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              Anuluj
-            </button>
-            <button
-              type="submit"
-              disabled={createMutation.isPending || updateMutation.isPending || createRecurringMutation.isPending}
-              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {createMutation.isPending || updateMutation.isPending || createRecurringMutation.isPending
-                ? isRecurring
-                  ? 'Tworzenie serii lekcji...'
-                  : 'Zapisywanie...'
-                : isEdit
-                ? 'Zapisz zmiany'
-                : isRecurring
-                ? 'Utwórz serię lekcji'
-                : 'Dodaj lekcję'}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );
