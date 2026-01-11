@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage'
 import StudentsPage from './pages/StudentsPage'
 import TeachersPage from './pages/TeachersPage'
 import CoursesPage from './pages/CoursesPage'
+import CourseTypesPage from './pages/CourseTypesPage'
 import GroupsPage from './pages/GroupsPage'
 import MaterialsPage from './pages/MaterialsPage'
 import LessonsPage from './pages/LessonsPage'
@@ -120,6 +121,23 @@ function App() {
               <Layout>
                 <CoursesPage />
               </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/course-types"
+          element={
+            isAuthenticated ? (
+              useAuthStore.getState().user?.role === 'ADMIN' || useAuthStore.getState().user?.role === 'MANAGER' ? (
+                <Layout>
+                  <CourseTypesPage />
+                </Layout>
+              ) : (
+                <Navigate to="/dashboard" />
+              )
             ) : (
               <Navigate to="/login" />
             )

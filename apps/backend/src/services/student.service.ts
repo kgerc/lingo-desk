@@ -13,6 +13,7 @@ interface CreateStudentData {
   languageLevel: LanguageLevel;
   goals?: string;
   isMinor?: boolean;
+  paymentDueDays?: number;
   organizationId: string;
 }
 
@@ -26,6 +27,7 @@ interface UpdateStudentData {
   languageLevel?: LanguageLevel;
   goals?: string;
   isMinor?: boolean;
+  paymentDueDays?: number;
   isActive?: boolean;
 }
 
@@ -42,6 +44,7 @@ export class StudentService {
       languageLevel,
       goals,
       isMinor,
+      paymentDueDays,
       organizationId
     } = data;
 
@@ -100,6 +103,7 @@ export class StudentService {
           languageLevel,
           goals,
           isMinor: isMinor || false,
+          paymentDueDays,
         },
         include: {
           user: {
@@ -295,6 +299,7 @@ export class StudentService {
           languageLevel: data.languageLevel,
           goals: data.goals,
           isMinor: data.isMinor,
+          paymentDueDays: data.paymentDueDays,
         },
         include: {
           user: {

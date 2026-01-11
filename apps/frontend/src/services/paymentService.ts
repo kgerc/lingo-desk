@@ -168,6 +168,7 @@ const paymentService = {
       id: string;
       amount: number;
       createdAt: string;
+      dueAt?: string | null;
       notes?: string;
     }>;
   }>> {

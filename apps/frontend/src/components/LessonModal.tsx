@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { lessonService, Lesson, CreateLessonData, LessonDeliveryMode } from '../services/lessonService';
 import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
 import { courseService } from '../services/courseService';
-import { X, Calendar, Users as UsersIcon } from 'lucide-react';
+import { X, Calendar, Users as UsersIcon, Check } from 'lucide-react';
 import AttendanceSection from './AttendanceSection';
 
 interface LessonModalProps {
@@ -19,6 +19,7 @@ interface LessonModalProps {
 type TabType = 'basic' | 'participants';
 
 const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialDuration, onClose, onSuccess }) => {
+  const queryClient = useQueryClient();
   const isEdit = !!lesson;
   const [activeTab, setActiveTab] = useState<TabType>('basic');
 
@@ -169,6 +170,23 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       setErrors({ form: errorMessage });
     },
   });
+
+  const completeMutation = useMutation({
+    mutationFn: () => lessonService.updateLesson(lesson!.id, { status: 'COMPLETED' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      toast.success('Lekcja oznaczona jako zakończona');
+      onClose();
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.error?.message || 'Błąd przy oznaczaniu lekcji';
+      toast.error(errorMessage);
+    },
+  });
+
+  const handleCompleteLesson = () => {
+    completeMutation.mutate();
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -706,6 +724,17 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                       className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
                     >
                       Wstecz
+                    </button>
+                  )}
+                  {isEdit && lesson && (lesson.status === 'SCHEDULED' || lesson.status === 'CONFIRMED') && (
+                    <button
+                      type="button"
+                      onClick={handleCompleteLesson}
+                      disabled={updateMutation.isPending || completeMutation.isPending}
+                      className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      <Check className="h-4 w-4" />
+                      {completeMutation.isPending ? 'Oznaczanie...' : 'Oznacz jako zakończoną'}
                     </button>
                   )}
                   <button

@@ -5,8 +5,14 @@ const prisma = new PrismaClient();
 export interface CreateCourseTypeData {
   organizationId: string;
   name: string;
-  category: string;
   description?: string;
+  language: string;
+  level: string; // LanguageLevel enum value
+  format: string; // CourseFormat enum value
+  deliveryMode: string; // CourseDeliveryMode enum value
+  defaultDurationMinutes: number;
+  maxStudents?: number;
+  pricePerLesson: number;
 }
 
 class CourseTypeService {
@@ -32,7 +38,7 @@ class CourseTypeService {
 
   async createCourseType(data: CreateCourseTypeData) {
     const courseType = await prisma.courseType.create({
-      data,
+      data
     });
     return courseType;
   }

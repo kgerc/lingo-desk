@@ -324,6 +324,7 @@ model Student {
   languageLevel  LanguageLevel @map("language_level")
   goals          String?
   isMinor        Boolean       @default(false) @map("is_minor")
+  paymentDueDays Int?          @map("payment_due_days")
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
@@ -599,6 +600,7 @@ model Payment {
   paymentMethod         PaymentMethod @map("payment_method")
   stripePaymentIntentId String?       @unique @map("stripe_payment_intent_id")
   paidAt                DateTime?     @map("paid_at")
+  dueAt                 DateTime?     @map("due_at")
   notes                 String?
   createdAt             DateTime      @default(now()) @map("created_at")
   updatedAt             DateTime      @updatedAt @map("updated_at")
@@ -615,6 +617,7 @@ model Payment {
   @@index([lessonId])
   @@index([status])
   @@index([paidAt])
+  @@index([dueAt])
   @@map("payments")
 }
 

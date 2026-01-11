@@ -354,11 +354,17 @@ class PaymentService {
    * Groups by student and shows total debt
    */
   async getDebtors(organizationId: string) {
-    // Get all pending payments grouped by student
+    const now = new Date();
+
+    // Get all pending payments that are past due (dueAt is null or <= now)
     const pendingPayments = await prisma.payment.findMany({
       where: {
         organizationId,
         status: PaymentStatus.PENDING,
+        OR: [
+          { dueAt: null },           // No due date set (immediate debtor)
+          { dueAt: { lte: now } },   // Due date has passed
+        ],
       },
       include: {
         student: {
@@ -409,6 +415,7 @@ class PaymentService {
         id: payment.id,
         amount: Number(payment.amount),
         createdAt: payment.createdAt,
+        dueAt: payment.dueAt,
         notes: payment.notes,
       });
 

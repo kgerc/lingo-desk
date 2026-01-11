@@ -19,6 +19,7 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Check,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
@@ -63,6 +64,18 @@ const LessonsPage: React.FC = () => {
     },
   });
 
+  const completeMutation = useMutation({
+    mutationFn: (lessonId: string) =>
+      lessonService.updateLesson(lessonId, { status: 'COMPLETED' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      toast.success('Lekcja oznaczona jako zakończona');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Błąd przy oznaczaniu lekcji jako zakończonej');
+    },
+  });
+
   const handleAddLesson = () => {
     setSelectedLesson(null);
     setIsModalOpen(true);
@@ -91,6 +104,10 @@ const LessonsPage: React.FC = () => {
     if (confirmDialog.lessonId) {
       await confirmMutation.mutateAsync(confirmDialog.lessonId);
     }
+  };
+
+  const handleCompleteLesson = (lessonId: string) => {
+    completeMutation.mutate(lessonId);
   };
 
   const handleModalClose = () => {
@@ -311,6 +328,16 @@ const LessonsPage: React.FC = () => {
                             title="Potwierdź lekcję"
                           >
                             <CheckCircle className="h-5 w-5" />
+                          </button>
+                        )}
+                        {(lesson.status === 'SCHEDULED' || lesson.status === 'CONFIRMED') && (
+                          <button
+                            onClick={() => handleCompleteLesson(lesson.id)}
+                            disabled={completeMutation.isPending}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                            title="Oznacz jako zakończoną"
+                          >
+                            <Check className="h-4 w-4" />
                           </button>
                         )}
                         <button

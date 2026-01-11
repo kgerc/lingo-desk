@@ -7,6 +7,7 @@ export interface Student {
   languageLevel: string;
   goals?: string;
   isMinor: boolean;
+  paymentDueDays?: number | null;
   enrollmentDate: string;
   user: {
     id: string;
@@ -41,6 +42,7 @@ export interface CreateStudentData {
   languageLevel: string;
   goals?: string;
   isMinor?: boolean;
+  paymentDueDays?: number | null;
 }
 
 export interface UpdateStudentData {
@@ -53,6 +55,7 @@ export interface UpdateStudentData {
   languageLevel?: string;
   goals?: string;
   isMinor?: boolean;
+  paymentDueDays?: number | null;
   isActive?: boolean;
 }
 

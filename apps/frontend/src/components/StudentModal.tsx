@@ -26,6 +26,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
     languageLevel: student?.languageLevel || 'A1',
     goals: student?.goals || '',
     isMinor: student?.isMinor || false,
+    paymentDueDays: student?.paymentDueDays || null,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -90,6 +91,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
           languageLevel: formData.languageLevel,
           goals: formData.goals || undefined,
           isMinor: formData.isMinor,
+          paymentDueDays: formData.paymentDueDays || undefined,
         },
       });
     } else {
@@ -305,6 +307,28 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                     Uczeń niepełnoletni
                   </span>
                 </label>
+              </div>
+
+              {/* Payment Due Days */}
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Termin płatności (dni)
+                </label>
+                <input
+                  type="number"
+                  name="paymentDueDays"
+                  min="0"
+                  value={formData.paymentDueDays ?? ''}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    paymentDueDays: e.target.value ? parseInt(e.target.value) : null
+                  })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="np. 7, 14, 30 (puste = natychmiast)"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Liczba dni po zakończeniu lekcji, po której uczeń staje się dłużnikiem. Pozostaw puste aby traktować jako dłużnika od razu.
+                </p>
               </div>
             </div>
           </div>

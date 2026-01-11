@@ -168,6 +168,11 @@ const DebtorsPage: React.FC = () => {
                                 <div>
                                   <div className="text-sm font-medium text-gray-900">
                                     {formatDate(payment.createdAt)}
+                                    {payment.dueAt && (
+                                      <span className="text-orange-600 ml-2">
+                                        (termin: {formatDate(payment.dueAt)})
+                                      </span>
+                                    )}
                                   </div>
                                   {payment.notes && (
                                     <div className="text-xs text-gray-500">{payment.notes}</div>

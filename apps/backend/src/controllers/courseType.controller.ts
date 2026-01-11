@@ -5,14 +5,26 @@ import { AuthRequest } from '../middleware/auth';
 
 const createCourseTypeSchema = z.object({
   name: z.string().min(2),
-  category: z.string().min(2),
   description: z.string().optional(),
+  language: z.string().min(2),
+  level: z.string(),
+  format: z.string(),
+  deliveryMode: z.string(),
+  defaultDurationMinutes: z.number().int().positive(),
+  maxStudents: z.number().int().positive().optional(),
+  pricePerLesson: z.number().nonnegative(),
 });
 
 const updateCourseTypeSchema = z.object({
   name: z.string().min(2).optional(),
-  category: z.string().min(2).optional(),
   description: z.string().optional(),
+  language: z.string().optional(),
+  level: z.string().optional(),
+  format: z.string().optional(),
+  deliveryMode: z.string().optional(),
+  defaultDurationMinutes: z.number().int().positive().optional(),
+  maxStudents: z.number().int().positive().optional(),
+  pricePerLesson: z.coerce.number().nonnegative().optional(),
 });
 
 class CourseTypeController {
@@ -52,6 +64,9 @@ class CourseTypeController {
     try {
       const { id } = req.params;
       const data = updateCourseTypeSchema.parse(req.body);
+      if (data.description === undefined) {
+        data.description = null;
+      }
       const courseType = await courseTypeService.updateCourseType(
         id,
         req.user.organizationId,

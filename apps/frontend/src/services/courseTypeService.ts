@@ -4,22 +4,40 @@ export interface CourseType {
   id: string;
   organizationId: string;
   name: string;
-  category: string;
   description?: string;
+  language: string;
+  level: string;
+  format: string;
+  deliveryMode: string;
+  defaultDurationMinutes: number;
+  maxStudents?: number;
+  pricePerLesson: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateCourseTypeData {
   name: string;
-  category: string;
   description?: string;
+  language: string;
+  level: string;
+  format: string;
+  deliveryMode: string;
+  defaultDurationMinutes: number;
+  maxStudents?: number;
+  pricePerLesson: number;
 }
 
 export interface UpdateCourseTypeData {
   name?: string;
-  category?: string;
   description?: string;
+  language?: string;
+  level?: string;
+  format?: string;
+  deliveryMode?: string;
+  defaultDurationMinutes?: number;
+  maxStudents?: number;
+  pricePerLesson?: number;
 }
 
 export const courseTypeService = {

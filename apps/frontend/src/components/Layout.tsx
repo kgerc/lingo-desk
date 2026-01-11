@@ -19,6 +19,7 @@ import {
   ChevronRight,
   AlertCircle,
   Bell,
+  Layers,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -48,6 +49,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { name: 'Uczniowie', href: '/students', icon: Users },
           { name: 'Lektorzy', href: '/teachers', icon: GraduationCap },
           { name: 'Kursy', href: '/courses', icon: BookOpen },
+          { name: 'Typy kursów', href: '/course-types', icon: Layers },
           // { name: 'Grupy', href: '/groups', icon: Users2 }, // Hidden temporarily
           { name: 'Materiały', href: '/materials', icon: FileText },
           { name: 'Lekcje', href: '/lessons', icon: Clock },
