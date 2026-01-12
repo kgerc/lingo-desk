@@ -177,6 +177,7 @@ model Organization {
   notificationTemplates NotificationTemplate[]
   files                File[]
   notes                Note[]
+  alerts               Alert[]
   settings             OrganizationSettings?
 
   @@map("organizations")
@@ -207,6 +208,7 @@ model User {
   notifications      Notification[]
   filesUploaded      File[]
   notesCreated       Note[]
+  alerts             Alert[]
 
   @@index([organizationId])
   @@index([email])
@@ -882,4 +884,38 @@ model UserOrganization {
   @@index([organizationId])
   @@index([role])
   @@map("user_organizations")
+}
+
+// ============================================
+// ALERTS & NOTIFICATIONS
+// ============================================
+
+model Alert {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  userId         String?   @map("user_id") // Null means alert for all users in org
+  type           AlertType
+  title          String
+  message        String
+  isRead         Boolean   @default(false) @map("is_read")
+  readAt         DateTime? @map("read_at")
+  metadata       Json?     // Additional data (e.g., lessonId, studentId)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([isRead])
+  @@map("alerts")
+}
+
+enum AlertType {
+  ERROR
+  WARNING
+  INFO
+  SUCCESS
 }

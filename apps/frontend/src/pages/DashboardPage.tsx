@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
-import { studentService } from '../services/studentService';
 import { dashboardService } from '../services/dashboardService';
-import alertService from '../services/alertService';
-import { Users, GraduationCap, BookOpen, Calendar, AlertTriangle, TrendingUp, BarChart3 } from 'lucide-react';
+import { Users, GraduationCap, BookOpen, Calendar, TrendingUp, BarChart3, ChevronRight } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import TeacherDashboard from './TeacherDashboard';
@@ -12,7 +10,6 @@ import StudentDashboard from './StudentDashboard';
 import StudentModal from '../components/StudentModal';
 import CourseModal from '../components/CourseModal';
 import LessonModal from '../components/LessonModal';
-import Alert from '../components/Alert';
 
 const DashboardPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
@@ -46,12 +43,6 @@ const DashboardPage: React.FC = () => {
     refetchInterval: 60000, // Refetch every minute
   });
 
-  // Fetch alerts
-  const { data: alerts, isLoading: isLoadingAlerts } = useQuery({
-    queryKey: ['alerts'],
-    queryFn: () => alertService.getAlerts(),
-    refetchInterval: 60000, // Refetch every minute
-  });
 
 
   if (isLoadingStats) {
@@ -111,20 +102,6 @@ const DashboardPage: React.FC = () => {
           Oto podsumowanie Twojej szkoły językowej
         </p>
       </div>
-
-      {/* Alerts Section */}
-      {!isLoadingAlerts && alerts && alerts.length > 0 && (
-        <div className="mb-8 space-y-3">
-          {alerts.map((alert) => (
-            <Alert
-              key={alert.id}
-              variant={alert.type.toLowerCase() as 'error' | 'warning' | 'info' | 'success'}
-              title={alert.title}
-              message={alert.message}
-            />
-          ))}
-        </div>
-      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">

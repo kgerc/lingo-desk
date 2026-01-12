@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useSidebarStore } from '../stores/sidebarStore';
 import NotificationBell from './NotificationBell';
 import OrganizationSwitcher from './OrganizationSwitcher';
+import alertService from '../services/alertService';
 import {
   Home,
   Users,
@@ -31,6 +33,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { isCollapsed, toggleSidebar } = useSidebarStore();
   const location = useLocation();
 
+  // Fetch unread alerts count (with auto-generation)
+  const { data: unreadCount } = useQuery({
+    queryKey: ['unreadCount'],
+    queryFn: async () => {
+      // First generate system alerts, then get unread count
+      await alertService.generateSystemAlerts();
+      return await alertService.getUnreadCount();
+    },
+    refetchInterval: 60000, // Refetch every minute
+  });
+
   // Role-based navigation (without Settings)
   const getNavigationForRole = () => {
     const role = user?.role;
@@ -46,6 +59,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       case 'MANAGER':
         return [
           ...commonItems,
+          { name: 'Alerty', href: '/alerts', icon: Bell, badge: unreadCount || 0 },
           { name: 'Uczniowie', href: '/students', icon: Users },
           { name: 'Lektorzy', href: '/teachers', icon: GraduationCap },
           { name: 'Kursy', href: '/courses', icon: BookOpen },
@@ -133,6 +147,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <nav className="p-4 space-y-1 flex-1 overflow-y-auto overflow-x-hidden">
           {navigation.map((item) => {
             const Icon = item.icon;
+            const hasBadge = 'badge' in item && item.badge && item.badge > 0;
             return (
               <Link
                 key={item.name}
@@ -144,18 +159,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     : 'text-white/80 hover:bg-white/5 hover:text-white'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 flex justify-center">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-8 flex justify-center relative">
                     <Icon className="h-5 w-5" />
                   </div>
 
                   <span
-                    className={`font-medium whitespace-nowrap transition-opacity duration-200 ${
+                    className={`font-medium whitespace-nowrap transition-opacity duration-200 flex-1 ${
                       isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
                     }`}
                   >
                     {item.name}
                   </span>
+
+                  {hasBadge && !isCollapsed && (
+                    <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold">
+                      {item.badge}
+                    </span>
+                  )}
                 </div>
               </Link>
             );

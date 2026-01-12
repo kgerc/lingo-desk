@@ -13,6 +13,7 @@ import MaterialsPage from './pages/MaterialsPage'
 import LessonsPage from './pages/LessonsPage'
 import CalendarPage from './pages/CalendarPage'
 import PaymentsPage from './pages/PaymentsPage'
+import AlertsPage from './pages/AlertsPage'
 import TeacherSchedulePage from './pages/TeacherSchedulePage'
 import TeacherAvailabilityPage from './pages/TeacherAvailabilityPage'
 import SettingsPage from './pages/SettingsPage'
@@ -81,6 +82,19 @@ function App() {
             isAuthenticated ? (
               <Layout>
                 <DashboardPage />
+              </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/alerts"
+          element={
+            isAuthenticated ? (
+              <Layout>
+                <AlertsPage />
               </Layout>
             ) : (
               <Navigate to="/login" />

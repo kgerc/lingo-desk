@@ -7,15 +7,69 @@ export interface Alert {
   type: AlertType;
   title: string;
   message: string;
-  createdAt: Date;
+  isRead: boolean;
+  readAt?: string;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AlertsResponse {
+  alerts: Alert[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 const alertService = {
   /**
-   * Get organization alerts
+   * Get organization alerts with pagination
    */
-  async getAlerts(): Promise<Alert[]> {
-    const response = await api.get('/alerts');
+  async getAlerts(options?: {
+    page?: number;
+    limit?: number;
+    isRead?: boolean;
+  }): Promise<AlertsResponse> {
+    const params = new URLSearchParams();
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.isRead !== undefined) params.append('isRead', options.isRead.toString());
+
+    const response = await api.get(`/alerts?${params.toString()}`);
+    return response.data.data;
+  },
+
+  /**
+   * Get count of unread alerts
+   */
+  async getUnreadCount(): Promise<number> {
+    const response = await api.get('/alerts/unread-count');
+    return response.data.data.count;
+  },
+
+  /**
+   * Mark specific alert as read
+   */
+  async markAsRead(alertId: string): Promise<Alert> {
+    const response = await api.patch(`/alerts/${alertId}/read`);
+    return response.data.data;
+  },
+
+  /**
+   * Mark all alerts as read
+   */
+  async markAllAsRead(): Promise<void> {
+    await api.patch('/alerts/mark-all-read');
+  },
+
+  /**
+   * Generate system alerts
+   */
+  async generateSystemAlerts(): Promise<Alert[]> {
+    const response = await api.post('/alerts/generate');
     return response.data.data;
   },
 };
