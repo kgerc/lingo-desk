@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { studentService, Student } from '../services/studentService';
-import { Plus, Search, Mail, Phone, MoreVertical } from 'lucide-react';
+import { Plus, Search, Mail, Phone, MoreVertical, Upload } from 'lucide-react';
 import StudentModal from '../components/StudentModal';
+import ImportStudentsModal from '../components/ImportStudentsModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Dropdown from '../components/Dropdown';
@@ -12,6 +13,7 @@ const StudentsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; studentId: string | null }>({ isOpen: false, studentId: null });
@@ -86,13 +88,22 @@ const StudentsPage: React.FC = () => {
             Zarządzaj uczniami swojej szkoły ({students.length} uczniów)
           </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm"
-        >
-          <Plus className="h-5 w-5" />
-          Dodaj ucznia
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-secondary text-secondary rounded-lg hover:bg-secondary hover:text-white transition-colors shadow-sm"
+          >
+            <Upload className="h-5 w-5" />
+            Import CSV
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm"
+          >
+            <Plus className="h-5 w-5" />
+            Dodaj ucznia
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -241,6 +252,17 @@ const StudentsPage: React.FC = () => {
           student={selectedStudent}
           onClose={handleCloseModal}
           onSuccess={handleSuccess}
+        />
+      )}
+
+      {/* Import Modal */}
+      {isImportModalOpen && (
+        <ImportStudentsModal
+          onClose={() => setIsImportModalOpen(false)}
+          onSuccess={() => {
+            setIsImportModalOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+          }}
         />
       )}
 

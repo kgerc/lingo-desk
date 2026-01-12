@@ -36,6 +36,20 @@ router.post(
   studentController.createStudent.bind(studentController)
 );
 
+// POST /api/students/import/preview - Preview CSV file
+router.post(
+  '/import/preview',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  studentController.previewCSV.bind(studentController)
+);
+
+// POST /api/students/import - Import students from CSV
+router.post(
+  '/import',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  studentController.importCSV.bind(studentController)
+);
+
 // PUT /api/students/:id - Update student
 router.put('/:id', studentController.updateStudent.bind(studentController));
 

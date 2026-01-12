@@ -11,7 +11,6 @@ import CourseTypesPage from './pages/CourseTypesPage'
 import GroupsPage from './pages/GroupsPage'
 import MaterialsPage from './pages/MaterialsPage'
 import LessonsPage from './pages/LessonsPage'
-import CalendarPage from './pages/CalendarPage'
 import PaymentsPage from './pages/PaymentsPage'
 import AlertsPage from './pages/AlertsPage'
 import TeacherSchedulePage from './pages/TeacherSchedulePage'
@@ -201,9 +200,7 @@ function App() {
           path="/calendar"
           element={
             isAuthenticated ? (
-              <Layout>
-                <CalendarPage />
-              </Layout>
+              <Navigate to="/lessons" replace />
             ) : (
               <Navigate to="/login" />
             )

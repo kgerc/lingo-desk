@@ -215,6 +215,85 @@ export class StudentController {
       next(error);
     }
   }
+
+  async previewCSV(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.organizationId) {
+        return res.status(401).json({
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Organization ID not found',
+          },
+        });
+      }
+
+      const { csvContent } = req.body;
+
+      if (!csvContent) {
+        return res.status(400).json({
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'CSV content is required',
+          },
+        });
+      }
+
+      const preview = await studentService.previewCSV(csvContent);
+
+      res.json({
+        data: preview,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async importCSV(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.organizationId) {
+        return res.status(401).json({
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Organization ID not found',
+          },
+        });
+      }
+
+      const { csvContent, columnMapping } = req.body;
+
+      if (!csvContent || !columnMapping) {
+        return res.status(400).json({
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'CSV content and column mapping are required',
+          },
+        });
+      }
+
+      // Validate required mappings
+      if (!columnMapping.email || !columnMapping.firstName || !columnMapping.lastName) {
+        return res.status(400).json({
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'Email, firstName, and lastName mappings are required',
+          },
+        });
+      }
+
+      const results = await studentService.importStudentsFromCSV(
+        csvContent,
+        columnMapping,
+        req.user.organizationId
+      );
+
+      res.json({
+        message: 'Import completed',
+        data: results,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new StudentController();

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { lessonService, Lesson, LessonStatus } from '../services/lessonService';
@@ -7,7 +7,8 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Dropdown from '../components/Dropdown';
 import {
-  Calendar,
+  Calendar as CalendarIcon,
+  List as ListIcon,
   Clock,
   User,
   GraduationCap,
@@ -22,18 +23,86 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import { Calendar, momentLocalizer, View, SlotInfo } from 'react-big-calendar';
+import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
+import moment from 'moment';
+import 'moment/locale/pl';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
+
+// Set Polish locale
+moment.locale('pl');
+const localizer = momentLocalizer(moment);
+const DnDCalendar = withDragAndDrop(Calendar);
+
+// Calendar event type
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  resource: Lesson;
+}
+
+// View mode type
+type ViewMode = 'list' | 'calendar';
+
+// Map lesson status to colors
+const getEventStyle = (lesson: Lesson) => {
+  const baseStyle = {
+    borderRadius: '8px',
+    border: 'none',
+    display: 'block',
+    padding: '4px 8px',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+  };
+
+  switch (lesson.status) {
+    case 'SCHEDULED':
+      return { ...baseStyle, backgroundColor: '#3B82F6', color: 'white' };
+    case 'CONFIRMED':
+      return { ...baseStyle, backgroundColor: '#10B981', color: 'white' };
+    case 'COMPLETED':
+      return { ...baseStyle, backgroundColor: '#6B7280', color: 'white' };
+    case 'CANCELLED':
+      return { ...baseStyle, backgroundColor: '#EF4444', color: 'white' };
+    case 'PENDING_CONFIRMATION':
+      return { ...baseStyle, backgroundColor: '#F59E0B', color: 'white' };
+    case 'NO_SHOW':
+      return { ...baseStyle, backgroundColor: '#DC2626', color: 'white' };
+    default:
+      return { ...baseStyle, backgroundColor: '#6B7280', color: 'white' };
+  }
+};
 
 const LessonsPage: React.FC = () => {
   const queryClient = useQueryClient();
+
+  // View mode state
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+
+  // Shared filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<LessonStatus | ''>('');
+
+  // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null);
+
+  // List view states
   const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; lessonId: string | null }>({ isOpen: false, lessonId: null });
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; lessonId: string | null }>({ isOpen: false, lessonId: null });
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
+  // Calendar view states
+  const [calendarView, setCalendarView] = useState<View>('week');
+  const [date, setDate] = useState(new Date());
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Shared data source - single query for both views
   const { data: lessons = [], isLoading } = useQuery({
     queryKey: ['lessons', searchTerm, statusFilter],
     queryFn: () =>
@@ -43,6 +112,7 @@ const LessonsPage: React.FC = () => {
       }),
   });
 
+  // Shared mutations
   const deleteMutation = useMutation({
     mutationFn: (id: string) => lessonService.deleteLesson(id),
     onSuccess: () => {
@@ -89,13 +159,30 @@ const LessonsPage: React.FC = () => {
     },
   });
 
+  const updateLessonMutation = useMutation({
+    mutationFn: ({ id, scheduledAt, durationMinutes }: { id: string; scheduledAt: string; durationMinutes: number }) =>
+      lessonService.updateLesson(id, { scheduledAt, durationMinutes }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      setIsDragging(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Nie można przenieść lekcji');
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      setIsDragging(false);
+    },
+  });
+
+  // Shared handlers
   const handleAddLesson = () => {
     setSelectedLesson(null);
+    setSelectedSlot(null);
     setIsModalOpen(true);
   };
 
   const handleEditLesson = (lesson: Lesson) => {
     setSelectedLesson(lesson);
+    setSelectedSlot(null);
     setIsModalOpen(true);
   };
 
@@ -130,6 +217,7 @@ const LessonsPage: React.FC = () => {
   const handleModalClose = () => {
     setIsModalOpen(false);
     setSelectedLesson(null);
+    setSelectedSlot(null);
   };
 
   const handleModalSuccess = () => {
@@ -137,12 +225,83 @@ const LessonsPage: React.FC = () => {
     handleModalClose();
   };
 
+  // Calendar-specific handlers
+  const handleSelectSlot = useCallback((slotInfo: SlotInfo) => {
+    setSelectedSlot({ start: slotInfo.start, end: slotInfo.end });
+    setSelectedLesson(null);
+    setIsModalOpen(true);
+  }, []);
+
+  const handleSelectEvent = useCallback((event: CalendarEvent) => {
+    setSelectedLesson(event.resource);
+    setSelectedSlot(null);
+    setIsModalOpen(true);
+  }, []);
+
+  const handleEventDrop = useCallback(
+    async ({ event, start, end }: any) => {
+      setIsDragging(true);
+      const lesson: Lesson = event.resource;
+      const newDuration = Math.round((end.getTime() - start.getTime()) / 60000);
+
+      try {
+        const conflicts = await lessonService.checkConflicts(
+          lesson.teacherId,
+          lesson.studentId,
+          start.toISOString(),
+          newDuration,
+          lesson.id
+        );
+
+        if (conflicts.hasConflicts) {
+          const conflictMessages = [];
+          if (conflicts.teacherConflicts.length > 0) {
+            conflictMessages.push(`Lektor jest zajęty w tym terminie`);
+          }
+          if (conflicts.studentConflicts.length > 0) {
+            conflictMessages.push(`Uczeń jest zajęty w tym terminie`);
+          }
+          toast.error(`Nie można przenieść lekcji: ${conflictMessages.join(', ')}`);
+          setIsDragging(false);
+          return;
+        }
+
+        await updateLessonMutation.mutateAsync({
+          id: lesson.id,
+          scheduledAt: start.toISOString(),
+          durationMinutes: newDuration,
+        });
+      } catch (error) {
+        console.error('Error checking conflicts:', error);
+        setIsDragging(false);
+      }
+    },
+    [updateLessonMutation]
+  );
+
+  const handleEventResize = useCallback(() => {
+    // Disable resizing
+    return;
+  }, []);
+
+  // Convert lessons to calendar events
+  const events = useMemo<CalendarEvent[]>(() => {
+    return lessons.map((lesson) => ({
+      id: lesson.id,
+      title: `${lesson.student.user.firstName} ${lesson.student.user.lastName} - ${lesson.title}`,
+      start: new Date(lesson.scheduledAt),
+      end: new Date(new Date(lesson.scheduledAt).getTime() + lesson.durationMinutes * 60000),
+      resource: lesson,
+    }));
+  }, [lessons]);
+
+  // Helper functions
   const getStatusBadge = (status: LessonStatus) => {
     const badges: Record<LessonStatus, { text: string; className: string; icon: any }> = {
       SCHEDULED: {
         text: 'Zaplanowana',
         className: 'bg-blue-100 text-blue-800',
-        icon: Calendar,
+        icon: CalendarIcon,
       },
       CONFIRMED: {
         text: 'Potwierdzona',
@@ -197,21 +356,185 @@ const LessonsPage: React.FC = () => {
     }
   };
 
+  // Render lesson row
+  const renderLessonRow = (lesson: Lesson) => {
+    return (
+      <div key={lesson.id} className="border-b border-gray-200">
+        <div className="px-6 py-4 hover:bg-gray-50 transition-colors flex items-center">
+          <div className="flex-1 grid grid-cols-6 gap-4 items-center">
+            <div>
+              <div className="text-sm font-medium text-gray-900">{lesson.title}</div>
+              {lesson.course && (
+                <div className="text-xs text-gray-500">{lesson.course.name}</div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <GraduationCap className="h-4 w-4 text-gray-400" />
+              <div className="text-sm text-gray-900">
+                {lesson.teacher.user.firstName} {lesson.teacher.user.lastName}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-gray-400" />
+              <div className="text-sm text-gray-900">
+                {lesson.student.user.firstName} {lesson.student.user.lastName}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-gray-400" />
+              <div>
+                <div className="text-sm text-gray-900">{formatDate(lesson.scheduledAt)}</div>
+                <div className="text-xs text-gray-500">{lesson.durationMinutes} min</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {getDeliveryModeIcon(lesson.deliveryMode)}
+              <span className="text-sm text-gray-900">
+                {lesson.deliveryMode === 'ONLINE' ? 'Online' : 'Stacjonarne'}
+              </span>
+            </div>
+            {getStatusBadge(lesson.status)}
+          </div>
+          <div className="ml-4">
+            <button
+              ref={(el) => {
+                if (el) {
+                  dropdownTriggerRefs.current.set(lesson.id, el);
+                }
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenDropdownId(openDropdownId === lesson.id ? null : lesson.id);
+              }}
+              className="p-1 hover:bg-gray-100 rounded transition-colors"
+              title="Więcej opcji"
+            >
+              <MoreVertical className="h-4 w-4 text-gray-600" />
+            </button>
+            <Dropdown
+              isOpen={openDropdownId === lesson.id}
+              onClose={() => setOpenDropdownId(null)}
+              triggerRef={{ current: dropdownTriggerRefs.current.get(lesson.id) || null }}
+              items={[
+                ...(lesson.status === 'SCHEDULED'
+                  ? [
+                      {
+                        label: 'Potwierdź lekcję',
+                        onClick: () => handleConfirmLesson(lesson.id),
+                      },
+                    ]
+                  : []),
+                ...((lesson.status === 'SCHEDULED' || lesson.status === 'CONFIRMED')
+                  ? [
+                      {
+                        label: 'Oznacz jako zakończoną',
+                        onClick: () => handleCompleteLesson(lesson.id),
+                      },
+                    ]
+                  : []),
+                ...(lesson.status === 'COMPLETED'
+                  ? [
+                      {
+                        label: 'Cofnij zakończenie',
+                        onClick: () => handleUncompleteLesson(lesson.id),
+                      },
+                    ]
+                  : []),
+                {
+                  label: 'Edytuj lekcję',
+                  onClick: () => handleEditLesson(lesson),
+                },
+                ...(lesson.status !== 'COMPLETED'
+                  ? [
+                      {
+                        label: 'Usuń lekcję',
+                        onClick: () => handleDeleteLesson(lesson.id),
+                        variant: 'danger' as const,
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const messages = {
+    allDay: 'Cały dzień',
+    previous: 'Poprzedni',
+    next: 'Następny',
+    today: 'Dziś',
+    month: 'Miesiąc',
+    week: 'Tydzień',
+    day: 'Dzień',
+    agenda: 'Agenda',
+    date: 'Data',
+    time: 'Czas',
+    event: 'Lekcja',
+    noEventsInRange: 'Brak zajęć w tym okresie',
+    showMore: (total: number) => `+ ${total} więcej`,
+  };
+
+  const formats = {
+    monthHeaderFormat: 'MMMM YYYY',
+    dayHeaderFormat: 'dddd, D MMMM',
+    dayRangeHeaderFormat: ({ start, end }: { start: Date; end: Date }) =>
+      `${moment(start).format('D MMMM')} - ${moment(end).format('D MMMM YYYY')}`,
+    agendaHeaderFormat: ({ start, end }: { start: Date; end: Date }) =>
+      `${moment(start).format('D MMMM')} - ${moment(end).format('D MMMM YYYY')}`,
+    eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
+      `${moment(start).format('HH:mm')} - ${moment(end).format('HH:mm')}`,
+    timeGutterFormat: 'HH:mm',
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Lekcje</h1>
-          <p className="mt-1 text-sm text-gray-500">Zarządzaj lekcjami w systemie</p>
+          <p className="mt-1 text-sm text-gray-500">
+            Zarządzaj lekcjami w systemie ({lessons.length} lekcji)
+          </p>
         </div>
-        <button
-          onClick={handleAddLesson}
-          className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm"
-        >
-          <Plus className="h-5 w-5" />
-          Dodaj lekcję
-        </button>
+        <div className="flex items-center gap-3">
+          {/* View Toggle */}
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-white text-secondary shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              title="Widok listy"
+            >
+              <ListIcon className="h-4 w-4" />
+              Lista
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                viewMode === 'calendar'
+                  ? 'bg-white text-secondary shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              title="Widok kalendarza"
+            >
+              <CalendarIcon className="h-4 w-4" />
+              Kalendarz
+            </button>
+          </div>
+          <button
+            onClick={handleAddLesson}
+            className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm"
+          >
+            <Plus className="h-5 w-5" />
+            Dodaj lekcję
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -246,169 +569,89 @@ const LessonsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Lessons Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        {isLoading ? (
-          <div className="py-12">
-            <LoadingSpinner message="Ładowanie lekcji..." />
+      {/* Content - List or Calendar */}
+      {isLoading ? (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 py-12">
+          <LoadingSpinner message="Ładowanie lekcji..." />
+        </div>
+      ) : viewMode === 'list' ? (
+        /* List View with Virtualization */
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <div className="grid grid-cols-6 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <div>Lekcja</div>
+              <div>Lektor</div>
+              <div>Uczeń</div>
+              <div>Data i czas</div>
+              <div>Tryb</div>
+              <div>Status</div>
+            </div>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Lekcja
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Lektor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Uczeń
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Data i czas
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tryb
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Akcje
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {lessons.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-500">
-                      <Calendar className="h-12 w-12 mb-2 text-gray-400" />
-                      <p className="text-lg font-medium">Brak lekcji</p>
-                      <p className="text-sm">Dodaj pierwszą lekcję, aby rozpocząć</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                lessons.map((lesson) => (
-                  <tr key={lesson.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{lesson.title}</div>
-                        {lesson.course && (
-                          <div className="text-xs text-gray-500">{lesson.course.name}</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <GraduationCap className="h-4 w-4 text-gray-400" />
-                        <div className="text-sm text-gray-900">
-                          {lesson.teacher.user.firstName} {lesson.teacher.user.lastName}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-gray-400" />
-                        <div className="text-sm text-gray-900">
-                          {lesson.student.user.firstName} {lesson.student.user.lastName}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-gray-400" />
-                        <div>
-                          <div className="text-sm text-gray-900">{formatDate(lesson.scheduledAt)}</div>
-                          <div className="text-xs text-gray-500">{lesson.durationMinutes} min</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        {getDeliveryModeIcon(lesson.deliveryMode)}
-                        <span className="text-sm text-gray-900">
-                          {lesson.deliveryMode === 'ONLINE' ? 'Online' : 'Stacjonarne'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(lesson.status)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        ref={(el) => {
-                          if (el) {
-                            dropdownTriggerRefs.current.set(lesson.id, el);
-                          }
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenDropdownId(openDropdownId === lesson.id ? null : lesson.id);
-                        }}
-                        className="p-1 hover:bg-gray-100 rounded transition-colors"
-                        title="Więcej opcji"
-                      >
-                        <MoreVertical className="h-4 w-4 text-gray-600" />
-                      </button>
-                      <Dropdown
-                        isOpen={openDropdownId === lesson.id}
-                        onClose={() => setOpenDropdownId(null)}
-                        triggerRef={{ current: dropdownTriggerRefs.current.get(lesson.id) || null }}
-                        items={[
-                          ...(lesson.status === 'SCHEDULED'
-                            ? [
-                                {
-                                  label: 'Potwierdź lekcję',
-                                  onClick: () => handleConfirmLesson(lesson.id),
-                                },
-                              ]
-                            : []),
-                          ...((lesson.status === 'SCHEDULED' || lesson.status === 'CONFIRMED')
-                            ? [
-                                {
-                                  label: 'Oznacz jako zakończoną',
-                                  onClick: () => handleCompleteLesson(lesson.id),
-                                },
-                              ]
-                            : []),
-                          ...(lesson.status === 'COMPLETED'
-                            ? [
-                                {
-                                  label: 'Cofnij zakończenie',
-                                  onClick: () => handleUncompleteLesson(lesson.id),
-                                },
-                              ]
-                            : []),
-                          {
-                            label: 'Edytuj lekcję',
-                            onClick: () => handleEditLesson(lesson),
-                          },
-                          ...(lesson.status !== 'COMPLETED'
-                            ? [
-                                {
-                                  label: 'Usuń lekcję',
-                                  onClick: () => handleDeleteLesson(lesson.id),
-                                  variant: 'danger' as const,
-                                },
-                              ]
-                            : []),
-                        ]}
-                      />
-                    </td>
-                  </tr>
-                ))
-              )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+          {lessons.length === 0 ? (
+            <div className="py-12 text-center">
+              <div className="flex flex-col items-center justify-center text-gray-500">
+                <CalendarIcon className="h-12 w-12 mb-2 text-gray-400" />
+                <p className="text-lg font-medium">Brak lekcji</p>
+                <p className="text-sm">Dodaj pierwszą lekcję, aby rozpocząć</p>
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-y-auto" style={{ maxHeight: '600px' }}>
+              {lessons.map((lesson) => renderLessonRow(lesson))}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Calendar View */
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6" style={{ height: '700px' }}>
+          {isDragging && (
+            <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 border-4 border-secondary border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-sm font-medium text-gray-700">Przenoszenie lekcji...</p>
+              </div>
+            </div>
+          )}
+          <DnDCalendar
+            localizer={localizer}
+            events={events}
+            startAccessor="start"
+            endAccessor="end"
+            style={{ height: '100%' }}
+            view={calendarView}
+            onView={setCalendarView}
+            date={date}
+            onNavigate={setDate}
+            selectable
+            onSelectSlot={handleSelectSlot}
+            onSelectEvent={handleSelectEvent}
+            onEventDrop={handleEventDrop}
+            onEventResize={handleEventResize}
+            resizable={false}
+            draggableAccessor={() => calendarView !== 'month'}
+            messages={messages}
+            formats={formats}
+            eventPropGetter={(event: CalendarEvent) => ({
+              style: getEventStyle(event.resource),
+            })}
+            step={15}
+            timeslots={4}
+            defaultView="week"
+            views={['month', 'week', 'day', 'agenda']}
+            showMultiDayTimes
+          />
+        </div>
+      )}
 
       {/* Modal */}
       {isModalOpen && (
-        <LessonModal lesson={selectedLesson} onClose={handleModalClose} onSuccess={handleModalSuccess} />
+        <LessonModal
+          lesson={selectedLesson}
+          initialDate={selectedSlot?.start}
+          initialDuration={selectedSlot ? Math.round((selectedSlot.end.getTime() - selectedSlot.start.getTime()) / 60000) : 60}
+          onClose={handleModalClose}
+          onSuccess={handleModalSuccess}
+        />
       )}
 
       {/* Delete Lesson Dialog */}
@@ -434,6 +677,83 @@ const LessonsPage: React.FC = () => {
         cancelText="Anuluj"
         variant="info"
       />
+
+      <style>{`
+        .rbc-calendar {
+          font-family: inherit;
+        }
+        .rbc-event {
+          box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+        .rbc-month-view {
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          overflow: hidden;
+          min-height: 500px;
+        }
+        .rbc-month-row {
+          min-height: 80px;
+        }
+        .rbc-month-view .rbc-header {
+          padding: 12px 4px;
+          font-weight: 600;
+          color: #374151;
+          background-color: #f9fafb;
+          border-bottom: 2px solid #e5e7eb;
+        }
+        .rbc-month-view .rbc-day-bg {
+          border-left: 1px solid #e5e7eb;
+        }
+        .rbc-month-view .rbc-day-bg:first-child {
+          border-left: none;
+        }
+        .rbc-month-view .rbc-date-cell {
+          padding: 8px;
+          text-align: right;
+        }
+        .rbc-month-view .rbc-off-range-bg {
+          background-color: #f9fafb;
+        }
+        .rbc-month-view .rbc-today {
+          background-color: #fef3c7;
+        }
+        .rbc-month-view .rbc-event {
+          padding: 2px 6px;
+          margin: 1px 2px;
+          font-size: 0.75rem;
+          border-radius: 4px;
+        }
+        .rbc-show-more {
+          color: #2563eb;
+          font-weight: 500;
+          margin: 2px 4px;
+          font-size: 0.75rem;
+        }
+        .rbc-event:hover {
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .rbc-today {
+          background-color: #FEF3C7;
+        }
+        .rbc-header {
+          padding: 12px 4px;
+          font-weight: 600;
+          border-bottom: 2px solid #E5E7EB;
+        }
+        .rbc-time-slot {
+          border-top: 1px solid #F3F4F6;
+        }
+        .rbc-timeslot-group {
+          border-left: 1px solid #E5E7EB;
+        }
+        .rbc-current-time-indicator {
+          background-color: #EF4444;
+          height: 2px;
+        }
+        .rbc-day-slot .rbc-time-slot {
+          border-top: 1px solid #F3F4F6;
+        }
+      `}</style>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import prisma from '../utils/prisma';
 import { LanguageLevel, UserRole } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import { parse } from 'csv-parse/sync';
 
 interface CreateStudentData {
   email: string;
@@ -497,6 +498,210 @@ export class StudentService {
       status: enrollment.status,
       enrollmentDate: enrollment.enrollmentDate,
       expiresAt: enrollment.expiresAt,
+    };
+  }
+
+  /**
+   * Import students from CSV file
+   */
+  async importStudentsFromCSV(
+    csvContent: string,
+    columnMapping: Record<string, string>,
+    organizationId: string
+  ) {
+    // Parse CSV
+    const records = parse(csvContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    });
+
+    const results = {
+      total: records.length,
+      successful: 0,
+      failed: 0,
+      errors: [] as Array<{ row: number; email: string; error: string }>,
+    };
+
+    // Process each row
+    for (let i = 0; i < records.length; i++) {
+      const row = records[i];
+      const rowNumber = i + 2; // +2 because: 1 for header, 1 for 0-based index
+
+      try {
+        // Validate required fields
+        const email = row[columnMapping.email]?.trim();
+        const firstName = row[columnMapping.firstName]?.trim();
+        const lastName = row[columnMapping.lastName]?.trim();
+        const languageLevelRaw = row[columnMapping.languageLevel]?.trim().toUpperCase();
+
+        if (!email || !firstName || !lastName) {
+          throw new Error('Email, imię i nazwisko są wymagane');
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          throw new Error('Nieprawidłowy format email');
+        }
+
+        // Validate language level
+        const validLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+        const languageLevel = languageLevelRaw && validLevels.includes(languageLevelRaw)
+          ? (languageLevelRaw as LanguageLevel)
+          : 'A1'; // Default to A1 if not provided or invalid
+
+        // Check if user already exists
+        const existingUser = await prisma.user.findUnique({
+          where: { email },
+        });
+
+        if (existingUser) {
+          throw new Error('Użytkownik z tym emailem już istnieje');
+        }
+
+        // Generate default password (can be changed later)
+        const defaultPassword = 'LingoDesk2024!';
+        const passwordHash = await bcrypt.hash(defaultPassword, 10);
+
+        // Parse optional fields
+        const phone = row[columnMapping.phone]?.trim() || undefined;
+        const dateOfBirth = row[columnMapping.dateOfBirth]?.trim() || undefined;
+        const address = row[columnMapping.address]?.trim() || undefined;
+        const goals = row[columnMapping.goals]?.trim() || undefined;
+        const isMinor = row[columnMapping.isMinor]?.trim().toLowerCase() === 'true' ||
+                       row[columnMapping.isMinor]?.trim().toLowerCase() === 'tak' ||
+                       row[columnMapping.isMinor]?.trim() === '1';
+
+        // Parse payment terms
+        const paymentDueDays = row[columnMapping.paymentDueDays]?.trim()
+          ? parseInt(row[columnMapping.paymentDueDays])
+          : undefined;
+        const paymentDueDayOfMonth = row[columnMapping.paymentDueDayOfMonth]?.trim()
+          ? parseInt(row[columnMapping.paymentDueDayOfMonth])
+          : undefined;
+
+        // Generate student number
+        const lastStudent = await prisma.student.findFirst({
+          where: { organizationId },
+          orderBy: { studentNumber: 'desc' },
+        });
+
+        const studentNumber = lastStudent
+          ? String(parseInt(lastStudent.studentNumber) + 1).padStart(6, '0')
+          : '000001';
+
+        // Create student in transaction
+        await prisma.$transaction(async (tx) => {
+          // Create user
+          const user = await tx.user.create({
+            data: {
+              email,
+              passwordHash,
+              firstName,
+              lastName,
+              phone,
+              role: UserRole.STUDENT,
+              organizationId,
+            },
+          });
+
+          // Create user profile
+          await tx.userProfile.create({
+            data: {
+              userId: user.id,
+              dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+              address,
+            },
+          });
+
+          // Create student
+          const student = await tx.student.create({
+            data: {
+              userId: user.id,
+              organizationId,
+              studentNumber,
+              languageLevel,
+              goals,
+              isMinor,
+              paymentDueDays,
+              paymentDueDayOfMonth,
+            },
+          });
+
+          // Create empty budget
+          await tx.studentBudget.create({
+            data: {
+              studentId: student.id,
+              organizationId,
+            },
+          });
+        });
+
+        results.successful++;
+      } catch (error: any) {
+        results.failed++;
+        results.errors.push({
+          row: rowNumber,
+          email: row[columnMapping.email] || 'N/A',
+          error: error.message,
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Preview CSV file and suggest column mappings
+   */
+  async previewCSV(csvContent: string) {
+    // Parse first 5 rows for preview
+    const records = parse(csvContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+      to: 5, // Only parse first 5 rows
+    });
+
+    if (records.length === 0) {
+      throw new Error('Plik CSV jest pusty lub nieprawidłowy');
+    }
+
+    // Get column headers
+    const headers = Object.keys(records[0]);
+
+    // Suggest mappings based on common column names
+    const suggestedMapping: Record<string, string> = {};
+    const commonMappings: Record<string, string[]> = {
+      email: ['email', 'e-mail', 'mail', 'adres email'],
+      firstName: ['firstname', 'first name', 'imię', 'imie', 'name'],
+      lastName: ['lastname', 'last name', 'nazwisko', 'surname'],
+      phone: ['phone', 'telefon', 'tel', 'mobile', 'phone number'],
+      dateOfBirth: ['dateofbirth', 'date of birth', 'birth date', 'data urodzenia', 'dob'],
+      address: ['address', 'adres', 'street', 'ulica'],
+      languageLevel: ['languagelevel', 'language level', 'level', 'poziom'],
+      goals: ['goals', 'cele', 'notes', 'uwagi'],
+      isMinor: ['isminor', 'minor', 'is minor', 'nieletni', 'nieletniosc'],
+      paymentDueDays: ['paymentduedays', 'payment due days', 'dni płatności', 'termin płatności (dni)'],
+      paymentDueDayOfMonth: ['paymentduedayofmonth', 'payment day of month', 'dzień płatności', 'termin płatności (dzień)'],
+    };
+
+    for (const header of headers) {
+      const normalizedHeader = header.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      for (const [field, patterns] of Object.entries(commonMappings)) {
+        if (patterns.some(pattern => normalizedHeader.includes(pattern.toLowerCase().replace(/[^a-z0-9]/g, '')))) {
+          suggestedMapping[field] = header;
+          break;
+        }
+      }
+    }
+
+    return {
+      headers,
+      preview: records,
+      suggestedMapping,
     };
   }
 }

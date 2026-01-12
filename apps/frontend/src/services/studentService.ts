@@ -149,4 +149,23 @@ export const studentService = {
 
     return lowBudgetAlerts;
   },
+
+  async previewCSV(csvContent: string) {
+    const response = await api.post('/students/import/preview', { csvContent });
+    return response.data.data as {
+      headers: string[];
+      preview: Record<string, string>[];
+      suggestedMapping: Record<string, string>;
+    };
+  },
+
+  async importCSV(csvContent: string, columnMapping: Record<string, string>) {
+    const response = await api.post('/students/import', { csvContent, columnMapping });
+    return response.data.data as {
+      total: number;
+      successful: number;
+      failed: number;
+      errors: Array<{ row: number; email: string; error: string }>;
+    };
+  },
 };
