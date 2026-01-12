@@ -1,7 +1,9 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { lessonService, Lesson, LessonStatus } from '../services/lessonService';
+import { courseService } from '../services/courseService';
 import LessonModal from '../components/LessonModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -78,6 +80,7 @@ const getEventStyle = (lesson: Lesson) => {
 
 const LessonsPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // View mode state
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -85,6 +88,15 @@ const LessonsPage: React.FC = () => {
   // Shared filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<LessonStatus | ''>('');
+  const [courseFilter, setCourseFilter] = useState<string>('');
+
+  // Initialize courseFilter from URL params
+  useEffect(() => {
+    const courseId = searchParams.get('courseId');
+    if (courseId) {
+      setCourseFilter(courseId);
+    }
+  }, [searchParams]);
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -102,13 +114,20 @@ const LessonsPage: React.FC = () => {
   const [date, setDate] = useState(new Date());
   const [isDragging, setIsDragging] = useState(false);
 
+  // Fetch courses for dropdown
+  const { data: courses = [] } = useQuery({
+    queryKey: ['courses'],
+    queryFn: () => courseService.getCourses({ isActive: true }),
+  });
+
   // Shared data source - single query for both views
   const { data: lessons = [], isLoading } = useQuery({
-    queryKey: ['lessons', searchTerm, statusFilter],
+    queryKey: ['lessons', searchTerm, statusFilter, courseFilter],
     queryFn: () =>
       lessonService.getLessons({
         search: searchTerm || undefined,
         status: statusFilter || undefined,
+        courseId: courseFilter || undefined,
       }),
   });
 
@@ -539,7 +558,7 @@ const LessonsPage: React.FC = () => {
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -551,6 +570,20 @@ const LessonsPage: React.FC = () => {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
+
+          {/* Course Filter */}
+          <select
+            value={courseFilter}
+            onChange={(e) => setCourseFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="">Wszystkie kursy</option>
+            {courses.map((course) => (
+              <option key={course.id} value={course.id}>
+                {course.name}
+              </option>
+            ))}
+          </select>
 
           {/* Status Filter */}
           <select
@@ -649,6 +682,7 @@ const LessonsPage: React.FC = () => {
           lesson={selectedLesson}
           initialDate={selectedSlot?.start}
           initialDuration={selectedSlot ? Math.round((selectedSlot.end.getTime() - selectedSlot.start.getTime()) / 60000) : 60}
+          initialCourseId={courseFilter || undefined}
           onClose={handleModalClose}
           onSuccess={handleModalSuccess}
         />

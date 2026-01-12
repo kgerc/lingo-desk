@@ -1,6 +1,7 @@
 import toast from 'react-hot-toast';
 import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { courseService, Course } from '../services/courseService';
 import { Plus, Search, Users, BookOpen, Calendar, MapPin, Wifi, Home, MoreVertical } from 'lucide-react';
 import CourseModal from '../components/CourseModal';
@@ -11,6 +12,7 @@ import Dropdown from '../components/Dropdown';
 
 const CoursesPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -56,6 +58,10 @@ const CoursesPage: React.FC = () => {
   const handleManageStudents = (course: Course) => {
     setCourseForEnrollment(course);
     setIsEnrollModalOpen(true);
+  };
+
+  const handleViewSchedule = (courseId: string) => {
+    navigate(`/lessons?courseId=${courseId}`);
   };
 
   const handleCloseModal = () => {
@@ -277,6 +283,10 @@ const CoursesPage: React.FC = () => {
                         onClose={() => setOpenDropdownId(null)}
                         triggerRef={{ current: dropdownTriggerRefs.current.get(course.id) || null }}
                         items={[
+                          {
+                            label: 'Zobacz grafik',
+                            onClick: () => handleViewSchedule(course.id),
+                          },
                           {
                             label: 'Zarządzaj uczniami',
                             onClick: () => handleManageStudents(course),

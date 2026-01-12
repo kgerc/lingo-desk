@@ -12,19 +12,20 @@ interface LessonModalProps {
   lesson: Lesson | null;
   initialDate?: Date;
   initialDuration?: number;
+  initialCourseId?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
 type TabType = 'basic' | 'participants';
 
-const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialDuration, onClose, onSuccess }) => {
+const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialDuration, initialCourseId, onClose, onSuccess }) => {
   const queryClient = useQueryClient();
   const isEdit = !!lesson;
   const [activeTab, setActiveTab] = useState<TabType>('basic');
 
   const [formData, setFormData] = useState({
-    courseId: lesson?.courseId || '',
+    courseId: lesson?.courseId || initialCourseId || '',
     teacherId: lesson?.teacherId || '',
     studentIds: lesson ? [lesson.studentId] : [] as string[],
     title: lesson?.title || '',
