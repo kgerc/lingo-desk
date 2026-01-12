@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { courseTypeService, CourseType } from '../services/courseTypeService';
 import CourseTypeModal from '../components/CourseTypeModal';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Plus, Pencil, Trash2, BookOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -95,15 +96,14 @@ const CourseTypesPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">Ładowanie typów kursów...</div>
+      <div className="py-12">
+        <LoadingSpinner message="Ładowanie typów kursów..." />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="space-y-6">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -306,7 +306,6 @@ const CourseTypesPage: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
 
       {/* Modal */}
       {isModalOpen && (

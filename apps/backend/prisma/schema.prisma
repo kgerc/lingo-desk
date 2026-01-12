@@ -322,10 +322,11 @@ model Student {
   studentNumber  String        @map("student_number")
   enrollmentDate DateTime      @default(now()) @map("enrollment_date")
   languageLevel  LanguageLevel @map("language_level")
-  goals          String?
-  isMinor        Boolean       @default(false) @map("is_minor")
-  paymentDueDays Int?          @map("payment_due_days")
-  createdAt      DateTime      @default(now()) @map("created_at")
+  goals               String?
+  isMinor             Boolean       @default(false) @map("is_minor")
+  paymentDueDays      Int?          @map("payment_due_days")
+  paymentDueDayOfMonth Int?         @map("payment_due_day_of_month")
+  createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
   // Relations
@@ -510,6 +511,7 @@ model Lesson {
   description           String?
   scheduledAt           DateTime           @map("scheduled_at")
   durationMinutes       Int                @default(60) @map("duration_minutes")
+  teacherRate           Decimal?           @map("teacher_rate") @db.Decimal(10, 2)
   locationId            String?            @map("location_id")
   classroomId           String?            @map("classroom_id")
   deliveryMode          LessonDeliveryMode @map("delivery_mode")

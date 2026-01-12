@@ -8,6 +8,7 @@ export interface Student {
   goals?: string;
   isMinor: boolean;
   paymentDueDays?: number | null;
+  paymentDueDayOfMonth?: number | null;
   enrollmentDate: string;
   user: {
     id: string;
@@ -43,6 +44,7 @@ export interface CreateStudentData {
   goals?: string;
   isMinor?: boolean;
   paymentDueDays?: number | null;
+  paymentDueDayOfMonth?: number | null;
 }
 
 export interface UpdateStudentData {
@@ -56,6 +58,7 @@ export interface UpdateStudentData {
   goals?: string;
   isMinor?: boolean;
   paymentDueDays?: number | null;
+  paymentDueDayOfMonth?: number | null;
   isActive?: boolean;
 }
 

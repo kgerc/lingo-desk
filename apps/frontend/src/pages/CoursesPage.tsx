@@ -2,7 +2,7 @@ import toast from 'react-hot-toast';
 import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { courseService, Course } from '../services/courseService';
-import { Plus, Search, Edit, Trash2, Users, BookOpen, Calendar, MapPin, Wifi, Home, UserPlus, MoreVertical } from 'lucide-react';
+import { Plus, Search, Users, BookOpen, Calendar, MapPin, Wifi, Home, MoreVertical } from 'lucide-react';
 import CourseModal from '../components/CourseModal';
 import EnrollStudentModal from '../components/EnrollStudentModal';
 import LoadingSpinner from '../components/LoadingSpinner';

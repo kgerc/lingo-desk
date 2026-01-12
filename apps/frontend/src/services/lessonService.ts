@@ -21,6 +21,7 @@ export interface Lesson {
   description?: string;
   scheduledAt: string;
   durationMinutes: number;
+  teacherRate?: number;
   locationId?: string;
   classroomId?: string;
   deliveryMode: LessonDeliveryMode;
@@ -99,6 +100,7 @@ export interface CreateLessonData {
   description?: string;
   scheduledAt: string;
   durationMinutes: number;
+  teacherRate?: number;
   locationId?: string;
   classroomId?: string;
   deliveryMode: LessonDeliveryMode;
@@ -113,6 +115,7 @@ export interface UpdateLessonData {
   description?: string;
   scheduledAt?: string;
   durationMinutes?: number;
+  teacherRate?: number;
   locationId?: string;
   classroomId?: string;
   deliveryMode?: LessonDeliveryMode;

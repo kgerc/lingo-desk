@@ -19,6 +19,7 @@ const createLessonSchema = z.object({
   status: z.enum(['SCHEDULED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'PENDING_CONFIRMATION', 'NO_SHOW']).default('SCHEDULED'),
   isRecurring: z.boolean().default(false),
   recurringPatternId: z.string().uuid().optional(),
+  teacherRate: z.number().optional()
 });
 
 const updateLessonSchema = z.object({
@@ -35,6 +36,7 @@ const updateLessonSchema = z.object({
   meetingUrl: z.string().url().optional(),
   status: z.enum(['SCHEDULED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'PENDING_CONFIRMATION', 'NO_SHOW']).optional(),
   cancellationReason: z.string().optional(),
+  teacherRate: z.number().optional()
 });
 
 class LessonController {

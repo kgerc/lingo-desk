@@ -14,6 +14,7 @@ interface CreateStudentData {
   goals?: string;
   isMinor?: boolean;
   paymentDueDays?: number;
+  paymentDueDayOfMonth?: number;
   organizationId: string;
 }
 
@@ -28,6 +29,7 @@ interface UpdateStudentData {
   goals?: string;
   isMinor?: boolean;
   paymentDueDays?: number;
+  paymentDueDayOfMonth?: number;
   isActive?: boolean;
 }
 
@@ -45,6 +47,7 @@ export class StudentService {
       goals,
       isMinor,
       paymentDueDays,
+      paymentDueDayOfMonth,
       organizationId
     } = data;
 
@@ -104,6 +107,7 @@ export class StudentService {
           goals,
           isMinor: isMinor || false,
           paymentDueDays,
+          paymentDueDayOfMonth,
         },
         include: {
           user: {
@@ -300,6 +304,7 @@ export class StudentService {
           goals: data.goals,
           isMinor: data.isMinor,
           paymentDueDays: data.paymentDueDays,
+          paymentDueDayOfMonth: data.paymentDueDayOfMonth,
         },
         include: {
           user: {
@@ -317,10 +322,80 @@ export class StudentService {
         },
       });
 
+      // Recalculate dueAt for all PENDING payments when payment terms change
+      if (data.paymentDueDays !== undefined || data.paymentDueDayOfMonth !== undefined) {
+        await this.recalculatePaymentDueDates(
+          tx,
+          id,
+          updatedStudent.paymentDueDays,
+          updatedStudent.paymentDueDayOfMonth
+        );
+      }
+
       return updatedStudent;
     });
 
     return result;
+  }
+
+  /**
+   * Recalculate dueAt for all PENDING payments when student's payment terms change
+   */
+  private async recalculatePaymentDueDates(
+    tx: any,
+    studentId: string,
+    paymentDueDays: number | null,
+    paymentDueDayOfMonth: number | null
+  ) {
+    // Get all PENDING payments for this student with their associated lesson
+    const pendingPayments = await tx.payment.findMany({
+      where: {
+        studentId,
+        status: 'PENDING',
+      },
+      include: {
+        lesson: {
+          select: {
+            completedAt: true,
+          },
+        },
+      },
+    });
+
+    // Recalculate dueAt for each payment
+    for (const payment of pendingPayments) {
+      // Use lesson completedAt if available, otherwise use payment createdAt
+      const referenceDate = payment.lesson?.completedAt || payment.createdAt;
+      let newDueAt: Date;
+
+      if (paymentDueDayOfMonth) {
+        // PRIORITY 1: Fixed day of month
+        newDueAt = new Date(referenceDate);
+        newDueAt.setDate(paymentDueDayOfMonth);
+
+        // If the target day has already passed relative to the reference date,
+        // move to next month
+        if (newDueAt <= referenceDate) {
+          newDueAt.setMonth(newDueAt.getMonth() + 1);
+        }
+
+        // Handle edge case: if target day doesn't exist in the month
+        // JavaScript automatically adjusts to the next valid date
+      } else if (paymentDueDays) {
+        // PRIORITY 2: X days from reference date
+        newDueAt = new Date(referenceDate);
+        newDueAt.setDate(newDueAt.getDate() + paymentDueDays);
+      } else {
+        // PRIORITY 3: No term = immediate debtor (use reference date)
+        newDueAt = referenceDate;
+      }
+
+      // Update payment with new dueAt
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: { dueAt: newDueAt },
+      });
+    }
   }
 
   async deleteStudent(id: string, organizationId: string) {

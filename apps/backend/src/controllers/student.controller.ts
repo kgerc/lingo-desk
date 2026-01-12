@@ -15,6 +15,8 @@ const createStudentSchema = z.object({
   languageLevel: z.nativeEnum(LanguageLevel),
   goals: z.string().optional(),
   isMinor: z.boolean().optional(),
+  paymentDueDays: z.number().nullable().optional(),
+  paymentDueDayOfMonth: z.number().nullable().optional()
 });
 
 const updateStudentSchema = z.object({
@@ -28,6 +30,8 @@ const updateStudentSchema = z.object({
   goals: z.string().optional(),
   isMinor: z.boolean().optional(),
   isActive: z.boolean().optional(),
+  paymentDueDays: z.number().nullable().optional(),
+  paymentDueDayOfMonth: z.number().nullable().optional()
 });
 
 export class StudentController {
@@ -122,7 +126,15 @@ export class StudentController {
 
       const { id } = req.params;
       const data = updateStudentSchema.parse(req.body);
+      if (typeof data.paymentDueDays === 'number' ||
+        typeof data.paymentDueDayOfMonth === 'undefined') {
+        data.paymentDueDayOfMonth = null;
+      }
 
+      if (typeof data.paymentDueDayOfMonth === 'number' ||
+        typeof data.paymentDueDays === 'undefined') {
+        data.paymentDueDays = null;
+      }
       const student = await studentService.updateStudent(
         id,
         req.user.organizationId,

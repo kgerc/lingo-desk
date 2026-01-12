@@ -13,6 +13,7 @@ export interface CreateLessonData {
   description?: string;
   scheduledAt: Date;
   durationMinutes: number;
+  teacherRate?: number;
   locationId?: string;
   classroomId?: string;
   deliveryMode: 'IN_PERSON' | 'ONLINE';
@@ -27,6 +28,7 @@ export interface UpdateLessonData {
   description?: string;
   scheduledAt?: Date;
   durationMinutes?: number;
+  teacherRate?: number;
   locationId?: string;
   classroomId?: string;
   deliveryMode?: 'IN_PERSON' | 'ONLINE';
@@ -46,6 +48,35 @@ export interface LessonFilters {
 }
 
 class LessonService {
+  /**
+   * Calculate teacher rate based on course type price, teacher hourly rate, or custom value
+   * Priority: custom teacherRate > courseType pricePerLesson > teacher hourlyRate
+   */
+  private calculateTeacherRate(
+    customRate: number | undefined,
+    durationMinutes: number,
+    courseTypePricePerLesson: number | undefined,
+    teacherHourlyRate: number
+  ): number {
+    // 1. If custom rate provided, use it directly
+    if (customRate !== undefined && customRate !== null) {
+      return customRate;
+    }
+
+    // 2. If course has pricePerLesson, calculate proportional rate based on duration
+    // Assuming pricePerLesson is for the defaultDurationMinutes (usually 60 min)
+    if (courseTypePricePerLesson !== undefined && courseTypePricePerLesson !== null) {
+      // For simplicity, we'll use pricePerLesson as base for 60 minutes
+      // and scale proportionally
+      const baseDuration = 60; // assume 60 minutes as base
+      return (courseTypePricePerLesson / baseDuration) * durationMinutes;
+    }
+
+    // 3. Fallback to teacher hourly rate
+    const hours = durationMinutes / 60;
+    return teacherHourlyRate * hours;
+  }
+
   async createLesson(data: CreateLessonData) {
     const { organizationId, enrollmentId, teacherId, studentId, courseId, ...lessonData } = data;
 
@@ -57,7 +88,11 @@ class LessonService {
         course: { organizationId },
       },
       include: {
-        course: true,
+        course: {
+          include: {
+            courseType: true,
+          },
+        },
         student: true,
       },
     });
@@ -120,6 +155,19 @@ class LessonService {
       throw new Error('Student not found');
     }
 
+    // Calculate teacher rate if not explicitly provided
+    const courseTypePricePerLesson = enrollment?.course?.courseType?.pricePerLesson
+      ? Number(enrollment.course.courseType.pricePerLesson)
+      : undefined;
+    const teacherHourlyRate = Number(teacher.hourlyRate);
+
+    const calculatedTeacherRate = this.calculateTeacherRate(
+      data.teacherRate,
+      data.durationMinutes,
+      courseTypePricePerLesson,
+      teacherHourlyRate
+    );
+
     // Create lesson
     const lesson = await prisma.lesson.create({
       data: {
@@ -129,6 +177,7 @@ class LessonService {
         teacherId,
         studentId,
         status: data.status || 'SCHEDULED',
+        teacherRate: calculatedTeacherRate,
         ...lessonData,
       },
       include: {
@@ -394,6 +443,19 @@ class LessonService {
       );
     }
 
+    // If uncompleting (reverting from COMPLETED to another status), restore budget and remove payment
+    const isUncompletingLesson = existingLesson.status === 'COMPLETED' && data.status && data.status !== 'COMPLETED';
+    if (isUncompletingLesson) {
+      updateData.completedAt = null;
+
+      // Restore budget and remove payment
+      await this.restoreLessonBudget(
+        existingLesson.enrollmentId,
+        existingLesson.durationMinutes,
+        existingLesson.id
+      );
+    }
+
     const lesson = await prisma.lesson.update({
       where: { id },
       data: updateData,
@@ -472,6 +534,61 @@ class LessonService {
   /**
    * Deduct lesson hours from student budget or create payment for per-lesson mode
    */
+  /**
+   * Restore budget when uncompleting a lesson (reverting from COMPLETED status)
+   */
+  private async restoreLessonBudget(enrollmentId: string, durationMinutes: number, lessonId?: string) {
+    const hoursToRestore = durationMinutes / 60;
+
+    return await prisma.$transaction(async (tx) => {
+      const enrollment = await tx.studentEnrollment.findUnique({
+        where: { id: enrollmentId },
+        include: {
+          student: true,
+          course: {
+            include: {
+              courseType: true,
+            },
+          },
+        },
+      });
+
+      if (!enrollment) {
+        throw new Error('Enrollment not found');
+      }
+
+      // Handle based on payment mode
+      if (enrollment.paymentMode === 'PACKAGE') {
+        // PACKAGE mode: Restore hoursUsed
+        await tx.studentEnrollment.update({
+          where: { id: enrollmentId },
+          data: {
+            hoursUsed: {
+              decrement: hoursToRestore,
+            },
+          },
+        });
+      } else if (enrollment.paymentMode === 'PER_LESSON') {
+        // PER_LESSON mode: Delete the payment if it exists and is still PENDING
+        if (lessonId) {
+          const payment = await tx.payment.findFirst({
+            where: {
+              lessonId,
+              status: 'PENDING', // Only delete if still pending
+            },
+          });
+
+          if (payment) {
+            await tx.payment.delete({
+              where: { id: payment.id },
+            });
+          }
+          // If payment was already COMPLETED, we don't delete it - that's a financial record
+        }
+      }
+    });
+  }
+
   private async deductLessonFromBudget(enrollmentId: string, durationMinutes: number, lessonId?: string) {
     const hoursToDeduct = durationMinutes / 60;
 
@@ -524,18 +641,42 @@ class LessonService {
 
           // If no payment exists, create a pending payment
           if (!existingPayment) {
-            const pricePerLesson = enrollment.course?.courseType?.pricePerLesson || 0;
+            // Get the lesson to retrieve teacherRate
+            const lesson = await tx.lesson.findUnique({
+              where: { id: lessonId },
+              select: { teacherRate: true },
+            });
 
-            // Calculate dueAt based on student's paymentDueDays
+            // Use teacherRate from lesson if available, fallback to courseType pricePerLesson
+            const pricePerLesson = lesson?.teacherRate
+              ? parseFloat(lesson.teacherRate.toString())
+              : parseFloat((enrollment.course?.courseType?.pricePerLesson || 0).toString());
+
+            // Calculate dueAt based on student's payment settings
             const now = new Date();
             let dueAt: Date | null = null;
 
-            if (enrollment.student.paymentDueDays) {
-              // If paymentDueDays is set, calculate due date
+            if (enrollment.student.paymentDueDayOfMonth) {
+              // If paymentDueDayOfMonth is set (e.g., 10 = 10th day of month)
+              dueAt = new Date(now);
+              const targetDay = enrollment.student.paymentDueDayOfMonth;
+
+              // Set to target day of current month
+              dueAt.setDate(targetDay);
+
+              // If the target day has already passed this month, move to next month
+              if (dueAt <= now) {
+                dueAt.setMonth(dueAt.getMonth() + 1);
+              }
+
+              // Handle edge case: if target day doesn't exist in the month (e.g., 31st in February)
+              // JavaScript automatically adjusts to the next valid date
+            } else if (enrollment.student.paymentDueDays) {
+              // If paymentDueDays is set, calculate due date (X days from now)
               dueAt = new Date(now);
               dueAt.setDate(dueAt.getDate() + enrollment.student.paymentDueDays);
             } else {
-              // If paymentDueDays is null, student becomes debtor immediately
+              // If neither is set, student becomes debtor immediately
               dueAt = now;
             }
 

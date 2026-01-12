@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { lessonService, Lesson, LessonStatus } from '../services/lessonService';
 import LessonModal from '../components/LessonModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Dropdown from '../components/Dropdown';
 import {
   Calendar,
   Clock,
@@ -14,12 +15,10 @@ import {
   MapPin,
   Search,
   Plus,
-  Edit,
-  Trash2,
   CheckCircle,
-  XCircle,
   AlertCircle,
-  Check,
+  XCircle,
+  MoreVertical,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
@@ -32,6 +31,8 @@ const LessonsPage: React.FC = () => {
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; lessonId: string | null }>({ isOpen: false, lessonId: null });
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; lessonId: string | null }>({ isOpen: false, lessonId: null });
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   const { data: lessons = [], isLoading } = useQuery({
     queryKey: ['lessons', searchTerm, statusFilter],
@@ -76,6 +77,18 @@ const LessonsPage: React.FC = () => {
     },
   });
 
+  const uncompleteMutation = useMutation({
+    mutationFn: (lessonId: string) =>
+      lessonService.updateLesson(lessonId, { status: 'CONFIRMED' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      toast.success('Potwierdzenie lekcji zostało cofnięte');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Błąd przy cofaniu potwierdzenia');
+    },
+  });
+
   const handleAddLesson = () => {
     setSelectedLesson(null);
     setIsModalOpen(true);
@@ -108,6 +121,10 @@ const LessonsPage: React.FC = () => {
 
   const handleCompleteLesson = (lessonId: string) => {
     completeMutation.mutate(lessonId);
+  };
+
+  const handleUncompleteLesson = (lessonId: string) => {
+    uncompleteMutation.mutate(lessonId);
   };
 
   const handleModalClose = () => {
@@ -320,44 +337,65 @@ const LessonsPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(lesson.status)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2">
-                        {lesson.status === 'SCHEDULED' && (
-                          <button
-                            onClick={() => handleConfirmLesson(lesson.id)}
-                            className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 transition-colors"
-                            title="Potwierdź lekcję"
-                          >
-                            <CheckCircle className="h-5 w-5" />
-                          </button>
-                        )}
-                        {(lesson.status === 'SCHEDULED' || lesson.status === 'CONFIRMED') && (
-                          <button
-                            onClick={() => handleCompleteLesson(lesson.id)}
-                            disabled={completeMutation.isPending}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
-                            title="Oznacz jako zakończoną"
-                          >
-                            <Check className="h-4 w-4" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleEditLesson(lesson)}
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
-                          title="Edytuj"
-                        >
-                          <Edit className="h-5 w-5" />
-                        </button>
-                        {lesson.status !== 'COMPLETED' && (
-                          <button
-                            onClick={() => handleDeleteLesson(lesson.id)}
-                            className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
-                            title="Usuń"
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="h-5 w-5" />
-                          </button>
-                        )}
-                      </div>
+                      <button
+                        ref={(el) => {
+                          if (el) {
+                            dropdownTriggerRefs.current.set(lesson.id, el);
+                          }
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenDropdownId(openDropdownId === lesson.id ? null : lesson.id);
+                        }}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                        title="Więcej opcji"
+                      >
+                        <MoreVertical className="h-4 w-4 text-gray-600" />
+                      </button>
+                      <Dropdown
+                        isOpen={openDropdownId === lesson.id}
+                        onClose={() => setOpenDropdownId(null)}
+                        triggerRef={{ current: dropdownTriggerRefs.current.get(lesson.id) || null }}
+                        items={[
+                          ...(lesson.status === 'SCHEDULED'
+                            ? [
+                                {
+                                  label: 'Potwierdź lekcję',
+                                  onClick: () => handleConfirmLesson(lesson.id),
+                                },
+                              ]
+                            : []),
+                          ...((lesson.status === 'SCHEDULED' || lesson.status === 'CONFIRMED')
+                            ? [
+                                {
+                                  label: 'Oznacz jako zakończoną',
+                                  onClick: () => handleCompleteLesson(lesson.id),
+                                },
+                              ]
+                            : []),
+                          ...(lesson.status === 'COMPLETED'
+                            ? [
+                                {
+                                  label: 'Cofnij zakończenie',
+                                  onClick: () => handleUncompleteLesson(lesson.id),
+                                },
+                              ]
+                            : []),
+                          {
+                            label: 'Edytuj lekcję',
+                            onClick: () => handleEditLesson(lesson),
+                          },
+                          ...(lesson.status !== 'COMPLETED'
+                            ? [
+                                {
+                                  label: 'Usuń lekcję',
+                                  onClick: () => handleDeleteLesson(lesson.id),
+                                  variant: 'danger' as const,
+                                },
+                              ]
+                            : []),
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))

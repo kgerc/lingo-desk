@@ -35,6 +35,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
         ? new Date(initialDate).toISOString().slice(0, 16)
         : '',
     durationMinutes: lesson?.durationMinutes?.toString() || initialDuration?.toString() || '60',
+    teacherRate: lesson?.teacherRate?.toString() || '',
     deliveryMode: (lesson?.deliveryMode || 'IN_PERSON') as LessonDeliveryMode,
     meetingUrl: lesson?.meetingUrl || '',
     locationId: lesson?.locationId || '',
@@ -270,6 +271,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       description: formData.description || undefined,
       scheduledAt: formData.scheduledAt,
       durationMinutes: Number(formData.durationMinutes),
+      teacherRate: formData.teacherRate ? Number(formData.teacherRate) : undefined,
       deliveryMode: formData.deliveryMode,
       meetingUrl: formData.deliveryMode === 'ONLINE' ? formData.meetingUrl || undefined : undefined,
       locationId: formData.deliveryMode === 'IN_PERSON' ? formData.locationId || undefined : undefined,
@@ -513,6 +515,25 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                         {errors.durationMinutes && (
                           <p className="mt-1 text-sm text-red-600">{errors.durationMinutes}</p>
                         )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Stawka lektora (PLN)
+                        </label>
+                        <input
+                          type="number"
+                          name="teacherRate"
+                          value={formData.teacherRate}
+                          onChange={handleChange}
+                          min="0"
+                          step="0.01"
+                          placeholder="Automatycznie wyliczona"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Pozostaw puste aby automatycznie wyliczyć na podstawie kursu lub stawki lektora
+                        </p>
                       </div>
                     </div>
 

@@ -27,6 +27,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
     goals: student?.goals || '',
     isMinor: student?.isMinor || false,
     paymentDueDays: student?.paymentDueDays || null,
+    paymentDueDayOfMonth: student?.paymentDueDayOfMonth || null,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -92,6 +93,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
           goals: formData.goals || undefined,
           isMinor: formData.isMinor,
           paymentDueDays: formData.paymentDueDays || undefined,
+          paymentDueDayOfMonth: formData.paymentDueDayOfMonth || undefined,
         },
       });
     } else {
@@ -310,7 +312,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
               </div>
 
               {/* Payment Due Days */}
-              <div className="col-span-2">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Termin płatności (dni)
                 </label>
@@ -321,13 +323,46 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                   value={formData.paymentDueDays ?? ''}
                   onChange={(e) => setFormData({
                     ...formData,
-                    paymentDueDays: e.target.value ? parseInt(e.target.value) : null
+                    paymentDueDays: e.target.value ? parseInt(e.target.value) : null,
+                    paymentDueDayOfMonth: null, // Clear day of month when setting days
                   })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="np. 7, 14, 30 (puste = natychmiast)"
+                  disabled={formData.paymentDueDayOfMonth !== null}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  placeholder="np. 7, 14, 30"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Liczba dni po zakończeniu lekcji, po której uczeń staje się dłużnikiem. Pozostaw puste aby traktować jako dłużnika od razu.
+                  Liczba dni po zakończeniu lekcji
+                </p>
+              </div>
+
+              {/* Payment Due Day of Month */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Dzień miesiąca płatności
+                </label>
+                <input
+                  type="number"
+                  name="paymentDueDayOfMonth"
+                  min="1"
+                  max="31"
+                  value={formData.paymentDueDayOfMonth ?? ''}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    paymentDueDayOfMonth: e.target.value ? parseInt(e.target.value) : null,
+                    paymentDueDays: null, // Clear days when setting day of month
+                  })}
+                  disabled={formData.paymentDueDays !== null}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  placeholder="np. 10, 15, 25"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Konkretny dzień miesiąca (np. zawsze 10-go)
+                </p>
+              </div>
+
+              <div className="col-span-2">
+                <p className="text-xs text-gray-500">
+                  ℹ️ Wybierz jedno z powyższych. Pozostaw oba puste aby traktować jako dłużnika natychmiast.
                 </p>
               </div>
             </div>
