@@ -1,10 +1,11 @@
 import prisma from '../utils/prisma';
 import emailService from './email.service';
+import { PaymentStatus } from '@prisma/client';
 
 interface SendBulkEmailData {
   subject: string;
   message: string;
-  recipients: 'all' | 'selected';
+  recipients: 'all' | 'selected' | 'debtors';
   selectedStudentIds?: string[];
   organizationId: string;
 }
@@ -18,6 +19,45 @@ class MailingService {
     if (recipients === 'all') {
       students = await prisma.student.findMany({
         where: { organizationId },
+        include: {
+          user: {
+            select: {
+              email: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      });
+    } else if (recipients === 'debtors') {
+      // Get debtors - students with pending payments past due
+      const now = new Date();
+      const pendingPayments = await prisma.payment.findMany({
+        where: {
+          organizationId,
+          status: PaymentStatus.PENDING,
+          OR: [
+            { dueAt: null },           // No due date set (immediate debtor)
+            { dueAt: { lte: now } },   // Due date has passed
+          ],
+        },
+        select: {
+          studentId: true,
+        },
+        distinct: ['studentId'],
+      });
+
+      const debtorStudentIds = pendingPayments.map(p => p.studentId);
+
+      if (debtorStudentIds.length === 0) {
+        throw new Error('No debtors found');
+      }
+
+      students = await prisma.student.findMany({
+        where: {
+          id: { in: debtorStudentIds },
+          organizationId,
+        },
         include: {
           user: {
             select: {

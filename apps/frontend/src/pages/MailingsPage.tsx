@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Mail, Users, Send, Loader2 } from 'lucide-react';
+import { Mail, Users, Send, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { studentService } from '../services/studentService';
 import mailingService from '../services/mailingService';
@@ -8,7 +8,7 @@ import mailingService from '../services/mailingService';
 interface MailingFormData {
   subject: string;
   message: string;
-  recipients: 'all' | 'selected';
+  recipients: 'all' | 'selected' | 'debtors';
   selectedStudentIds: string[];
 }
 
@@ -20,12 +20,18 @@ const MailingsPage: React.FC = () => {
     selectedStudentIds: [],
   });
 
-  const [emailTemplate, setEmailTemplate] = useState<'welcome' | 'reminder' | 'custom'>('custom');
+  const [emailTemplate, setEmailTemplate] = useState<'welcome' | 'reminder' | 'payment' | 'custom'>('custom');
 
   // Fetch all students for selection
   const { data: students = [] } = useQuery({
     queryKey: ['students'],
     queryFn: () => studentService.getStudents(),
+  });
+
+  // Fetch debtors count
+  const { data: debtorsCount = 0 } = useQuery({
+    queryKey: ['debtors-count'],
+    queryFn: () => mailingService.getDebtorsCount(),
   });
 
   // Email templates
@@ -60,9 +66,24 @@ Powodzenia!
 Z poważaniem,
 Zespół szkoły`,
     },
+    payment: {
+      subject: 'Przypomnienie o zaległych płatnościach',
+      message: `Dzień dobry!
+
+Uprzejmie informujemy, że na Twoim koncie figurują zaległe płatności za zajęcia w naszej szkole językowej.
+
+Prosimy o uregulowanie należności w najbliższym możliwym terminie, aby móc kontynuować naukę bez zakłóceń.
+
+W przypadku pytań lub chęci ustalenia indywidualnego planu spłaty, prosimy o kontakt.
+
+Dziękujemy za zrozumienie i współpracę.
+
+Z poważaniem,
+Zespół szkoły`,
+    },
   };
 
-  const applyTemplate = (template: 'welcome' | 'reminder' | 'custom') => {
+  const applyTemplate = (template: 'welcome' | 'reminder' | 'payment' | 'custom') => {
     setEmailTemplate(template);
     if (template !== 'custom') {
       setFormData({
@@ -132,6 +153,8 @@ Zespół szkoły`,
   const recipientCount =
     formData.recipients === 'all'
       ? students.length
+      : formData.recipients === 'debtors'
+      ? debtorsCount
       : formData.selectedStudentIds.length;
 
   return (
@@ -152,7 +175,7 @@ Zespół szkoły`,
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
             Szablon wiadomości
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <button
               type="button"
               onClick={() => applyTemplate('welcome')}
@@ -186,6 +209,24 @@ Zespół szkoły`,
               </div>
               <p className="text-sm text-gray-600 text-left">
                 Przypomnienie o zajęciach i zaangażowaniu
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => applyTemplate('payment')}
+              className={`p-4 rounded-lg border-2 transition-all ${
+                emailTemplate === 'payment'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <span className="font-medium">Płatności</span>
+              </div>
+              <p className="text-sm text-gray-600 text-left">
+                Przypomnienie o zaległych płatnościach
               </p>
             </button>
 
@@ -255,7 +296,7 @@ Zespół szkoły`,
           </h2>
 
           <div className="space-y-4">
-            <div className="flex gap-4">
+            <div className="flex gap-4 flex-wrap">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
@@ -264,7 +305,7 @@ Zespół szkoły`,
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      recipients: e.target.value as 'all' | 'selected',
+                      recipients: e.target.value as 'all' | 'selected' | 'debtors',
                     })
                   }
                   className="w-4 h-4 text-primary focus:ring-primary"
@@ -277,12 +318,30 @@ Zespół szkoły`,
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
+                  value="debtors"
+                  checked={formData.recipients === 'debtors'}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      recipients: e.target.value as 'all' | 'selected' | 'debtors',
+                    })
+                  }
+                  className="w-4 h-4 text-primary focus:ring-primary"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  Dłużnicy ({debtorsCount})
+                </span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
                   value="selected"
                   checked={formData.recipients === 'selected'}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      recipients: e.target.value as 'all' | 'selected',
+                      recipients: e.target.value as 'all' | 'selected' | 'debtors',
                     })
                   }
                   className="w-4 h-4 text-primary focus:ring-primary"

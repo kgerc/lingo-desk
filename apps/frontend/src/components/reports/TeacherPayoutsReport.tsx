@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { reportService, TeacherPayoutData } from '../../services/reportService';
+import { reportService } from '../../services/reportService';
 import { Download, FileText, Calendar } from 'lucide-react';
 import LoadingSpinner from '../LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -15,7 +15,7 @@ const TeacherPayoutsReport: React.FC = () => {
   const [endDate, setEndDate] = useState(format(lastMonthEnd, 'yyyy-MM-dd'));
 
   // Fetch report data
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['report-teacher-payouts', startDate, endDate],
     queryFn: () =>
       reportService.getTeacherPayouts({
