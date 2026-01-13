@@ -26,6 +26,7 @@ import attendanceRoutes from './routes/attendance.routes';
 import userProfileRoutes from './routes/userProfile.routes';
 import mailingRoutes from './routes/mailing.routes';
 import googleCalendarRoutes from './routes/google-calendar.routes';
+import reportRoutes from './routes/report.routes';
 
 // Import scheduler
 import scheduler from './utils/scheduler';
@@ -99,6 +100,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/profile', userProfileRoutes);
 app.use('/api/mailings', mailingRoutes);
 app.use('/api/google-calendar', googleCalendarRoutes);
+app.use('/api/reports', reportRoutes);
 
 // ============================================
 // ERROR HANDLING

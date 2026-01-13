@@ -18,6 +18,7 @@ import TeacherAvailabilityPage from './pages/TeacherAvailabilityPage'
 import SettingsPage from './pages/SettingsPage'
 import DebtorsPage from './pages/DebtorsPage'
 import NotificationSettingsPage from './pages/NotificationSettingsPage'
+import ReportsPage from './pages/ReportsPage'
 import Layout from './components/Layout'
 
 function App() {
@@ -269,6 +270,19 @@ function App() {
             isAuthenticated ? (
               <Layout>
                 <DebtorsPage />
+              </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/reports"
+          element={
+            isAuthenticated ? (
+              <Layout>
+                <ReportsPage />
               </Layout>
             ) : (
               <Navigate to="/login" />

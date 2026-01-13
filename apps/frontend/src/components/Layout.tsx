@@ -22,6 +22,7 @@ import {
   AlertCircle,
   Bell,
   Layers,
+  BarChart3,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -69,6 +70,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { name: 'Lekcje', href: '/lessons', icon: Clock },
           { name: 'Płatności', href: '/payments', icon: CreditCard },
           { name: 'Dłużnicy', href: '/debtors', icon: AlertCircle },
+          { name: 'Raporty', href: '/reports', icon: BarChart3 },
         ];
 
       case 'TEACHER':
