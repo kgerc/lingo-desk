@@ -13,6 +13,7 @@ export interface Payment {
   stripePaymentIntentId?: string;
   paidAt?: string;
   notes?: string;
+  exchangeRateOverride?: number;
   createdAt: string;
   updatedAt: string;
   student?: {
@@ -50,14 +51,17 @@ export interface CreatePaymentData {
   paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'ONLINE' | 'OTHER';
   notes?: string;
   paidAt?: string;
+  exchangeRateOverride?: number;
 }
 
 export interface UpdatePaymentData {
   amount?: number;
+  currency?: string;
   status?: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
   paymentMethod?: 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'ONLINE' | 'OTHER';
   notes?: string;
   paidAt?: string;
+  exchangeRateOverride?: number;
 }
 
 export interface GetPaymentsFilters {
@@ -68,6 +72,8 @@ export interface GetPaymentsFilters {
   dateTo?: string;
   limit?: number;
   offset?: number;
+  currency?: string;
+  convertToCurrency?: string;
 }
 
 export interface PaymentStats {

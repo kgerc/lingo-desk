@@ -13,6 +13,7 @@ export interface CreateCourseTypeData {
   defaultDurationMinutes: number;
   maxStudents?: number;
   pricePerLesson: number;
+  currency?: string; // Default: PLN
 }
 
 class CourseTypeService {

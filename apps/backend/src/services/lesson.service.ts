@@ -15,6 +15,8 @@ export interface CreateLessonData {
   scheduledAt: Date;
   durationMinutes: number;
   teacherRate?: number;
+  pricePerLesson?: number; // Price charged to student
+  currency?: string; // Default: PLN
   locationId?: string;
   classroomId?: string;
   deliveryMode: 'IN_PERSON' | 'ONLINE';
@@ -30,6 +32,8 @@ export interface UpdateLessonData {
   scheduledAt?: Date;
   durationMinutes?: number;
   teacherRate?: number;
+  pricePerLesson?: number;
+  currency?: string;
   locationId?: string;
   classroomId?: string;
   deliveryMode?: 'IN_PERSON' | 'ONLINE';

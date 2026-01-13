@@ -10,7 +10,7 @@ class PaymentController {
   async getPayments(req: Request, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
-      const { studentId, status, paymentMethod, dateFrom, dateTo, limit, offset } = req.query;
+      const { studentId, status, paymentMethod, dateFrom, dateTo, limit, offset, currency, convertToCurrency } = req.query;
 
       const payments = await paymentService.getPayments({
         organizationId,
@@ -21,6 +21,8 @@ class PaymentController {
         dateTo: dateTo ? new Date(dateTo as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
         offset: offset ? parseInt(offset as string) : undefined,
+        currency: currency as string | undefined,
+        convertToCurrency: convertToCurrency as string | undefined,
       });
 
       res.json({
@@ -67,7 +69,7 @@ class PaymentController {
   async createPayment(req: Request, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
-      const { studentId, enrollmentId, amount, currency, status, paymentMethod, notes, paidAt } =
+      const { studentId, enrollmentId, amount, currency, status, paymentMethod, notes, paidAt, exchangeRateOverride } =
         req.body;
 
       // Validation
@@ -88,6 +90,7 @@ class PaymentController {
         paymentMethod,
         notes,
         paidAt: paidAt ? new Date(paidAt) : undefined,
+        exchangeRateOverride: exchangeRateOverride !== undefined ? parseFloat(exchangeRateOverride) : undefined,
       });
 
       res.status(201).json({
@@ -112,14 +115,16 @@ class PaymentController {
     try {
       const organizationId = req.user!.organizationId;
       const { id } = req.params;
-      const { amount, status, paymentMethod, notes, paidAt } = req.body;
+      const { amount, currency, status, paymentMethod, notes, paidAt, exchangeRateOverride } = req.body;
 
       const payment = await paymentService.updatePayment(id, organizationId, {
         amount: amount !== undefined ? parseFloat(amount) : undefined,
+        currency,
         status,
         paymentMethod,
         notes,
         paidAt: paidAt !== undefined ? (paidAt ? new Date(paidAt) : null) : undefined,
+        exchangeRateOverride: exchangeRateOverride !== undefined ? (exchangeRateOverride ? parseFloat(exchangeRateOverride) : null) : undefined,
       });
 
       res.json({

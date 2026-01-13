@@ -15,12 +15,17 @@ export default function PaymentsPage() {
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [currencyFilter, setCurrencyFilter] = useState<string>('ALL');
+  const [convertToCurrency, setConvertToCurrency] = useState<string>('');
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; paymentId: string | null }>({ isOpen: false, paymentId: null });
 
   // Fetch payments
   const { data: payments = [], isLoading } = useQuery({
-    queryKey: ['payments'],
-    queryFn: () => paymentService.getPayments(),
+    queryKey: ['payments', currencyFilter, convertToCurrency],
+    queryFn: () => paymentService.getPayments({
+      currency: currencyFilter !== 'ALL' ? currencyFilter : undefined,
+      convertToCurrency: convertToCurrency || undefined,
+    }),
   });
 
   // Fetch payment stats
@@ -181,7 +186,7 @@ export default function PaymentsPage() {
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
@@ -204,6 +209,44 @@ export default function PaymentsPage() {
               <option value="COMPLETED">Opłacone</option>
               <option value="FAILED">Niepowodzenie</option>
               <option value="REFUNDED">Zwrócone</option>
+            </select>
+          </div>
+
+          <div>
+            <select
+              value={currencyFilter}
+              onChange={(e) => setCurrencyFilter(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
+            >
+              <option value="ALL">Wszystkie waluty</option>
+              <option value="PLN">PLN</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="CHF">CHF</option>
+              <option value="CZK">CZK</option>
+              <option value="DKK">DKK</option>
+              <option value="NOK">NOK</option>
+              <option value="SEK">SEK</option>
+            </select>
+          </div>
+
+          <div>
+            <select
+              value={convertToCurrency}
+              onChange={(e) => setConvertToCurrency(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
+            >
+              <option value="">Bez konwersji</option>
+              <option value="PLN">Przelicz na PLN</option>
+              <option value="USD">Przelicz na USD</option>
+              <option value="EUR">Przelicz na EUR</option>
+              <option value="GBP">Przelicz na GBP</option>
+              <option value="CHF">Przelicz na CHF</option>
+              <option value="CZK">Przelicz na CZK</option>
+              <option value="DKK">Przelicz na DKK</option>
+              <option value="NOK">Przelicz na NOK</option>
+              <option value="SEK">Przelicz na SEK</option>
             </select>
           </div>
         </div>
@@ -263,7 +306,7 @@ export default function PaymentsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {payment.enrollment?.course.name || '-'}
+                      {payment.enrollment?.course?.name || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">

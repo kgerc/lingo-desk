@@ -57,6 +57,7 @@ const CourseTypeModal: React.FC<CourseTypeModalProps> = ({ courseType, onClose, 
     defaultDurationMinutes: courseType?.defaultDurationMinutes || 60,
     maxStudents: courseType?.maxStudents || null,
     pricePerLesson: courseType?.pricePerLesson || 0,
+    currency: courseType?.currency || 'PLN',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -132,6 +133,7 @@ const CourseTypeModal: React.FC<CourseTypeModalProps> = ({ courseType, onClose, 
       defaultDurationMinutes: formData.defaultDurationMinutes,
       maxStudents: formData.maxStudents || undefined,
       pricePerLesson: formData.pricePerLesson,
+      currency: formData.currency,
     };
 
     if (isEdit) {
@@ -351,9 +353,9 @@ const CourseTypeModal: React.FC<CourseTypeModalProps> = ({ courseType, onClose, 
             </div>
 
             {/* Price Per Lesson */}
-            <div className="col-span-2">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Cena za lekcję (PLN) *
+                Cena za lekcję *
               </label>
               <input
                 type="number"
@@ -370,6 +372,32 @@ const CourseTypeModal: React.FC<CourseTypeModalProps> = ({ courseType, onClose, 
               {errors.pricePerLesson && (
                 <p className="mt-1 text-sm text-red-500">{errors.pricePerLesson}</p>
               )}
+            </div>
+
+            {/* Currency */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Waluta *
+              </label>
+              <select
+                name="currency"
+                value={formData.currency}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="PLN">PLN (Polski złoty)</option>
+                <option value="USD">USD (Dolar amerykański)</option>
+                <option value="EUR">EUR (Euro)</option>
+                <option value="GBP">GBP (Funt brytyjski)</option>
+                <option value="CHF">CHF (Frank szwajcarski)</option>
+                <option value="CZK">CZK (Korona czeska)</option>
+                <option value="DKK">DKK (Korona duńska)</option>
+                <option value="NOK">NOK (Korona norweska)</option>
+                <option value="SEK">SEK (Korona szwedzka)</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Waluta domyślna dla lekcji tego typu kursu
+              </p>
             </div>
           </div>
 

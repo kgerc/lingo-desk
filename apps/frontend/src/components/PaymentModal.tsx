@@ -23,6 +23,7 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
     paymentMethod: payment?.paymentMethod || 'CASH',
     notes: payment?.notes || '',
     paidAt: payment?.paidAt ? new Date(payment.paidAt).toISOString().slice(0, 16) : '',
+    exchangeRateOverride: payment?.exchangeRateOverride || undefined,
   });
 
   // Fetch students for dropdown
@@ -71,10 +72,12 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
     if (isEditMode) {
       updateMutation.mutate({
         amount: formData.amount,
+        currency: formData.currency,
         status: formData.status,
         paymentMethod: formData.paymentMethod,
         notes: formData.notes,
         paidAt: formData.paidAt || undefined,
+        exchangeRateOverride: formData.exchangeRateOverride,
       });
     } else {
       createMutation.mutate({
@@ -88,7 +91,9 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: name === 'amount' ? parseFloat(value) || 0 : value,
+      [name]: name === 'amount' ? parseFloat(value) || 0
+            : name === 'exchangeRateOverride' ? (value ? parseFloat(value) : undefined)
+            : value,
     }));
   };
 
@@ -183,12 +188,41 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
               >
-                <option value="PLN">PLN</option>
-                <option value="EUR">EUR</option>
-                <option value="USD">USD</option>
+                <option value="PLN">PLN (Polski złoty)</option>
+                <option value="USD">USD (Dolar amerykański)</option>
+                <option value="EUR">EUR (Euro)</option>
+                <option value="GBP">GBP (Funt brytyjski)</option>
+                <option value="CHF">CHF (Frank szwajcarski)</option>
+                <option value="CZK">CZK (Korona czeska)</option>
+                <option value="DKK">DKK (Korona duńska)</option>
+                <option value="NOK">NOK (Korona norweska)</option>
+                <option value="SEK">SEK (Korona szwedzka)</option>
               </select>
             </div>
           </div>
+
+          {/* Exchange Rate Override - only show if currency is not PLN */}
+          {formData.currency !== 'PLN' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Ręczny kurs wymiany (opcjonalnie)
+              </label>
+              <input
+                type="number"
+                name="exchangeRateOverride"
+                value={formData.exchangeRateOverride || ''}
+                onChange={handleChange}
+                min="0"
+                step="0.000001"
+                placeholder="Automatyczny kurs z NBP"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Pozostaw puste aby użyć automatycznego kursu z NBP.
+                Podaj kurs jako: 1 {formData.currency} = X PLN
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             {/* Payment Method */}

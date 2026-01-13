@@ -1,6 +1,7 @@
 import { PrismaClient, PaymentStatus, PaymentMethod } from '@prisma/client';
 import prisma from '../utils/prisma';
 import emailService from './email.service';
+import exchangeRateService from './exchange-rate.service';
 
 export interface CreatePaymentData {
   organizationId: string;
@@ -8,6 +9,7 @@ export interface CreatePaymentData {
   enrollmentId?: string;
   amount: number;
   currency?: string;
+  exchangeRateOverride?: number; // Manual override of exchange rate
   status: PaymentStatus;
   paymentMethod: PaymentMethod;
   notes?: string;
@@ -16,6 +18,8 @@ export interface CreatePaymentData {
 
 export interface UpdatePaymentData {
   amount?: number;
+  currency?: string;
+  exchangeRateOverride?: number;
   status?: PaymentStatus;
   paymentMethod?: PaymentMethod;
   notes?: string;
@@ -27,10 +31,12 @@ export interface GetPaymentsFilters {
   studentId?: string;
   status?: PaymentStatus;
   paymentMethod?: PaymentMethod;
+  currency?: string; // Filter by currency
   dateFrom?: Date;
   dateTo?: Date;
   limit?: number;
   offset?: number;
+  convertToCurrency?: string; // Convert all amounts to this currency
 }
 
 class PaymentService {
@@ -43,10 +49,12 @@ class PaymentService {
       studentId,
       status,
       paymentMethod,
+      currency,
       dateFrom,
       dateTo,
       limit = 50,
       offset = 0,
+      convertToCurrency,
     } = filters;
 
     const payments = await prisma.payment.findMany({
@@ -55,6 +63,7 @@ class PaymentService {
         ...(studentId && { studentId }),
         ...(status && { status }),
         ...(paymentMethod && { paymentMethod }),
+        ...(currency && { currency }),
         ...(dateFrom || dateTo
           ? {
               createdAt: {
@@ -99,7 +108,83 @@ class PaymentService {
       skip: offset,
     });
 
+    // If convertToCurrency is specified, convert all amounts
+    if (convertToCurrency) {
+      const paymentsWithConversion = await Promise.all(
+        payments.map(async (payment) => {
+          const convertedAmount = await this.convertPaymentAmount(
+            payment,
+            convertToCurrency,
+            organizationId
+          );
+
+          return {
+            ...payment,
+            originalAmount: Number(payment.amount),
+            originalCurrency: payment.currency,
+            amount: convertedAmount,
+            currency: convertToCurrency,
+            isConverted: payment.currency !== convertToCurrency,
+          };
+        })
+      );
+
+      return paymentsWithConversion;
+    }
+
     return payments;
+  }
+
+  /**
+   * Convert payment amount to target currency
+   */
+  private async convertPaymentAmount(
+    payment: any,
+    targetCurrency: string,
+    organizationId: string
+  ): Promise<number> {
+    if (payment.currency === targetCurrency) {
+      return Number(payment.amount);
+    }
+
+    const paymentDate = payment.paidAt || payment.createdAt;
+
+    try {
+      let convertedAmount: number;
+
+      // Use exchangeRateOverride if available
+      if (payment.exchangeRateOverride) {
+        // If we have override, it's the rate to PLN
+        const plnAmount = Number(payment.amount) * Number(payment.exchangeRateOverride);
+
+        if (targetCurrency === 'PLN') {
+          convertedAmount = plnAmount;
+        } else {
+          // Convert from PLN to target currency
+          convertedAmount = await exchangeRateService.convertFromPLN(
+            organizationId,
+            plnAmount,
+            targetCurrency,
+            paymentDate
+          );
+        }
+      } else {
+        // Use automatic conversion
+        convertedAmount = await exchangeRateService.convert(
+          organizationId,
+          Number(payment.amount),
+          payment.currency,
+          targetCurrency,
+          paymentDate
+        );
+      }
+
+      // Round to 2 decimal places
+      return Math.round(convertedAmount * 100) / 100;
+    } catch (error) {
+      console.error(`Error converting payment ${payment.id}:`, error);
+      return Number(payment.amount); // Return original amount if conversion fails
+    }
   }
 
   /**

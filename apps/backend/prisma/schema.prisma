@@ -180,6 +180,7 @@ model Organization {
   alerts                Alert[]
   settings              OrganizationSettings?
   googleCalendarSyncs   GoogleCalendarSync[]
+  exchangeRates         ExchangeRate[]
 
   @@map("organizations")
 }
@@ -381,6 +382,7 @@ model CourseType {
   defaultDurationMinutes Int                @default(60) @map("default_duration_minutes")
   maxStudents            Int?               @map("max_students")
   pricePerLesson         Decimal            @map("price_per_lesson") @db.Decimal(10, 2)
+  currency               String             @default("PLN")
   createdAt              DateTime           @default(now()) @map("created_at")
   updatedAt              DateTime           @updatedAt @map("updated_at")
 
@@ -516,6 +518,8 @@ model Lesson {
   scheduledAt           DateTime           @map("scheduled_at")
   durationMinutes       Int                @default(60) @map("duration_minutes")
   teacherRate           Decimal?           @map("teacher_rate") @db.Decimal(10, 2)
+  pricePerLesson        Decimal?           @map("price_per_lesson") @db.Decimal(10, 2) // Price charged to student
+  currency              String             @default("PLN")
   locationId            String?            @map("location_id")
   classroomId           String?            @map("classroom_id")
   deliveryMode          LessonDeliveryMode @map("delivery_mode")
@@ -603,6 +607,7 @@ model Payment {
   lessonId              String?       @map("lesson_id")
   amount                Decimal       @db.Decimal(10, 2)
   currency              String        @default("PLN")
+  exchangeRateOverride  Decimal?      @map("exchange_rate_override") @db.Decimal(10, 6) // Manual override of exchange rate
   status                PaymentStatus
   paymentMethod         PaymentMethod @map("payment_method")
   stripePaymentIntentId String?       @unique @map("stripe_payment_intent_id")
@@ -998,4 +1003,28 @@ model ExternalCalendarEvent {
   @@index([googleCalendarSyncId])
   @@index([startTime])
   @@map("external_calendar_events")
+}
+
+// ============================================
+// EXCHANGE RATES
+// ============================================
+
+model ExchangeRate {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  currency       String   // e.g., 'USD', 'EUR', 'GBP'
+  rate           Decimal  @db.Decimal(10, 6) // Rate to PLN (1 currency = X PLN)
+  effectiveDate  DateTime @map("effective_date") // Date when this rate is effective
+  source         String   @default("NBP") // 'NBP' or 'MANUAL'
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, currency, effectiveDate])
+  @@index([organizationId])
+  @@index([currency])
+  @@index([effectiveDate])
+  @@map("exchange_rates")
 }

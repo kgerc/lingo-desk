@@ -37,6 +37,8 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
         : '',
     durationMinutes: lesson?.durationMinutes?.toString() || initialDuration?.toString() || '60',
     teacherRate: lesson?.teacherRate?.toString() || '',
+    pricePerLesson: lesson?.pricePerLesson?.toString() || '',
+    currency: lesson?.currency || 'PLN',
     deliveryMode: (lesson?.deliveryMode || 'IN_PERSON') as LessonDeliveryMode,
     meetingUrl: lesson?.meetingUrl || '',
     locationId: lesson?.locationId || '',
@@ -273,6 +275,8 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       scheduledAt: formData.scheduledAt,
       durationMinutes: Number(formData.durationMinutes),
       teacherRate: formData.teacherRate ? Number(formData.teacherRate) : undefined,
+      pricePerLesson: formData.pricePerLesson ? Number(formData.pricePerLesson) : undefined,
+      currency: formData.currency,
       deliveryMode: formData.deliveryMode,
       meetingUrl: formData.deliveryMode === 'ONLINE' ? formData.meetingUrl || undefined : undefined,
       locationId: formData.deliveryMode === 'IN_PERSON' ? formData.locationId || undefined : undefined,
@@ -534,6 +538,52 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                         />
                         <p className="mt-1 text-xs text-gray-500">
                           Pozostaw puste aby automatycznie wyliczyć na podstawie kursu lub stawki lektora
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Cena za lekcję (dla ucznia)
+                        </label>
+                        <input
+                          type="number"
+                          name="pricePerLesson"
+                          value={formData.pricePerLesson}
+                          onChange={handleChange}
+                          min="0"
+                          step="0.01"
+                          placeholder="Opcjonalnie"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Cena lekcji dla ucznia (może się różnić od stawki lektora)
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Waluta
+                        </label>
+                        <select
+                          name="currency"
+                          value={formData.currency}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          <option value="PLN">PLN (Polski złoty)</option>
+                          <option value="USD">USD (Dolar amerykański)</option>
+                          <option value="EUR">EUR (Euro)</option>
+                          <option value="GBP">GBP (Funt brytyjski)</option>
+                          <option value="CHF">CHF (Frank szwajcarski)</option>
+                          <option value="CZK">CZK (Korona czeska)</option>
+                          <option value="DKK">DKK (Korona duńska)</option>
+                          <option value="NOK">NOK (Korona norweska)</option>
+                          <option value="SEK">SEK (Korona szwedzka)</option>
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Waluta, w której będą rozliczane płatności za tę lekcję
                         </p>
                       </div>
                     </div>

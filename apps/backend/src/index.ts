@@ -28,9 +28,10 @@ import mailingRoutes from './routes/mailing.routes';
 import googleCalendarRoutes from './routes/google-calendar.routes';
 import reportRoutes from './routes/report.routes';
 
-// Import scheduler
+// Import scheduler and jobs
 import scheduler from './utils/scheduler';
 import { initializeStorage } from './utils/supabase';
+import { startExchangeRateJob } from './jobs/exchange-rate.job';
 
 // Load environment variables
 dotenv.config();
@@ -125,6 +126,8 @@ app.listen(PORT, async () => {
   // Start scheduled tasks
   if (process.env.NODE_ENV !== 'test') {
     scheduler.start();
+    // Start exchange rate updates
+    startExchangeRateJob();
   }
 });
 
