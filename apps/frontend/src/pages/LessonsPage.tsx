@@ -36,6 +36,11 @@ import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 
 // Set Polish locale
 moment.locale('pl');
+moment.updateLocale('pl', {
+  week: {
+    dow: 1
+  },
+});
 const localizer = momentLocalizer(moment);
 const DnDCalendar = withDragAndDrop(Calendar);
 
@@ -94,6 +99,14 @@ const LessonsPage: React.FC = () => {
   // View mode state
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
+  const toggleViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    setSearchParams(prev => {
+      prev.set('view', mode);
+      return prev;
+    });
+  };
+
   // Shared filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<LessonStatus | ''>('');
@@ -102,8 +115,15 @@ const LessonsPage: React.FC = () => {
   // Initialize courseFilter from URL params
   useEffect(() => {
     const courseId = searchParams.get('courseId');
+    const mode = searchParams.get('view') as ViewMode | null;
+
     if (courseId) {
       setCourseFilter(courseId);
+    }
+
+    // Jeśli w URL jest parametr view=calendar, ustawiamy stan widoku
+    if (mode === 'calendar' || mode === 'list') {
+      setViewMode(mode);
     }
   }, [searchParams]);
 
@@ -561,13 +581,26 @@ const LessonsPage: React.FC = () => {
 
   const formats = {
     monthHeaderFormat: 'MMMM YYYY',
+
+// Nagłówki kolumn w widoku tygodnia (np. Poniedziałek 13.01)
+    dayFormat: (date: Date, culture: string, localizer: any) =>
+      localizer.format(date, 'dddd DD.MM', culture),
+
+    // Nagłówki dni w widoku miesiąca (Pn, Wt...)
+    weekdayFormat: (date: Date, culture: string, localizer: any) =>
+      localizer.format(date, 'dd', culture),
+
     dayHeaderFormat: 'dddd, D MMMM',
+
     dayRangeHeaderFormat: ({ start, end }: { start: Date; end: Date }) =>
-      `${moment(start).format('D MMMM')} - ${moment(end).format('D MMMM YYYY')}`,
+      `${moment(start).format('D MMMM')} – ${moment(end).format('D MMMM YYYY')}`,
+
     agendaHeaderFormat: ({ start, end }: { start: Date; end: Date }) =>
-      `${moment(start).format('D MMMM')} - ${moment(end).format('D MMMM YYYY')}`,
+      `${moment(start).format('D MMMM')} – ${moment(end).format('D MMMM YYYY')}`,
+
     eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
-      `${moment(start).format('HH:mm')} - ${moment(end).format('HH:mm')}`,
+      `${moment(start).format('HH:mm')} – ${moment(end).format('HH:mm')}`,
+
     timeGutterFormat: 'HH:mm',
   };
 
@@ -585,7 +618,7 @@ const LessonsPage: React.FC = () => {
           {/* View Toggle */}
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
             <button
-              onClick={() => setViewMode('list')}
+              onClick={() => toggleViewMode('list')}
               className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                 viewMode === 'list'
                   ? 'bg-white text-secondary shadow-sm'
@@ -597,7 +630,7 @@ const LessonsPage: React.FC = () => {
               Lista
             </button>
             <button
-              onClick={() => setViewMode('calendar')}
+              onClick={() => toggleViewMode('calendar')}
               className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                 viewMode === 'calendar'
                   ? 'bg-white text-secondary shadow-sm'
@@ -747,6 +780,7 @@ const LessonsPage: React.FC = () => {
             defaultView="week"
             views={['month', 'week', 'day', 'agenda']}
             showMultiDayTimes
+            culture="pl"
           />
         </div>
       )}

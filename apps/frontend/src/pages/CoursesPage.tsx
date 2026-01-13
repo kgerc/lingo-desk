@@ -61,7 +61,7 @@ const CoursesPage: React.FC = () => {
   };
 
   const handleViewSchedule = (courseId: string) => {
-    navigate(`/lessons?courseId=${courseId}`);
+    navigate(`/lessons?courseId=${courseId}&view=calendar`);
   };
 
   const handleCloseModal = () => {

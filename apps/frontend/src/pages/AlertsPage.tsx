@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import alertService, { Alert } from '../services/alertService';
 import { Bell, CheckCheck, AlertTriangle, Info, XCircle, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -13,13 +13,27 @@ const AlertsPage: React.FC = () => {
 
   // Fetch alerts (with auto-generation)
   const { data: alertsData, isLoading } = useQuery({
-    queryKey: ['alerts', page, filterRead],
+    queryKey: ['alerts', page],
     queryFn: async () => {
-      // First generate system alerts, then fetch the list
       await alertService.generateSystemAlerts();
-      return await alertService.getAlerts({ page, limit, isRead: filterRead });
+      return await alertService.getAlerts({ page, limit });
     },
   });
+
+  const filteredAlerts = useMemo(() => {
+    const allAlerts = alertsData?.alerts || [];
+    if (filterRead === undefined) return allAlerts;
+    return allAlerts.filter(alert => alert.isRead === filterRead);
+  }, [alertsData, filterRead]);
+
+  const counts = useMemo(() => {
+    const all = alertsData?.alerts || [];
+    return {
+      all: all.length,
+      unread: all.filter(a => !a.isRead).length,
+      read: all.filter(a => a.isRead).length
+    };
+  }, [alertsData]);
 
   // Mark as read mutation
   const markAsReadMutation = useMutation({
@@ -116,38 +130,32 @@ const AlertsPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Filter Tabs */}
+{/* Filter Tabs - teraz zmieniają tylko lokalny stan filterRead */}
       <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
         <div className="flex gap-2">
           <button
             onClick={() => setFilterRead(undefined)}
             className={`px-4 py-2 rounded-lg transition-colors ${
-              filterRead === undefined
-                ? 'bg-primary text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              filterRead === undefined ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'
             }`}
           >
-            Wszystkie ({pagination?.total || 0})
+            Wszystkie ({counts.all})
           </button>
           <button
             onClick={() => setFilterRead(false)}
             className={`px-4 py-2 rounded-lg transition-colors ${
-              filterRead === false
-                ? 'bg-primary text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              filterRead === false ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'
             }`}
           >
-            Nieprzeczytane
+            Nieprzeczytane ({counts.unread})
           </button>
           <button
             onClick={() => setFilterRead(true)}
             className={`px-4 py-2 rounded-lg transition-colors ${
-              filterRead === true
-                ? 'bg-primary text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              filterRead === true ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'
             }`}
           >
-            Przeczytane
+            Przeczytane ({counts.read})
           </button>
         </div>
       </div>
@@ -160,7 +168,7 @@ const AlertsPage: React.FC = () => {
             <p className="text-gray-500">Brak alertów do wyświetlenia</p>
           </div>
         ) : (
-          alerts.map((alert: Alert) => (
+          filteredAlerts.map((alert: Alert) => (
             <div
               key={alert.id}
               className={`bg-white rounded-lg shadow border p-4 transition-all ${
