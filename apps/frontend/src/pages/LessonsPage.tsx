@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { lessonService, Lesson, LessonStatus } from '../services/lessonService';
 import { courseService } from '../services/courseService';
+import { googleCalendarService, ExternalCalendarEvent } from '../services/googleCalendarService';
 import LessonModal from '../components/LessonModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -22,6 +23,7 @@ import {
   AlertCircle,
   XCircle,
   MoreVertical,
+  RefreshCw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
@@ -43,14 +45,15 @@ interface CalendarEvent {
   title: string;
   start: Date;
   end: Date;
-  resource: Lesson;
+  resource: Lesson | ExternalCalendarEvent;
+  isExternal?: boolean;
 }
 
 // View mode type
 type ViewMode = 'list' | 'calendar';
 
 // Map lesson status to colors
-const getEventStyle = (lesson: Lesson) => {
+const getEventStyle = (event: CalendarEvent) => {
   const baseStyle = {
     borderRadius: '8px',
     border: 'none',
@@ -60,6 +63,12 @@ const getEventStyle = (lesson: Lesson) => {
     fontWeight: '500',
   };
 
+  // External events have a different style
+  if (event.isExternal) {
+    return { ...baseStyle, backgroundColor: '#8B5CF6', color: 'white', opacity: 0.8 };
+  }
+
+  const lesson = event.resource as Lesson;
   switch (lesson.status) {
     case 'SCHEDULED':
       return { ...baseStyle, backgroundColor: '#3B82F6', color: 'white' };
@@ -131,6 +140,14 @@ const LessonsPage: React.FC = () => {
       }),
   });
 
+  // Fetch external calendar events
+  const { data: externalEvents = [] } = useQuery({
+    queryKey: ['externalEvents'],
+    queryFn: () => googleCalendarService.getExternalEvents(),
+    // Only fetch if calendar view is active
+    enabled: viewMode === 'calendar',
+  });
+
   // Shared mutations
   const deleteMutation = useMutation({
     mutationFn: (id: string) => lessonService.deleteLesson(id),
@@ -189,6 +206,27 @@ const LessonsPage: React.FC = () => {
       toast.error(error.response?.data?.error?.message || 'Nie można przenieść lekcji');
       queryClient.invalidateQueries({ queryKey: ['lessons'] });
       setIsDragging(false);
+    },
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: () => googleCalendarService.syncFromGoogleCalendar(),
+    onSuccess: (data) => {
+      const lessonsResult = data?.lessonsSynced;
+      const externalResult = data?.externalEventsImported;
+
+      let message = 'Synchronizacja zakończona pomyślnie!';
+      if (lessonsResult && externalResult) {
+        message += `\nLekcje: ${lessonsResult.synced}/${lessonsResult.total}\nOsobiste wydarzenia: ${externalResult.imported}/${externalResult.total}`;
+      }
+
+      toast.success(message);
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      queryClient.invalidateQueries({ queryKey: ['externalEvents'] });
+    },
+    onError: (error) => {
+      console.error('Error syncing:', error);
+      toast.error('Błąd podczas synchronizacji');
     },
   });
 
@@ -252,13 +290,26 @@ const LessonsPage: React.FC = () => {
   }, []);
 
   const handleSelectEvent = useCallback((event: CalendarEvent) => {
-    setSelectedLesson(event.resource);
+    // Don't open modal for external events
+    if (event.isExternal) {
+      const externalEvent = event.resource as ExternalCalendarEvent;
+      toast.info(`${externalEvent.title}\n${externalEvent.description || ''}`);
+      return;
+    }
+
+    setSelectedLesson(event.resource as Lesson);
     setSelectedSlot(null);
     setIsModalOpen(true);
   }, []);
 
   const handleEventDrop = useCallback(
     async ({ event, start, end }: any) => {
+      // Don't allow dragging external events
+      if (event.isExternal) {
+        setIsDragging(false);
+        return;
+      }
+
       setIsDragging(true);
       const lesson: Lesson = event.resource;
       const newDuration = Math.round((end.getTime() - start.getTime()) / 60000);
@@ -305,14 +356,26 @@ const LessonsPage: React.FC = () => {
 
   // Convert lessons to calendar events
   const events = useMemo<CalendarEvent[]>(() => {
-    return lessons.map((lesson) => ({
+    const lessonEvents: CalendarEvent[] = lessons.map((lesson) => ({
       id: lesson.id,
       title: `${lesson.student.user.firstName} ${lesson.student.user.lastName} - ${lesson.title}`,
       start: new Date(lesson.scheduledAt),
       end: new Date(new Date(lesson.scheduledAt).getTime() + lesson.durationMinutes * 60000),
       resource: lesson,
+      isExternal: false,
     }));
-  }, [lessons]);
+
+    const externalEventsFormatted: CalendarEvent[] = externalEvents.map((event) => ({
+      id: event.id,
+      title: `📅 ${event.title}`,
+      start: new Date(event.startTime),
+      end: new Date(event.endTime),
+      resource: event,
+      isExternal: true,
+    }));
+
+    return [...lessonEvents, ...externalEventsFormatted];
+  }, [lessons, externalEvents]);
 
   // Helper functions
   const getStatusBadge = (status: LessonStatus) => {
@@ -546,13 +609,25 @@ const LessonsPage: React.FC = () => {
               Kalendarz
             </button>
           </div>
-          <button
-            onClick={handleAddLesson}
-            className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm"
-          >
-            <Plus className="h-5 w-5" />
-            Dodaj lekcję
-          </button>
+          <div className="flex items-center gap-2">
+            {viewMode === 'calendar' && (
+              <button
+                onClick={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+                className="flex items-center justify-center p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Synchronizuj z Google Calendar"
+              >
+                <RefreshCw className={`h-5 w-5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+              </button>
+            )}
+            <button
+              onClick={handleAddLesson}
+              className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm"
+            >
+              <Plus className="h-5 w-5" />
+              Dodaj lekcję
+            </button>
+          </div>
         </div>
       </div>
 
@@ -661,11 +736,11 @@ const LessonsPage: React.FC = () => {
             onEventDrop={handleEventDrop}
             onEventResize={handleEventResize}
             resizable={false}
-            draggableAccessor={() => calendarView !== 'month'}
+            draggableAccessor={(event: CalendarEvent) => !event.isExternal && calendarView !== 'month'}
             messages={messages}
             formats={formats}
             eventPropGetter={(event: CalendarEvent) => ({
-              style: getEventStyle(event.resource),
+              style: getEventStyle(event),
             })}
             step={15}
             timeslots={4}

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import emailService from './email.service';
+import googleCalendarService from './google-calendar.service';
 
 const prisma = new PrismaClient();
 
@@ -218,6 +219,14 @@ class LessonService {
         attendances: true,
       },
     });
+
+    // Sync to Google Calendar if teacher has connected their calendar
+    try {
+      await googleCalendarService.createEventFromLesson(lesson.id);
+    } catch (error) {
+      console.error('Failed to sync lesson to Google Calendar:', error);
+      // Don't fail the lesson creation if Google Calendar sync fails
+    }
 
     return lesson;
   }
@@ -528,6 +537,20 @@ class LessonService {
       }
     }
 
+    // Sync to Google Calendar if teacher has connected their calendar
+    try {
+      if (isCancellingLesson) {
+        // If lesson is cancelled, delete the event from Google Calendar
+        await googleCalendarService.deleteEventFromLesson(lesson.id);
+      } else {
+        // Otherwise, update the event in Google Calendar
+        await googleCalendarService.updateEventFromLesson(lesson.id);
+      }
+    } catch (error) {
+      console.error('Failed to sync lesson update to Google Calendar:', error);
+      // Don't fail the lesson update if Google Calendar sync fails
+    }
+
     return lesson;
   }
 
@@ -727,6 +750,14 @@ class LessonService {
         cancellationReason: 'Deleted by user',
       },
     });
+
+    // Delete event from Google Calendar if teacher has connected their calendar
+    try {
+      await googleCalendarService.deleteEventFromLesson(id);
+    } catch (error) {
+      console.error('Failed to delete lesson from Google Calendar:', error);
+      // Don't fail the lesson deletion if Google Calendar sync fails
+    }
 
     return { message: 'Lesson deleted successfully' };
   }

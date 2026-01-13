@@ -161,24 +161,25 @@ model Organization {
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   // Relations
-  users                User[] @relation("PrimaryOrganization")
-  userOrganizations    UserOrganization[]
-  students             Student[]
-  teachers             Teacher[]
-  courses              Course[]
-  courseTypes          CourseType[]
-  packages             Package[]
-  subscriptions        Subscription[]
-  lessons              Lesson[]
-  recurringPatterns    RecurringPattern[]
-  locations            Location[]
-  payments             Payment[]
-  notifications        Notification[]
+  users                 User[] @relation("PrimaryOrganization")
+  userOrganizations     UserOrganization[]
+  students              Student[]
+  teachers              Teacher[]
+  courses               Course[]
+  courseTypes           CourseType[]
+  packages              Package[]
+  subscriptions         Subscription[]
+  lessons               Lesson[]
+  recurringPatterns     RecurringPattern[]
+  locations             Location[]
+  payments              Payment[]
+  notifications         Notification[]
   notificationTemplates NotificationTemplate[]
-  files                File[]
-  notes                Note[]
-  alerts               Alert[]
-  settings             OrganizationSettings?
+  files                 File[]
+  notes                 Note[]
+  alerts                Alert[]
+  settings              OrganizationSettings?
+  googleCalendarSyncs   GoogleCalendarSync[]
 
   @@map("organizations")
 }
@@ -199,16 +200,17 @@ model User {
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  organization       Organization @relation("PrimaryOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
-  organizations      UserOrganization[]
-  profile            UserProfile?
-  teacher            Teacher?
-  student            Student?
-  parentRelations    ParentStudentRelation[] @relation("ParentRelations")
-  notifications      Notification[]
-  filesUploaded      File[]
-  notesCreated       Note[]
-  alerts             Alert[]
+  organization        Organization        @relation("PrimaryOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  organizations       UserOrganization[]
+  profile             UserProfile?
+  teacher             Teacher?
+  student             Student?
+  parentRelations     ParentStudentRelation[] @relation("ParentRelations")
+  notifications       Notification[]
+  filesUploaded       File[]
+  notesCreated        Note[]
+  alerts              Alert[]
+  googleCalendarSync  GoogleCalendarSync?
 
   @@index([organizationId])
   @@index([email])
@@ -529,16 +531,17 @@ model Lesson {
   updatedAt             DateTime           @updatedAt @map("updated_at")
 
   // Relations
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  course            Course?            @relation(fields: [courseId], references: [id])
-  enrollment        StudentEnrollment  @relation(fields: [enrollmentId], references: [id])
-  teacher           Teacher            @relation(fields: [teacherId], references: [id])
-  student           Student            @relation(fields: [studentId], references: [id])
-  location          Location?          @relation(fields: [locationId], references: [id])
-  classroom         Classroom?         @relation(fields: [classroomId], references: [id])
-  recurringPattern  RecurringPattern?  @relation(fields: [recurringPatternId], references: [id])
-  attendances       LessonAttendance[]
-  payments          Payment[]
+  organization        Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  course              Course?                    @relation(fields: [courseId], references: [id])
+  enrollment          StudentEnrollment          @relation(fields: [enrollmentId], references: [id])
+  teacher             Teacher                    @relation(fields: [teacherId], references: [id])
+  student             Student                    @relation(fields: [studentId], references: [id])
+  location            Location?                  @relation(fields: [locationId], references: [id])
+  classroom           Classroom?                 @relation(fields: [classroomId], references: [id])
+  recurringPattern    RecurringPattern?          @relation(fields: [recurringPatternId], references: [id])
+  attendances         LessonAttendance[]
+  payments            Payment[]
+  googleCalendarEvent LessonGoogleCalendarEvent?
 
   @@index([organizationId])
   @@index([teacherId])
@@ -918,4 +921,81 @@ enum AlertType {
   WARNING
   INFO
   SUCCESS
+}
+
+// ============================================
+// GOOGLE CALENDAR INTEGRATION
+// ============================================
+
+model GoogleCalendarSync {
+  id                    String    @id @default(uuid())
+  userId                String    @map("user_id")
+  organizationId        String    @map("organization_id")
+  accessToken           String    @map("access_token")
+  refreshToken          String    @map("refresh_token")
+  tokenExpiry           DateTime  @map("token_expiry")
+  calendarId            String    @map("calendar_id") // Primary calendar ID
+  watchChannelId        String?   @map("watch_channel_id") // For push notifications
+  watchResourceId       String?   @map("watch_resource_id")
+  watchExpiration       DateTime? @map("watch_expiration")
+  syncToken             String?   @map("sync_token") // For incremental sync
+  isActive              Boolean   @default(true) @map("is_active")
+  lastSyncAt            DateTime? @map("last_sync_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lessons        LessonGoogleCalendarEvent[]
+  externalEvents ExternalCalendarEvent[]
+
+  @@unique([userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("google_calendar_syncs")
+}
+
+model LessonGoogleCalendarEvent {
+  id                      String   @id @default(uuid())
+  lessonId                String   @map("lesson_id")
+  googleCalendarSyncId    String   @map("google_calendar_sync_id")
+  googleEventId           String   @map("google_event_id")
+  googleEventEtag         String?  @map("google_event_etag") // For conflict detection
+  lastSyncedAt            DateTime @map("last_synced_at")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  lesson              Lesson               @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  googleCalendarSync  GoogleCalendarSync   @relation(fields: [googleCalendarSyncId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId])
+  @@unique([googleEventId, googleCalendarSyncId])
+  @@index([googleCalendarSyncId])
+  @@map("lesson_google_calendar_events")
+}
+
+model ExternalCalendarEvent {
+  id                   String   @id @default(uuid())
+  googleCalendarSyncId String   @map("google_calendar_sync_id")
+  googleEventId        String   @map("google_event_id")
+  title                String
+  description          String?
+  startTime            DateTime @map("start_time")
+  endTime              DateTime @map("end_time")
+  location             String?
+  isAllDay             Boolean  @default(false) @map("is_all_day")
+  googleEventEtag      String?  @map("google_event_etag")
+  lastSyncedAt         DateTime @map("last_synced_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  googleCalendarSync GoogleCalendarSync @relation(fields: [googleCalendarSyncId], references: [id], onDelete: Cascade)
+
+  @@unique([googleEventId, googleCalendarSyncId])
+  @@index([googleCalendarSyncId])
+  @@index([startTime])
+  @@map("external_calendar_events")
 }

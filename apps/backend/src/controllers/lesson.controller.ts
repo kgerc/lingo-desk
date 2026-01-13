@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { z } from 'zod';
 import lessonService from '../services/lesson.service';
 import { AuthRequest } from '../middleware/auth';
+import googleCalendarService from '../services/google-calendar.service';
 
 const createLessonSchema = z.object({
   courseId: z.string().uuid().optional(),
@@ -77,6 +78,14 @@ class LessonController {
         ...data,
         organizationId: req.user.organizationId,
       });
+
+      // Sync to Google Calendar asynchronously (don't block response)
+      if (req.user?.id) {
+        googleCalendarService.createEventFromLesson(lesson.id, req.user.id).catch(error => {
+          console.error('Failed to sync lesson to Google Calendar:', error);
+        });
+      }
+
       res.status(201).json({ message: 'Lesson created successfully', data: lesson });
     } catch (error) {
       next(error);
@@ -88,6 +97,14 @@ class LessonController {
       const { id } = req.params;
       const data = updateLessonSchema.parse(req.body);
       const lesson = await lessonService.updateLesson(id, req.user.organizationId, data);
+
+      // Sync to Google Calendar asynchronously (don't block response)
+      if (req.user?.id) {
+        googleCalendarService.updateEventFromLesson(id, req.user.id).catch(error => {
+          console.error('Failed to update lesson in Google Calendar:', error);
+        });
+      }
+
       res.json({ message: 'Lesson updated successfully', data: lesson });
     } catch (error) {
       next(error);
@@ -97,6 +114,14 @@ class LessonController {
   async deleteLesson(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
+
+      // Sync to Google Calendar asynchronously before deleting (don't block response)
+      if (req.user?.id) {
+        googleCalendarService.deleteEventFromLesson(id).catch(error => {
+          console.error('Failed to delete lesson from Google Calendar:', error);
+        });
+      }
+
       const result = await lessonService.deleteLesson(id, req.user.organizationId);
       res.json(result);
     } catch (error) {

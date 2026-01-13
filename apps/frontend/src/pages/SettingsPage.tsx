@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Building2, Bell, Mail } from 'lucide-react';
+import { Building2, Bell, Mail, Plug } from 'lucide-react';
 import OrganizationSettingsPage from './OrganizationSettingsPage';
 import NotificationSettingsPage from './NotificationSettingsPage';
 import MailingsPage from './MailingsPage';
+import IntegrationsPage from './IntegrationsPage';
 
-type TabType = 'organization' | 'notifications' | 'mailings';
+type TabType = 'organization' | 'notifications' | 'mailings' | 'integrations';
 
 const SettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('organization');
@@ -24,6 +25,11 @@ const SettingsPage: React.FC = () => {
       id: 'mailings' as TabType,
       name: 'Mailingi',
       icon: Mail,
+    },
+    {
+      id: 'integrations' as TabType,
+      name: 'Integracje',
+      icon: Plug,
     },
   ];
 
@@ -63,6 +69,7 @@ const SettingsPage: React.FC = () => {
         {activeTab === 'organization' && <OrganizationSettingsPage />}
         {activeTab === 'notifications' && <NotificationSettingsPage />}
         {activeTab === 'mailings' && <MailingsPage />}
+        {activeTab === 'integrations' && <IntegrationsPage />}
       </div>
     </div>
   );
