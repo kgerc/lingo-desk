@@ -10,12 +10,13 @@ class Scheduler {
   start() {
     console.log('⏰ Starting scheduled tasks...');
 
-    // Send lesson reminders every day at 9:00 AM
-    const lessonReminderTask = cron.schedule('0 9 * * *', async () => {
-      console.log('⏰ Running lesson reminder task...');
+    // Check for upcoming lessons every 5 minutes and send reminders 1 hour before
+    const lessonReminderTask = cron.schedule('*/5 * * * *', async () => {
       try {
-        const results = await notificationService.sendLessonReminders();
-        console.log(`✅ Sent ${results.filter(r => r.success).length} lesson reminders`);
+        const results = await notificationService.sendUpcomingLessonReminders();
+        if (results.length > 0) {
+          console.log(`✅ Sent ${results.filter(r => r.success).length}/${results.length} lesson reminders`);
+        }
       } catch (error) {
         console.error('❌ Error sending lesson reminders:', error);
       }
@@ -25,7 +26,7 @@ class Scheduler {
     });
 
     this.tasks.push(lessonReminderTask);
-    console.log('✅ Lesson reminder task scheduled (daily at 9:00 AM)');
+    console.log('✅ Lesson reminder task scheduled (every 5 minutes)');
 
     // Send low budget alerts every Monday at 10:00 AM
     const budgetAlertTask = cron.schedule('0 10 * * 1', async () => {

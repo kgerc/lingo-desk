@@ -5,10 +5,12 @@ import toast from 'react-hot-toast';
 import { lessonService, Lesson, LessonStatus } from '../services/lessonService';
 import { courseService } from '../services/courseService';
 import { googleCalendarService, ExternalCalendarEvent } from '../services/googleCalendarService';
+import substitutionService from '../services/substitutionService';
 import LessonModal from '../components/LessonModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Dropdown from '../components/Dropdown';
+import SubstitutionsTab from '../components/SubstitutionsTab';
 import {
   Calendar as CalendarIcon,
   List as ListIcon,
@@ -24,6 +26,7 @@ import {
   XCircle,
   MoreVertical,
   RefreshCw,
+  Users,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
@@ -55,7 +58,7 @@ interface CalendarEvent {
 }
 
 // View mode type
-type ViewMode = 'list' | 'calendar';
+type ViewMode = 'list' | 'calendar' | 'substitutions';
 
 // Map lesson status to colors
 const getEventStyle = (event: CalendarEvent) => {
@@ -121,8 +124,8 @@ const LessonsPage: React.FC = () => {
       setCourseFilter(courseId);
     }
 
-    // Jeśli w URL jest parametr view=calendar, ustawiamy stan widoku
-    if (mode === 'calendar' || mode === 'list') {
+    // Jeśli w URL jest parametr view, ustawiamy stan widoku
+    if (mode === 'calendar' || mode === 'list' || mode === 'substitutions') {
       setViewMode(mode);
     }
   }, [searchParams]);
@@ -159,6 +162,21 @@ const LessonsPage: React.FC = () => {
         courseId: courseFilter || undefined,
       }),
   });
+
+  // Fetch substitutions
+  const { data: substitutions = [] } = useQuery({
+    queryKey: ['substitutions'],
+    queryFn: () => substitutionService.getSubstitutions(),
+  });
+
+  // Create a map of lesson ID to substitution for quick lookup
+  const substitutionMap = useMemo(() => {
+    const map = new Map();
+    substitutions.forEach(sub => {
+      map.set(sub.lessonId, sub);
+    });
+    return map;
+  }, [substitutions]);
 
   // Fetch external calendar events
   const { data: externalEvents = [] } = useQuery({
@@ -474,6 +492,11 @@ const LessonsPage: React.FC = () => {
               <GraduationCap className="h-4 w-4 text-gray-400" />
               <div className="text-sm text-gray-900">
                 {lesson.teacher.user.firstName} {lesson.teacher.user.lastName}
+                {substitutionMap.has(lesson.id) && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                    Zastępstwo
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -641,6 +664,18 @@ const LessonsPage: React.FC = () => {
               <CalendarIcon className="h-4 w-4" />
               Kalendarz
             </button>
+            <button
+              onClick={() => toggleViewMode('substitutions')}
+              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                viewMode === 'substitutions'
+                  ? 'bg-white text-secondary shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              title="Zastępstwa"
+            >
+              <Users className="h-4 w-4" />
+              Zastępstwa
+            </button>
           </div>
           <div className="flex items-center gap-2">
             {viewMode === 'calendar' && (
@@ -710,11 +745,14 @@ const LessonsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Content - List or Calendar */}
+      {/* Content - List, Calendar, or Substitutions */}
       {isLoading ? (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 py-12">
           <LoadingSpinner message="Ładowanie lekcji..." />
         </div>
+      ) : viewMode === 'substitutions' ? (
+        /* Substitutions View */
+        <SubstitutionsTab substitutions={substitutions} />
       ) : viewMode === 'list' ? (
         /* List View with Virtualization */
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">

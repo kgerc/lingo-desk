@@ -181,6 +181,7 @@ model Organization {
   settings              OrganizationSettings?
   googleCalendarSyncs   GoogleCalendarSync[]
   exchangeRates         ExchangeRate[]
+  substitutions         Substitution[]
 
   @@map("organizations")
 }
@@ -263,6 +264,8 @@ model Teacher {
   courses                  Course[]
   lessons                  Lesson[]
   payouts                  TeacherPayout[]
+  substitutionsAsOriginal  Substitution[]             @relation("OriginalTeacher")
+  substitutionsAsSubstitute Substitution[]            @relation("SubstituteTeacher")
 
   @@index([organizationId])
   @@map("teachers")
@@ -547,6 +550,7 @@ model Lesson {
   attendances         LessonAttendance[]
   payments            Payment[]
   googleCalendarEvent LessonGoogleCalendarEvent?
+  substitution        Substitution?
 
   @@index([organizationId])
   @@index([teacherId])
@@ -594,6 +598,30 @@ model LessonAttendance {
 
   @@unique([lessonId, studentId])
   @@map("lesson_attendances")
+}
+
+model Substitution {
+  id                    String   @id @default(uuid())
+  organizationId        String   @map("organization_id")
+  lessonId              String   @unique @map("lesson_id")
+  originalTeacherId     String   @map("original_teacher_id")
+  substituteTeacherId   String   @map("substitute_teacher_id")
+  reason                String?
+  notes                 String?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lesson            Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  originalTeacher   Teacher      @relation("OriginalTeacher", fields: [originalTeacherId], references: [id])
+  substituteTeacher Teacher      @relation("SubstituteTeacher", fields: [substituteTeacherId], references: [id])
+
+  @@index([organizationId])
+  @@index([lessonId])
+  @@index([originalTeacherId])
+  @@index([substituteTeacherId])
+  @@map("substitutions")
 }
 
 // ============================================
@@ -851,7 +879,7 @@ model Classroom {
 model OrganizationSettings {
   id                         String   @id @default(uuid())
   organizationId             String   @unique @map("organization_id")
-  lessonReminderHours        Int      @default(24) @map("lesson_reminder_hours")
+  lessonReminderHours        Int      @default(1) @map("lesson_reminder_hours") // Hours before lesson to send reminder
   budgetAlertThresholdHours  Int      @default(2) @map("budget_alert_threshold_hours")
   autoGenerateLessonsEnabled Boolean  @default(true) @map("auto_generate_lessons_enabled")
   stripeAccountId            String?  @map("stripe_account_id")

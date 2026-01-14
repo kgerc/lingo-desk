@@ -224,13 +224,10 @@ class LessonService {
       },
     });
 
-    // Sync to Google Calendar if teacher has connected their calendar
-    try {
-      await googleCalendarService.createEventFromLesson(lesson.id);
-    } catch (error) {
-      console.error('Failed to sync lesson to Google Calendar:', error);
-      // Don't fail the lesson creation if Google Calendar sync fails
-    }
+    // Fire-and-forget: Sync to Google Calendar if teacher has connected their calendar
+    googleCalendarService.createEventFromLesson(lesson.id).catch(err =>
+      console.error('Failed to sync lesson to Google Calendar:', err)
+    );
 
     return lesson;
   }
@@ -525,138 +522,151 @@ class LessonService {
       },
     });
 
-    // Send cancellation emails if lesson was cancelled
+    // Fire-and-forget: Send cancellation emails if lesson was cancelled
     if (isCancellingLesson) {
-      try {
-        // Email to teacher
-        await emailService.sendLessonCancellation({
-          recipientEmail: lesson.teacher.user.email,
-          recipientName: `${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}`,
-          otherPersonName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
-          otherPersonRole: 'uczeń',
-          lessonTitle: lesson.title,
-          lessonDate: lesson.scheduledAt,
-          cancellationReason: data.cancellationReason,
-        });
-
-        // Email to student
-        await emailService.sendLessonCancellation({
-          recipientEmail: lesson.student.user.email,
-          recipientName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
-          otherPersonName: `${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}`,
-          otherPersonRole: 'lektor',
-          lessonTitle: lesson.title,
-          lessonDate: lesson.scheduledAt,
-          cancellationReason: data.cancellationReason,
-        });
-      } catch (emailError) {
-        console.error('Failed to send lesson cancellation emails:', emailError);
-        // Don't fail the update if email fails
-      }
+      this.sendCancellationEmails(lesson, data.cancellationReason).catch(err =>
+        console.error('Failed to send lesson cancellation emails:', err)
+      );
     }
 
-    // Send rescheduling notifications and create audit log if lesson time was changed
+    // Fire-and-forget: Send rescheduling notifications if lesson time was changed
     if (isRescheduling && userId) {
-      try {
-        // Get user who made the change
-        const userWhoRescheduled = await prisma.user.findUnique({
-          where: { id: userId },
-          select: {
-            firstName: true,
-            lastName: true,
-          },
-        });
-
-        const rescheduledByName = userWhoRescheduled
-          ? `${userWhoRescheduled.firstName} ${userWhoRescheduled.lastName}`
-          : 'System';
-
-        // Create in-app notifications for teacher and student
-        await prisma.notification.create({
-          data: {
-            organizationId,
-            userId: lesson.teacher.userId,
-            type: NotificationType.IN_APP,
-            channel: 'IN_APP',
-            subject: 'Zmiana terminu zajęć',
-            body: `Zajęcia "${lesson.title}" z ${lesson.student.user.firstName} ${lesson.student.user.lastName} zostały przeniesione. Nowy termin: ${new Date(lesson.scheduledAt).toLocaleString('pl-PL')}`,
-            status: 'SENT',
-            metadata: {
-              lessonId: lesson.id,
-              oldDate: existingLesson.scheduledAt,
-              newDate: lesson.scheduledAt,
-              rescheduledBy: userId,
-            },
-          },
-        });
-
-        await prisma.notification.create({
-          data: {
-            organizationId,
-            userId: lesson.student.userId,
-            type: NotificationType.IN_APP,
-            channel: 'IN_APP',
-            subject: 'Zmiana terminu zajęć',
-            body: `Zajęcia "${lesson.title}" z ${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName} zostały przeniesione. Nowy termin: ${new Date(lesson.scheduledAt).toLocaleString('pl-PL')}`,
-            status: 'SENT',
-            metadata: {
-              lessonId: lesson.id,
-              oldDate: existingLesson.scheduledAt,
-              newDate: lesson.scheduledAt,
-              rescheduledBy: userId,
-            },
-          },
-        });
-
-        // Send rescheduling emails
-        await emailService.sendLessonRescheduled({
-          recipientEmail: lesson.teacher.user.email,
-          recipientName: `${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}`,
-          otherPersonName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
-          otherPersonRole: 'uczeń',
-          lessonTitle: lesson.title,
-          oldDate: existingLesson.scheduledAt,
-          newDate: lesson.scheduledAt,
-          lessonDuration: lesson.durationMinutes,
-          deliveryMode: lesson.deliveryMode || 'IN_PERSON',
-          meetingUrl: lesson.meetingUrl,
-          rescheduledBy: rescheduledByName,
-        });
-
-        await emailService.sendLessonRescheduled({
-          recipientEmail: lesson.student.user.email,
-          recipientName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
-          otherPersonName: `${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}`,
-          otherPersonRole: 'lektor',
-          lessonTitle: lesson.title,
-          oldDate: existingLesson.scheduledAt,
-          newDate: lesson.scheduledAt,
-          lessonDuration: lesson.durationMinutes,
-          deliveryMode: lesson.deliveryMode || 'IN_PERSON',
-          meetingUrl: lesson.meetingUrl,
-          rescheduledBy: rescheduledByName,
-        });
-      } catch (notificationError) {
-        console.error('Failed to send rescheduling notifications:', notificationError);
-        // Don't fail the update if notification/audit fails
-      }
+      this.sendReschedulingNotifications(
+        lesson,
+        existingLesson.scheduledAt,
+        organizationId,
+        userId
+      ).catch(err =>
+        console.error('Failed to send rescheduling notifications:', err)
+      );
     }
 
-    // Sync to Google Calendar if teacher has connected their calendar
-    try {
-      if (isCancellingLesson) {
-        // If lesson is cancelled, delete the event from Google Calendar
-        await googleCalendarService.deleteEventFromLesson(lesson.id);
-      } else {
-        // Otherwise, update the event in Google Calendar
-        await googleCalendarService.updateEventFromLesson(lesson.id);
-      }
-    } catch (error) {
-      console.error('Failed to sync lesson update to Google Calendar:', error);
-      // Don't fail the lesson update if Google Calendar sync fails
+    // Fire-and-forget: Sync to Google Calendar
+    if (isCancellingLesson) {
+      googleCalendarService.deleteEventFromLesson(lesson.id).catch(err =>
+        console.error('Failed to delete lesson from Google Calendar:', err)
+      );
+    } else {
+      googleCalendarService.updateEventFromLesson(lesson.id).catch(err =>
+        console.error('Failed to sync lesson update to Google Calendar:', err)
+      );
     }
 
     return lesson;
+  }
+
+  /**
+   * Send cancellation emails to teacher and student (fire-and-forget helper)
+   */
+  private async sendCancellationEmails(lesson: any, cancellationReason?: string) {
+    await Promise.all([
+      emailService.sendLessonCancellation({
+        recipientEmail: lesson.teacher.user.email,
+        recipientName: `${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}`,
+        otherPersonName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
+        otherPersonRole: 'uczeń',
+        lessonTitle: lesson.title,
+        lessonDate: lesson.scheduledAt,
+        cancellationReason,
+      }),
+      emailService.sendLessonCancellation({
+        recipientEmail: lesson.student.user.email,
+        recipientName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
+        otherPersonName: `${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}`,
+        otherPersonRole: 'lektor',
+        lessonTitle: lesson.title,
+        lessonDate: lesson.scheduledAt,
+        cancellationReason,
+      }),
+    ]);
+  }
+
+  /**
+   * Send rescheduling notifications and emails (fire-and-forget helper)
+   */
+  private async sendReschedulingNotifications(
+    lesson: any,
+    oldScheduledAt: Date,
+    organizationId: string,
+    userId: string
+  ) {
+    // Get user who made the change
+    const userWhoRescheduled = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true },
+    });
+
+    const rescheduledByName = userWhoRescheduled
+      ? `${userWhoRescheduled.firstName} ${userWhoRescheduled.lastName}`
+      : 'System';
+
+    // Create in-app notifications and send emails in parallel
+    await Promise.all([
+      // In-app notification for teacher
+      prisma.notification.create({
+        data: {
+          organizationId,
+          userId: lesson.teacher.userId,
+          type: NotificationType.IN_APP,
+          channel: 'IN_APP',
+          subject: 'Zmiana terminu zajęć',
+          body: `Zajęcia "${lesson.title}" z ${lesson.student.user.firstName} ${lesson.student.user.lastName} zostały przeniesione. Nowy termin: ${new Date(lesson.scheduledAt).toLocaleString('pl-PL')}`,
+          status: 'SENT',
+          metadata: {
+            lessonId: lesson.id,
+            oldDate: oldScheduledAt,
+            newDate: lesson.scheduledAt,
+            rescheduledBy: userId,
+          },
+        },
+      }),
+      // In-app notification for student
+      prisma.notification.create({
+        data: {
+          organizationId,
+          userId: lesson.student.userId,
+          type: NotificationType.IN_APP,
+          channel: 'IN_APP',
+          subject: 'Zmiana terminu zajęć',
+          body: `Zajęcia "${lesson.title}" z ${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName} zostały przeniesione. Nowy termin: ${new Date(lesson.scheduledAt).toLocaleString('pl-PL')}`,
+          status: 'SENT',
+          metadata: {
+            lessonId: lesson.id,
+            oldDate: oldScheduledAt,
+            newDate: lesson.scheduledAt,
+            rescheduledBy: userId,
+          },
+        },
+      }),
+      // Email to teacher
+      emailService.sendLessonRescheduled({
+        recipientEmail: lesson.teacher.user.email,
+        recipientName: `${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}`,
+        otherPersonName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
+        otherPersonRole: 'uczeń',
+        lessonTitle: lesson.title,
+        oldDate: oldScheduledAt,
+        newDate: lesson.scheduledAt,
+        lessonDuration: lesson.durationMinutes,
+        deliveryMode: lesson.deliveryMode || 'IN_PERSON',
+        meetingUrl: lesson.meetingUrl,
+        rescheduledBy: rescheduledByName,
+      }),
+      // Email to student
+      emailService.sendLessonRescheduled({
+        recipientEmail: lesson.student.user.email,
+        recipientName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
+        otherPersonName: `${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}`,
+        otherPersonRole: 'lektor',
+        lessonTitle: lesson.title,
+        oldDate: oldScheduledAt,
+        newDate: lesson.scheduledAt,
+        lessonDuration: lesson.durationMinutes,
+        deliveryMode: lesson.deliveryMode || 'IN_PERSON',
+        meetingUrl: lesson.meetingUrl,
+        rescheduledBy: rescheduledByName,
+      }),
+    ]);
   }
 
   /**

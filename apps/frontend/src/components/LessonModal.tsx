@@ -5,6 +5,7 @@ import { lessonService, Lesson, CreateLessonData, LessonDeliveryMode } from '../
 import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
 import { courseService } from '../services/courseService';
+import substitutionService from '../services/substitutionService';
 import { X, Calendar, Users as UsersIcon, Check } from 'lucide-react';
 import AttendanceSection from './AttendanceSection';
 
@@ -50,7 +51,30 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
   const [recurringType, setRecurringType] = useState<'weeks' | 'months'>('weeks');
   const [recurringCount, setRecurringCount] = useState<string>('4');
 
+  const [isSubstitution, setIsSubstitution] = useState(false);
+  const [substituteTeacherId, setSubstituteTeacherId] = useState('');
+  const [substitutionReason, setSubstitutionReason] = useState('');
+  const [substitutionNotes, setSubstitutionNotes] = useState('');
+
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Fetch existing substitution if editing
+  const { data: existingSubstitution } = useQuery({
+    queryKey: ['substitution', lesson?.id],
+    queryFn: () => lesson ? substitutionService.getSubstitutionByLessonId(lesson.id) : null,
+    enabled: !!lesson,
+  });
+
+  // Load substitution data if exists
+  useEffect(() => {
+    if (existingSubstitution) {
+      setIsSubstitution(true);
+      setSubstituteTeacherId(existingSubstitution.substituteTeacherId);
+      setSubstitutionReason(existingSubstitution.reason || '');
+      setSubstitutionNotes(existingSubstitution.notes || '');
+      // Original teacher stays in the main teacherId field (from lesson data)
+    }
+  }, [existingSubstitution]);
 
   // Fetch teachers
   const { data: teachers = [] } = useQuery({
@@ -164,7 +188,59 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
   const updateMutation = useMutation({
     mutationFn: (data: { id: string; updates: any }) =>
       lessonService.updateLesson(data.id, data.updates),
-    onSuccess: () => {
+    onSuccess: async (_data, variables) => {
+      // Handle substitution changes only if something actually changed
+      const hadSubstitution = !!existingSubstitution;
+      const hasSubstitutionNow = isSubstitution && !!substituteTeacherId;
+
+      // Check if substitution data changed
+      const substitutionDataChanged = existingSubstitution && (
+        existingSubstitution.substituteTeacherId !== substituteTeacherId ||
+        (existingSubstitution.reason || '') !== substitutionReason ||
+        (existingSubstitution.notes || '') !== substitutionNotes
+      );
+
+      if (hasSubstitutionNow && !hadSubstitution) {
+        // Create new substitution
+        try {
+          await substitutionService.createSubstitution({
+            lessonId: variables.id,
+            originalTeacherId: formData.teacherId,
+            substituteTeacherId: substituteTeacherId,
+            reason: substitutionReason || undefined,
+            notes: substitutionNotes || undefined,
+          });
+          queryClient.invalidateQueries({ queryKey: ['substitutions'] });
+        } catch (error) {
+          console.error('Error creating substitution:', error);
+          toast.error('Lekcja zaktualizowana, ale wystąpił błąd przy tworzeniu zastępstwa');
+        }
+      } else if (hasSubstitutionNow && hadSubstitution && substitutionDataChanged) {
+        // Update existing substitution only if data changed
+        try {
+          await substitutionService.updateSubstitution(existingSubstitution.id, {
+            substituteTeacherId: substituteTeacherId,
+            reason: substitutionReason || undefined,
+            notes: substitutionNotes || undefined,
+          });
+          queryClient.invalidateQueries({ queryKey: ['substitutions'] });
+        } catch (error) {
+          console.error('Error updating substitution:', error);
+          toast.error('Lekcja zaktualizowana, ale wystąpił błąd przy aktualizacji zastępstwa');
+        }
+      } else if (!isSubstitution && hadSubstitution) {
+        // Remove substitution if checkbox was unchecked
+        try {
+          await substitutionService.deleteSubstitution(existingSubstitution.id);
+          queryClient.invalidateQueries({ queryKey: ['substitutions'] });
+        } catch (error) {
+          console.error('Error deleting substitution:', error);
+        }
+      }
+
+      // Invalidate lessons query to refresh list
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+
       toast.success('Lekcja została pomyślnie zaktualizowana');
       onSuccess();
     },
@@ -679,6 +755,83 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                       <p className="mt-1 text-sm text-red-600">{errors.teacherId}</p>
                     )}
                   </div>
+
+                  {/* Substitution checkbox (only in edit mode) */}
+                  {isEdit && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isSubstitution}
+                          onChange={(e) => {
+                            setIsSubstitution(e.target.checked);
+                            if (!e.target.checked) {
+                              setSubstituteTeacherId('');
+                              setSubstitutionReason('');
+                              setSubstitutionNotes('');
+                            }
+                          }}
+                          className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
+                        />
+                        <span className="ml-2 text-sm font-medium text-amber-900">
+                          To jest zastępstwo
+                        </span>
+                      </label>
+
+                      {isSubstitution && (
+                        <div className="mt-4 space-y-3">
+                          <p className="text-xs text-amber-700 mb-2">
+                            Lektor wybrany powyżej ({teachers.find(t => t.id === formData.teacherId)?.user.firstName} {teachers.find(t => t.id === formData.teacherId)?.user.lastName}) zostanie zapisany jako pierwotny lektor.
+                          </p>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Lektor zastępczy *
+                            </label>
+                            <select
+                              value={substituteTeacherId}
+                              onChange={(e) => setSubstituteTeacherId(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            >
+                              <option value="">Wybierz lektora zastępczego</option>
+                              {teachers
+                                .filter(t => t.id !== formData.teacherId)
+                                .map((teacher) => (
+                                  <option key={teacher.id} value={teacher.id}>
+                                    {teacher.user.firstName} {teacher.user.lastName}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Powód zastępstwa
+                            </label>
+                            <input
+                              type="text"
+                              value={substitutionReason}
+                              onChange={(e) => setSubstitutionReason(e.target.value)}
+                              placeholder="np. choroba, urlop"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Notatki
+                            </label>
+                            <textarea
+                              value={substitutionNotes}
+                              onChange={(e) => setSubstitutionNotes(e.target.value)}
+                              placeholder="Dodatkowe informacje..."
+                              rows={2}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Course (optional) */}
                   {!isEdit && (

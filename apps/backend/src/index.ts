@@ -27,6 +27,7 @@ import userProfileRoutes from './routes/userProfile.routes';
 import mailingRoutes from './routes/mailing.routes';
 import googleCalendarRoutes from './routes/google-calendar.routes';
 import reportRoutes from './routes/report.routes';
+import substitutionRoutes from './routes/substitution.routes';
 
 // Import scheduler and jobs
 import scheduler from './utils/scheduler';
@@ -102,6 +103,7 @@ app.use('/api/profile', userProfileRoutes);
 app.use('/api/mailings', mailingRoutes);
 app.use('/api/google-calendar', googleCalendarRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/substitutions', substitutionRoutes);
 
 // ============================================
 // ERROR HANDLING
