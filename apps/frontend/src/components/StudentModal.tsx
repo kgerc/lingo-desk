@@ -12,6 +12,15 @@ interface StudentModalProps {
 
 const LANGUAGE_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
 
+const LANGUAGES = [
+  { value: 'en', label: 'Angielski' },
+  { value: 'de', label: 'Niemiecki' },
+  { value: 'es', label: 'Hiszpański' },
+  { value: 'fr', label: 'Francuski' },
+  { value: 'it', label: 'Włoski' },
+  { value: 'pl', label: 'Polski' },
+];
+
 const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess }) => {
   const isEdit = !!student;
 
@@ -24,6 +33,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
     dateOfBirth: student?.user.profile?.dateOfBirth?.split('T')[0] || '',
     address: student?.user.profile?.address || '',
     languageLevel: student?.languageLevel || 'A1',
+    language: student?.language || 'en',
     goals: student?.goals || '',
     isMinor: student?.isMinor || false,
     paymentDueDays: student?.paymentDueDays || null,
@@ -90,6 +100,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
           dateOfBirth: formData.dateOfBirth || undefined,
           address: formData.address || undefined,
           languageLevel: formData.languageLevel,
+          language: formData.language,
           goals: formData.goals || undefined,
           isMinor: formData.isMinor,
           paymentDueDays: formData.paymentDueDays || undefined,
@@ -249,6 +260,24 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Język nauczania *
+                </label>
+                <select
+                  name="language"
+                  value={formData.language}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {LANGUAGES.map((lang) => (
+                    <option key={lang.value} value={lang.value}>
+                      {lang.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

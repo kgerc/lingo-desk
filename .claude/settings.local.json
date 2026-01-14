@@ -12,7 +12,9 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(taskkill:*)",
-      "Bash(powershell -Command \"Stop-Process -Id 25128 -Force\")"
+      "Bash(powershell -Command \"Stop-Process -Id 25128 -Force\")",
+      "Bash(ls:*)",
+      "Bash(powershell -Command \"Get-Process | Where-Object {$_ProcessName -eq ''node''} | Stop-Process -Force\")"
     ]
   }
 }

@@ -12,6 +12,7 @@ interface CreateStudentData {
   dateOfBirth?: string;
   address?: string;
   languageLevel: LanguageLevel;
+  language?: string; // Language being learned (ISO 639-1 code)
   goals?: string;
   isMinor?: boolean;
   paymentDueDays?: number;
@@ -27,6 +28,7 @@ interface UpdateStudentData {
   dateOfBirth?: string;
   address?: string;
   languageLevel?: LanguageLevel;
+  language?: string; // Language being learned
   goals?: string;
   isMinor?: boolean;
   paymentDueDays?: number;
@@ -45,6 +47,7 @@ export class StudentService {
       dateOfBirth,
       address,
       languageLevel,
+      language,
       goals,
       isMinor,
       paymentDueDays,
@@ -105,6 +108,7 @@ export class StudentService {
           organizationId,
           studentNumber,
           languageLevel,
+          language,
           goals,
           isMinor: isMinor || false,
           paymentDueDays,
@@ -302,6 +306,7 @@ export class StudentService {
         where: { id },
         data: {
           languageLevel: data.languageLevel,
+          language: data.language,
           goals: data.goals,
           isMinor: data.isMinor,
           paymentDueDays: data.paymentDueDays,

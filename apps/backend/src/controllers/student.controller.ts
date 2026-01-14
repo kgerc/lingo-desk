@@ -13,6 +13,7 @@ const createStudentSchema = z.object({
   dateOfBirth: z.string().optional(),
   address: z.string().optional(),
   languageLevel: z.nativeEnum(LanguageLevel),
+  language: z.string().optional(), // Language being learned (ISO 639-1 code)
   goals: z.string().optional(),
   isMinor: z.boolean().optional(),
   paymentDueDays: z.number().nullable().optional(),
@@ -27,6 +28,7 @@ const updateStudentSchema = z.object({
   dateOfBirth: z.string().optional(),
   address: z.string().optional(),
   languageLevel: z.nativeEnum(LanguageLevel).optional(),
+  language: z.string().optional(), // Language being learned
   goals: z.string().optional(),
   isMinor: z.boolean().optional(),
   isActive: z.boolean().optional(),

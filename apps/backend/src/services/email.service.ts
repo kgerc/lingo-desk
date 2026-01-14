@@ -372,6 +372,88 @@ class EmailService {
   }
 
   /**
+   * Send lesson rescheduled email
+   */
+  async sendLessonRescheduled(data: {
+    recipientEmail: string;
+    recipientName: string;
+    otherPersonName: string;
+    otherPersonRole: 'lektor' | 'uczeń';
+    lessonTitle: string;
+    oldDate: Date;
+    newDate: Date;
+    lessonDuration: number;
+    deliveryMode: string;
+    meetingUrl?: string;
+    rescheduledBy: string;
+  }) {
+    const {
+      recipientEmail,
+      recipientName,
+      otherPersonName,
+      otherPersonRole,
+      lessonTitle,
+      oldDate,
+      newDate,
+      lessonDuration,
+      deliveryMode,
+      meetingUrl,
+      rescheduledBy,
+    } = data;
+
+    const formatDate = (date: Date) => {
+      return new Date(date).toLocaleString('pl-PL', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    };
+
+    const oldFormattedDate = formatDate(oldDate);
+    const newFormattedDate = formatDate(newDate);
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #f59e0b;">🔄 Zmiana terminu zajęć</h2>
+        <p>Dzień dobry ${recipientName},</p>
+        <p>Informujemy o zmianie terminu zajęć przez ${rescheduledBy}:</p>
+
+        <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>${otherPersonRole === 'lektor' ? 'Lektor' : 'Uczeń'}:</strong> ${otherPersonName}</p>
+          <p style="margin: 5px 0;"><strong>Temat:</strong> ${lessonTitle}</p>
+          <p style="margin: 5px 0;"><strong>Czas trwania:</strong> ${lessonDuration} minut</p>
+          <p style="margin: 5px 0;"><strong>Tryb:</strong> ${deliveryMode === 'ONLINE' ? 'Online' : 'Stacjonarnie'}</p>
+          ${meetingUrl ? `<p style="margin: 5px 0;"><strong>Link:</strong> <a href="${meetingUrl}">${meetingUrl}</a></p>` : ''}
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; margin: 20px 0; align-items: center;">
+          <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; text-align: center;">
+            <p style="margin: 0; color: #991b1b; font-size: 12px; font-weight: bold;">STARY TERMIN</p>
+            <p style="margin: 10px 0 0 0; color: #dc2626;">${oldFormattedDate}</p>
+          </div>
+          <div style="font-size: 24px; color: #f59e0b;">→</div>
+          <div style="background-color: #d1fae5; padding: 15px; border-radius: 8px; text-align: center;">
+            <p style="margin: 0; color: #065f46; font-size: 12px; font-weight: bold;">NOWY TERMIN</p>
+            <p style="margin: 10px 0 0 0; color: #059669; font-weight: bold;">${newFormattedDate}</p>
+          </div>
+        </div>
+
+        <p>Prosimy o potwierdzenie lub kontakt w razie pytań.</p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
+      </div>
+    `;
+
+    return await this.sendEmail({
+      to: recipientEmail,
+      subject: `🔄 Zmiana terminu: Zajęcia z ${otherPersonName}`,
+      html,
+    });
+  }
+
+  /**
    * Send welcome email to new user
    */
   async sendWelcomeEmail(data: {

@@ -96,7 +96,7 @@ class LessonController {
     try {
       const { id } = req.params;
       const data = updateLessonSchema.parse(req.body);
-      const lesson = await lessonService.updateLesson(id, req.user.organizationId, data);
+      const lesson = await lessonService.updateLesson(id, req.user.organizationId, data, req.user.id);
 
       // Sync to Google Calendar asynchronously (don't block response)
       if (req.user?.id) {

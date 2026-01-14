@@ -5,6 +5,7 @@ export interface Student {
   userId: string;
   studentNumber: string;
   languageLevel: string;
+  language: string; // Language being learned (ISO 639-1 code)
   goals?: string;
   isMinor: boolean;
   paymentDueDays?: number | null;
@@ -41,6 +42,7 @@ export interface CreateStudentData {
   dateOfBirth?: string;
   address?: string;
   languageLevel: string;
+  language?: string; // Language being learned
   goals?: string;
   isMinor?: boolean;
   paymentDueDays?: number | null;
@@ -55,6 +57,7 @@ export interface UpdateStudentData {
   dateOfBirth?: string;
   address?: string;
   languageLevel?: string;
+  language?: string; // Language being learned
   goals?: string;
   isMinor?: boolean;
   paymentDueDays?: number | null;

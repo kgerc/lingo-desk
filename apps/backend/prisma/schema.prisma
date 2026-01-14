@@ -327,6 +327,7 @@ model Student {
   studentNumber  String        @map("student_number")
   enrollmentDate DateTime      @default(now()) @map("enrollment_date")
   languageLevel  LanguageLevel @map("language_level")
+  language            String        @default("en") // Language being learned (ISO 639-1 code: en, de, es, fr, it, pl)
   goals               String?
   isMinor             Boolean       @default(false) @map("is_minor")
   paymentDueDays      Int?          @map("payment_due_days")

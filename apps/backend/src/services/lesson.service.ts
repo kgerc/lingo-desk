@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, NotificationType } from '@prisma/client';
 import emailService from './email.service';
 import googleCalendarService from './google-calendar.service';
 
@@ -420,7 +420,7 @@ class LessonService {
     return lesson;
   }
 
-  async updateLesson(id: string, organizationId: string, data: UpdateLessonData) {
+  async updateLesson(id: string, organizationId: string, data: UpdateLessonData, userId?: string) {
     // Verify lesson exists
     const existingLesson = await prisma.lesson.findFirst({
       where: {
@@ -429,12 +429,26 @@ class LessonService {
       },
       include: {
         enrollment: true,
+        teacher: {
+          include: {
+            user: true,
+          },
+        },
+        student: {
+          include: {
+            user: true,
+          },
+        },
       },
     });
 
     if (!existingLesson) {
       throw new Error('Lesson not found');
     }
+
+    // Check if scheduledAt is being changed (lesson rescheduled)
+    const isRescheduling = data.scheduledAt &&
+      new Date(data.scheduledAt).getTime() !== new Date(existingLesson.scheduledAt).getTime();
 
     // If cancelling, set cancelled timestamp
     const updateData: any = { ...data };
@@ -538,6 +552,93 @@ class LessonService {
       } catch (emailError) {
         console.error('Failed to send lesson cancellation emails:', emailError);
         // Don't fail the update if email fails
+      }
+    }
+
+    // Send rescheduling notifications and create audit log if lesson time was changed
+    if (isRescheduling && userId) {
+      try {
+        // Get user who made the change
+        const userWhoRescheduled = await prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        });
+
+        const rescheduledByName = userWhoRescheduled
+          ? `${userWhoRescheduled.firstName} ${userWhoRescheduled.lastName}`
+          : 'System';
+
+        // Create in-app notifications for teacher and student
+        await prisma.notification.create({
+          data: {
+            organizationId,
+            userId: lesson.teacher.userId,
+            type: NotificationType.IN_APP,
+            channel: 'IN_APP',
+            subject: 'Zmiana terminu zajęć',
+            body: `Zajęcia "${lesson.title}" z ${lesson.student.user.firstName} ${lesson.student.user.lastName} zostały przeniesione. Nowy termin: ${new Date(lesson.scheduledAt).toLocaleString('pl-PL')}`,
+            status: 'SENT',
+            metadata: {
+              lessonId: lesson.id,
+              oldDate: existingLesson.scheduledAt,
+              newDate: lesson.scheduledAt,
+              rescheduledBy: userId,
+            },
+          },
+        });
+
+        await prisma.notification.create({
+          data: {
+            organizationId,
+            userId: lesson.student.userId,
+            type: NotificationType.IN_APP,
+            channel: 'IN_APP',
+            subject: 'Zmiana terminu zajęć',
+            body: `Zajęcia "${lesson.title}" z ${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName} zostały przeniesione. Nowy termin: ${new Date(lesson.scheduledAt).toLocaleString('pl-PL')}`,
+            status: 'SENT',
+            metadata: {
+              lessonId: lesson.id,
+              oldDate: existingLesson.scheduledAt,
+              newDate: lesson.scheduledAt,
+              rescheduledBy: userId,
+            },
+          },
+        });
+
+        // Send rescheduling emails
+        await emailService.sendLessonRescheduled({
+          recipientEmail: lesson.teacher.user.email,
+          recipientName: `${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}`,
+          otherPersonName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
+          otherPersonRole: 'uczeń',
+          lessonTitle: lesson.title,
+          oldDate: existingLesson.scheduledAt,
+          newDate: lesson.scheduledAt,
+          lessonDuration: lesson.durationMinutes,
+          deliveryMode: lesson.deliveryMode || 'IN_PERSON',
+          meetingUrl: lesson.meetingUrl,
+          rescheduledBy: rescheduledByName,
+        });
+
+        await emailService.sendLessonRescheduled({
+          recipientEmail: lesson.student.user.email,
+          recipientName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
+          otherPersonName: `${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}`,
+          otherPersonRole: 'lektor',
+          lessonTitle: lesson.title,
+          oldDate: existingLesson.scheduledAt,
+          newDate: lesson.scheduledAt,
+          lessonDuration: lesson.durationMinutes,
+          deliveryMode: lesson.deliveryMode || 'IN_PERSON',
+          meetingUrl: lesson.meetingUrl,
+          rescheduledBy: rescheduledByName,
+        });
+      } catch (notificationError) {
+        console.error('Failed to send rescheduling notifications:', notificationError);
+        // Don't fail the update if notification/audit fails
       }
     }
 

@@ -18,9 +18,16 @@ class NotificationController {
         limit: limit ? parseInt(limit as string) : undefined,
       });
 
+      // Map subject/body to title/message for frontend compatibility
+      const mappedNotifications = notifications.map((notification: any) => ({
+        ...notification,
+        title: notification.subject || notification.title,
+        message: notification.body || notification.message,
+      }));
+
       res.json({
         success: true,
-        data: notifications,
+        data: mappedNotifications,
       });
     } catch (error) {
       console.error('Error fetching notifications:', error);
