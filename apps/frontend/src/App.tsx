@@ -7,7 +7,6 @@ import DashboardPage from './pages/DashboardPage'
 import StudentsPage from './pages/StudentsPage'
 import TeachersPage from './pages/TeachersPage'
 import CoursesPage from './pages/CoursesPage'
-import CourseTypesPage from './pages/CourseTypesPage'
 import GroupsPage from './pages/GroupsPage'
 import MaterialsPage from './pages/MaterialsPage'
 import LessonsPage from './pages/LessonsPage'
@@ -18,6 +17,7 @@ import SettingsPage from './pages/SettingsPage'
 import DebtorsPage from './pages/DebtorsPage'
 import NotificationSettingsPage from './pages/NotificationSettingsPage'
 import ReportsPage from './pages/ReportsPage'
+import MailingsPage from './pages/MailingsPage'
 import Layout from './components/Layout'
 
 function App() {
@@ -144,9 +144,20 @@ function App() {
           path="/course-types"
           element={
             isAuthenticated ? (
+              <Navigate to="/courses" replace />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/mailing"
+          element={
+            isAuthenticated ? (
               useAuthStore.getState().user?.role === 'ADMIN' || useAuthStore.getState().user?.role === 'MANAGER' ? (
                 <Layout>
-                  <CourseTypesPage />
+                  <MailingsPage />
                 </Layout>
               ) : (
                 <Navigate to="/dashboard" />

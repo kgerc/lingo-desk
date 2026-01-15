@@ -1,5 +1,14 @@
 import prisma from '../utils/prisma';
 
+export type DateRangeType = 'last30days' | 'month' | 'year';
+
+export interface ChartDataParams {
+  organizationId: string;
+  rangeType: DateRangeType;
+  year?: number;
+  month?: number; // 1-12
+}
+
 export class DashboardService {
   /**
    * Get dashboard statistics for an organization
@@ -354,6 +363,231 @@ export class DashboardService {
         type: 'ATTENDANCE_INCOMPLETE',
       })),
     };
+  }
+
+  /**
+   * Get chart data with flexible date range and grouping
+   */
+  async getChartData(params: ChartDataParams) {
+    const { organizationId, rangeType, year, month } = params;
+    const { startDate, endDate, groupBy } = this.getDateRangeAndGrouping(rangeType, year, month);
+
+    const [revenueData, lessonsData] = await Promise.all([
+      this.getRevenueChartData(organizationId, startDate, endDate, groupBy),
+      this.getLessonsChartData(organizationId, startDate, endDate, groupBy),
+    ]);
+
+    // Calculate totals
+    const totalRevenue = revenueData.reduce((sum, item) => sum + item.amount, 0);
+    const totalLessons = lessonsData.reduce((sum, item) => sum + item.count, 0);
+
+    return {
+      rangeType,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      groupBy,
+      revenue: {
+        data: revenueData,
+        total: totalRevenue,
+      },
+      lessons: {
+        data: lessonsData,
+        total: totalLessons,
+      },
+    };
+  }
+
+  /**
+   * Calculate date range and grouping based on range type
+   */
+  private getDateRangeAndGrouping(
+    rangeType: DateRangeType,
+    year?: number,
+    month?: number
+  ): { startDate: Date; endDate: Date; groupBy: 'day' | 'month' } {
+    const now = new Date();
+
+    switch (rangeType) {
+      case 'month': {
+        // Specific month - group by day
+        const y = year || now.getFullYear();
+        const m = (month || now.getMonth() + 1) - 1; // month is 1-12, convert to 0-11
+        const startDate = new Date(y, m, 1, 0, 0, 0, 0);
+        const endDate = new Date(y, m + 1, 0, 23, 59, 59, 999); // Last day of month
+        return { startDate, endDate, groupBy: 'day' };
+      }
+
+      case 'year': {
+        // Full year - group by month
+        const y = year || now.getFullYear();
+        const startDate = new Date(y, 0, 1, 0, 0, 0, 0);
+        const endDate = new Date(y, 11, 31, 23, 59, 59, 999);
+        return { startDate, endDate, groupBy: 'month' };
+      }
+
+      case 'last30days':
+      default: {
+        // Last 30 days - group by day
+        const endDate = new Date();
+        endDate.setHours(23, 59, 59, 999);
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 29);
+        startDate.setHours(0, 0, 0, 0);
+        return { startDate, endDate, groupBy: 'day' };
+      }
+    }
+  }
+
+  /**
+   * Get revenue chart data with flexible grouping
+   */
+  private async getRevenueChartData(
+    organizationId: string,
+    startDate: Date,
+    endDate: Date,
+    groupBy: 'day' | 'month'
+  ) {
+    const payments = await prisma.payment.findMany({
+      where: {
+        organizationId,
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+        status: 'COMPLETED',
+      },
+      select: {
+        amount: true,
+        createdAt: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    // Group payments
+    const groupedData = new Map<string, number>();
+
+    payments.forEach((payment) => {
+      const key = groupBy === 'day'
+        ? payment.createdAt.toISOString().split('T')[0]
+        : `${payment.createdAt.getFullYear()}-${String(payment.createdAt.getMonth() + 1).padStart(2, '0')}`;
+      const currentAmount = groupedData.get(key) || 0;
+      groupedData.set(key, currentAmount + parseFloat(payment.amount.toString()));
+    });
+
+    // Create array with all periods in range
+    const chartData: Array<{ date: string; label: string; amount: number }> = [];
+
+    if (groupBy === 'day') {
+      const current = new Date(startDate);
+      while (current <= endDate) {
+        const dateStr = current.toISOString().split('T')[0];
+        chartData.push({
+          date: dateStr,
+          label: current.toLocaleDateString('pl-PL', { month: 'short', day: 'numeric' }),
+          amount: groupedData.get(dateStr) || 0,
+        });
+        current.setDate(current.getDate() + 1);
+      }
+    } else {
+      // Group by month
+      const startYear = startDate.getFullYear();
+      const startMonth = startDate.getMonth();
+      const endYear = endDate.getFullYear();
+      const endMonth = endDate.getMonth();
+
+      for (let y = startYear; y <= endYear; y++) {
+        const monthStart = y === startYear ? startMonth : 0;
+        const monthEnd = y === endYear ? endMonth : 11;
+        for (let m = monthStart; m <= monthEnd; m++) {
+          const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+          const date = new Date(y, m, 1);
+          chartData.push({
+            date: key,
+            label: date.toLocaleDateString('pl-PL', { month: 'short', year: '2-digit' }),
+            amount: groupedData.get(key) || 0,
+          });
+        }
+      }
+    }
+
+    return chartData;
+  }
+
+  /**
+   * Get lessons chart data with flexible grouping
+   */
+  private async getLessonsChartData(
+    organizationId: string,
+    startDate: Date,
+    endDate: Date,
+    groupBy: 'day' | 'month'
+  ) {
+    const lessons = await prisma.lesson.findMany({
+      where: {
+        organizationId,
+        scheduledAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      select: {
+        scheduledAt: true,
+      },
+      orderBy: {
+        scheduledAt: 'asc',
+      },
+    });
+
+    // Group lessons
+    const groupedData = new Map<string, number>();
+
+    lessons.forEach((lesson) => {
+      const key = groupBy === 'day'
+        ? lesson.scheduledAt.toISOString().split('T')[0]
+        : `${lesson.scheduledAt.getFullYear()}-${String(lesson.scheduledAt.getMonth() + 1).padStart(2, '0')}`;
+      const currentCount = groupedData.get(key) || 0;
+      groupedData.set(key, currentCount + 1);
+    });
+
+    // Create array with all periods in range
+    const chartData: Array<{ date: string; label: string; count: number }> = [];
+
+    if (groupBy === 'day') {
+      const current = new Date(startDate);
+      while (current <= endDate) {
+        const dateStr = current.toISOString().split('T')[0];
+        chartData.push({
+          date: dateStr,
+          label: current.toLocaleDateString('pl-PL', { month: 'short', day: 'numeric' }),
+          count: groupedData.get(dateStr) || 0,
+        });
+        current.setDate(current.getDate() + 1);
+      }
+    } else {
+      // Group by month
+      const startYear = startDate.getFullYear();
+      const startMonth = startDate.getMonth();
+      const endYear = endDate.getFullYear();
+      const endMonth = endDate.getMonth();
+
+      for (let y = startYear; y <= endYear; y++) {
+        const monthStart = y === startYear ? startMonth : 0;
+        const monthEnd = y === endYear ? endMonth : 11;
+        for (let m = monthStart; m <= monthEnd; m++) {
+          const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+          const date = new Date(y, m, 1);
+          chartData.push({
+            date: key,
+            label: date.toLocaleDateString('pl-PL', { month: 'short', year: '2-digit' }),
+            count: groupedData.get(key) || 0,
+          });
+        }
+      }
+    }
+
+    return chartData;
   }
 }
 

@@ -49,9 +49,49 @@ export interface TeacherReminders {
   incompleteAttendance: TeacherReminder[];
 }
 
+export type DateRangeType = 'last30days' | 'month' | 'year';
+
+export interface ChartDataParams {
+  rangeType: DateRangeType;
+  year?: number;
+  month?: number;
+}
+
+export interface ChartDataPoint {
+  date: string;
+  label: string;
+  amount?: number;
+  count?: number;
+}
+
+export interface ChartData {
+  rangeType: DateRangeType;
+  startDate: string;
+  endDate: string;
+  groupBy: 'day' | 'month';
+  revenue: {
+    data: ChartDataPoint[];
+    total: number;
+  };
+  lessons: {
+    data: ChartDataPoint[];
+    total: number;
+  };
+}
+
 class DashboardService {
   async getStats(): Promise<DashboardStats> {
     const response = await api.get('/dashboard/stats');
+    return response.data.data;
+  }
+
+  async getChartData(params: ChartDataParams): Promise<ChartData> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('rangeType', params.rangeType);
+    if (params.year) queryParams.append('year', params.year.toString());
+    if (params.month) queryParams.append('month', params.month.toString());
+
+    const response = await api.get(`/dashboard/charts?${queryParams.toString()}`);
     return response.data.data;
   }
 
