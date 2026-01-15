@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { dashboardService } from '../services/dashboardService';
 import teacherScheduleService from '../services/teacherScheduleService';
-import { Calendar, Clock, Users, AlertTriangle, CheckCircle, BookOpen, ArrowRight } from 'lucide-react';
+import { Clock, Users, AlertTriangle, CheckCircle, BookOpen, ArrowRight } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { pl } from 'date-fns/locale';
@@ -115,33 +115,16 @@ const TeacherDashboard: React.FC = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <Link
-          to="/teacher/availability"
-          className="bg-white rounded-lg shadow border border-gray-200 p-6 hover:shadow-lg transition-shadow"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Zarządzaj dostępnością</h3>
-              <p className="text-sm text-gray-600">
-                Ustaw swoją tygodniową dostępność i wyjątki
-              </p>
-            </div>
-            <Calendar className="h-8 w-8 text-primary" />
+      <div className="bg-white rounded-lg shadow border border-gray-200 p-6 mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Dzisiaj</h3>
+            <p className="text-sm text-gray-600">
+              {todayLessons.length} {todayLessons.length === 1 ? 'lekcja' : 'lekcji'}
+            </p>
           </div>
-        </Link>
-
-        <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Dzisiaj</h3>
-              <p className="text-sm text-gray-600">
-                {todayLessons.length} {todayLessons.length === 1 ? 'lekcja' : 'lekcji'}
-              </p>
-            </div>
-            <div className="bg-primary p-3 rounded-lg">
-              <Clock className="h-6 w-6 text-white" />
-            </div>
+          <div className="bg-primary p-3 rounded-lg">
+            <Clock className="h-6 w-6 text-white" />
           </div>
         </div>
       </div>

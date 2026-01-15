@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { organizationService, UpdateOrganizationData, CreateOrganizationData } from '../services/organization.service';
+import { organizationService, UpdateOrganizationData, CreateOrganizationData, UpdateOrganizationSettingsData } from '../services/organization.service';
 
 class OrganizationController {
   async getOrganization(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -133,6 +133,23 @@ class OrganizationController {
       res.json({
         success: true,
         data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateOrganizationSettings(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizationId = req.user!.organizationId;
+      const data: UpdateOrganizationSettingsData = req.body;
+      const userId = req.user!.id;
+
+      const settings = await organizationService.updateOrganizationSettings(organizationId, data, userId);
+
+      res.json({
+        success: true,
+        data: settings,
       });
     } catch (error) {
       next(error);

@@ -11,7 +11,7 @@ const createTeacherSchema = z.object({
   lastName: z.string().min(2),
   phone: z.string().optional(),
   hourlyRate: z.number().positive(),
-  contractType: z.nativeEnum(ContractType),
+  contractType: z.nativeEnum(ContractType).optional(),
   specializations: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
   bio: z.string().optional(),
@@ -29,16 +29,6 @@ const updateTeacherSchema = z.object({
   bio: z.string().optional(),
   isAvailableForBooking: z.boolean().optional(),
   isActive: z.boolean().optional(),
-});
-
-const availabilitySchema = z.object({
-  availability: z.array(
-    z.object({
-      dayOfWeek: z.number().min(0).max(6),
-      startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
-      endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
-    })
-  ),
 });
 
 export class TeacherController {
@@ -195,36 +185,6 @@ export class TeacherController {
     }
   }
 
-  async setAvailability(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      if (!req.user?.organizationId) {
-        return res.status(401).json({
-          error: {
-            code: 'UNAUTHORIZED',
-            message: 'Organization ID not found',
-          },
-        });
-      }
-
-      const { id } = req.params;
-      const { availability } = availabilitySchema.parse(req.body);
-
-      const result = await teacherService.setAvailability(
-        id,
-        req.user.organizationId,
-        availability
-      );
-
-      res.json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  // ============================================
-  // TEACHER SCHEDULE MANAGEMENT
-  // ============================================
-
   async getMe(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id || !req.user?.organizationId) {
@@ -258,7 +218,6 @@ export class TeacherController {
         return;
       }
 
-      // Get teacher by userId
       const teacher = await teacherService.getTeacherByUserId(req.user.id);
       if (!teacher) {
         res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Teacher not found' } });
@@ -267,75 +226,10 @@ export class TeacherController {
 
       const { startDate, endDate } = req.query;
       const start = startDate ? new Date(startDate as string) : new Date();
-      const end = endDate ? new Date(endDate as string) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+      const end = endDate ? new Date(endDate as string) : new Date();
 
-      const schedule = await teacherService.getTeacherSchedule(teacher.id, start, end);
-      res.json({ data: schedule });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async getAvailabilityExceptions(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { id } = req.params;
-      const { startDate, endDate } = req.query;
-
-      const start = startDate ? new Date(startDate as string) : undefined;
-      const end = endDate ? new Date(endDate as string) : undefined;
-
-      const exceptions = await teacherService.getAvailabilityExceptions(id, start, end);
-      res.json({ data: exceptions });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async addAvailabilityException(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { id } = req.params;
-      const { startDate, endDate, reason } = req.body;
-
-      const exception = await teacherService.addAvailabilityException(
-        id,
-        new Date(startDate),
-        new Date(endDate),
-        reason
-      );
-
-      res.json({ data: exception });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async deleteAvailabilityException(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { id, exceptionId } = req.params;
-      const result = await teacherService.deleteAvailabilityException(exceptionId);
-      res.json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async getPreferences(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { id } = req.params;
-      const preferences = await teacherService.getTeacherPreferences(id);
-      res.json({ data: preferences });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async updatePreferences(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { id } = req.params;
-      const data = req.body;
-
-      const preferences = await teacherService.updateTeacherPreferences(id, data);
-      res.json({ data: preferences });
+      const lessons = await teacherService.getTeacherSchedule(teacher.id, start, end);
+      res.json({ data: lessons });
     } catch (error) {
       next(error);
     }

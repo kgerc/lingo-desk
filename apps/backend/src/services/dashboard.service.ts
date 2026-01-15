@@ -16,6 +16,8 @@ export class DashboardService {
       lessonsToday,
       recentPayments,
       lessonsLast30Days,
+      debtorsData,
+      pendingPaymentsData,
     ] = await Promise.all([
       // Students count
       prisma.student.count({
@@ -64,6 +66,12 @@ export class DashboardService {
 
       // Lessons per day for last 30 days
       this.getLessonsPerDay(organizationId, 30),
+
+      // Debtors count and total amount
+      this.getDebtorsStats(organizationId),
+
+      // Pending payments count and total amount
+      this.getPendingPaymentsStats(organizationId),
     ]);
 
     // Calculate total revenue from recent payments
@@ -90,6 +98,8 @@ export class DashboardService {
         last30Days: recentPayments,
       },
       lessonsLast30Days,
+      debtors: debtorsData,
+      pendingPayments: pendingPaymentsData,
     };
   }
 
@@ -212,6 +222,66 @@ export class DashboardService {
     }
 
     return chartData;
+  }
+
+  /**
+   * Get debtors statistics - students with overdue payments
+   * A debtor is a student who has a PENDING payment with dueAt in the past
+   */
+  private async getDebtorsStats(organizationId: string) {
+    const now = new Date();
+
+    // Get all overdue payments grouped by student
+    const overduePayments = await prisma.payment.findMany({
+      where: {
+        organizationId,
+        status: 'PENDING',
+        dueAt: {
+          lt: now,
+        },
+      },
+      select: {
+        studentId: true,
+        amount: true,
+      },
+    });
+
+    // Count unique debtors and total overdue amount
+    const debtorIds = new Set<string>();
+    let totalAmount = 0;
+
+    overduePayments.forEach((payment) => {
+      debtorIds.add(payment.studentId);
+      totalAmount += parseFloat(payment.amount.toString());
+    });
+
+    return {
+      count: debtorIds.size,
+      totalAmount: totalAmount,
+    };
+  }
+
+  /**
+   * Get pending payments statistics - all payments awaiting payment
+   */
+  private async getPendingPaymentsStats(organizationId: string) {
+    const pendingPayments = await prisma.payment.aggregate({
+      where: {
+        organizationId,
+        status: 'PENDING',
+      },
+      _count: {
+        id: true,
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    return {
+      count: pendingPayments._count.id || 0,
+      totalAmount: parseFloat(pendingPayments._sum.amount?.toString() || '0'),
+    };
   }
 
   /**

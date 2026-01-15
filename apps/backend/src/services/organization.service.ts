@@ -22,6 +22,13 @@ export interface CreateOrganizationData extends UpdateOrganizationData {
   slug: string;
 }
 
+export interface UpdateOrganizationSettingsData {
+  lessonReminderHours?: number;
+  budgetAlertThresholdHours?: number;
+  autoGenerateLessonsEnabled?: boolean;
+  settings?: Record<string, any>;
+}
+
 class OrganizationService {
   async getOrganizationById(id: string) {
     const organization = await prisma.organization.findUnique({
@@ -271,6 +278,39 @@ class OrganizationService {
     });
 
     return { success: true };
+  }
+
+  async updateOrganizationSettings(
+    organizationId: string,
+    data: UpdateOrganizationSettingsData,
+    userId: string
+  ) {
+    // Verify user has permission to update settings (ADMIN or MANAGER)
+    const userOrg = await prisma.userOrganization.findFirst({
+      where: {
+        userId,
+        organizationId,
+        role: {
+          in: ['ADMIN', 'MANAGER'],
+        },
+      },
+    });
+
+    if (!userOrg) {
+      throw new Error('You do not have permission to update organization settings');
+    }
+
+    // Upsert organization settings
+    const settings = await prisma.organizationSettings.upsert({
+      where: { organizationId },
+      create: {
+        organizationId,
+        ...data,
+      },
+      update: data,
+    });
+
+    return settings;
   }
 }
 

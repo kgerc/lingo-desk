@@ -192,7 +192,7 @@ const TeachersPage: React.FC = () => {
                       <div className="font-medium text-gray-900">{teacher.hourlyRate} PLN/h</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getContractTypeBadge(teacher.contractType)}
+                      {teacher.contractType != null ? getContractTypeBadge(teacher.contractType) : "-"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {teacher.languages.length > 0 ? (

@@ -77,7 +77,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         return [
           ...commonItems,
           { name: 'Mój grafik', href: '/teacher/schedule', icon: Calendar },
-          { name: 'Dostępność', href: '/teacher/availability', icon: Clock },
           { name: 'Moje lekcje', href: '/lessons', icon: BookOpen },
           { name: 'Uczniowie', href: '/students', icon: Users },
         ];

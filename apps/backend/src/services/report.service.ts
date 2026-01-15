@@ -12,7 +12,7 @@ interface TeacherPayoutData {
   teacherId: string;
   teacherName: string;
   email: string;
-  contractType: string;
+  contractType: string | null;
   hourlyRate: number;
   lessonsCount: number;
   totalHours: number;

@@ -4,7 +4,7 @@ export interface Teacher {
   id: string;
   userId: string;
   hourlyRate: number;
-  contractType: 'B2B' | 'EMPLOYMENT' | 'CIVIL';
+  contractType?: 'B2B' | 'EMPLOYMENT' | 'CIVIL' | null;
   specializations: string[];
   languages: string[];
   bio?: string;
@@ -19,12 +19,6 @@ export interface Teacher {
     isActive: boolean;
     createdAt: string;
   };
-  availability?: Array<{
-    id: string;
-    dayOfWeek: number;
-    startTime: string;
-    endTime: string;
-  }>;
   _count?: {
     courses: number;
     lessons: number;
@@ -38,7 +32,7 @@ export interface CreateTeacherData {
   lastName: string;
   phone?: string;
   hourlyRate: number;
-  contractType: 'B2B' | 'EMPLOYMENT' | 'CIVIL';
+  contractType?: 'B2B' | 'EMPLOYMENT' | 'CIVIL';
   specializations?: string[];
   languages?: string[];
   bio?: string;
@@ -96,18 +90,6 @@ export const teacherService = {
 
   async deleteTeacher(id: string) {
     const response = await api.delete(`/teachers/${id}`);
-    return response.data;
-  },
-
-  async setAvailability(
-    id: string,
-    availability: Array<{
-      dayOfWeek: number;
-      startTime: string;
-      endTime: string;
-    }>
-  ) {
-    const response = await api.put(`/teachers/${id}/availability`, { availability });
     return response.data;
   },
 

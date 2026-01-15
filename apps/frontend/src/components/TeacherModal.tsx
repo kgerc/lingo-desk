@@ -11,6 +11,7 @@ interface TeacherModalProps {
 }
 
 const CONTRACT_TYPES = [
+  { value: '', label: 'Wybierz typ umowy' },
   { value: 'B2B', label: 'B2B' },
   { value: 'EMPLOYMENT', label: 'Umowa o pracę' },
   { value: 'CIVIL', label: 'Umowa cywilna' },
@@ -26,7 +27,7 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
     phone: teacher?.user.phone || '',
     password: '',
     hourlyRate: teacher?.hourlyRate || 100,
-    contractType: teacher?.contractType || 'B2B',
+    contractType: teacher?.contractType || '',
     specializations: teacher?.specializations.join(', ') || '',
     languages: teacher?.languages.join(', ') || '',
   });
@@ -99,7 +100,7 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
           email: formData.email,
           phone: formData.phone || undefined,
           hourlyRate: formData.hourlyRate,
-          contractType: formData.contractType as 'B2B' | 'EMPLOYMENT' | 'CIVIL',
+          contractType: formData.contractType ? formData.contractType as 'B2B' | 'EMPLOYMENT' | 'CIVIL' : undefined,
           specializations: specializationsArray,
           languages: languagesArray,
         },
@@ -109,7 +110,7 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
         ...formData,
         phone: formData.phone || undefined,
         hourlyRate: formData.hourlyRate,
-        contractType: formData.contractType as 'B2B' | 'EMPLOYMENT' | 'CIVIL',
+        contractType: formData.contractType ? formData.contractType as 'B2B' | 'EMPLOYMENT' | 'CIVIL' : undefined,
         specializations: specializationsArray,
         languages: languagesArray,
       });
@@ -248,7 +249,7 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Typ umowy *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Typ umowy</label>
                 <select
                   name="contractType"
                   value={formData.contractType}

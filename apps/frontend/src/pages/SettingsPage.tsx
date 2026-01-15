@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Building2, Bell, Mail, Plug } from 'lucide-react';
+import { Building2, Bell, Mail, Plug, LayoutDashboard } from 'lucide-react';
 import OrganizationSettingsPage from './OrganizationSettingsPage';
 import NotificationSettingsPage from './NotificationSettingsPage';
 import MailingsPage from './MailingsPage';
 import IntegrationsPage from './IntegrationsPage';
+import DashboardSettingsPage from './DashboardSettingsPage';
 
-type TabType = 'organization' | 'notifications' | 'mailings' | 'integrations';
+type TabType = 'organization' | 'dashboard' | 'notifications' | 'mailings' | 'integrations';
 
 const SettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('organization');
@@ -15,6 +16,11 @@ const SettingsPage: React.FC = () => {
       id: 'organization' as TabType,
       name: 'Organizacja',
       icon: Building2,
+    },
+    {
+      id: 'dashboard' as TabType,
+      name: 'Dashboard',
+      icon: LayoutDashboard,
     },
     {
       id: 'notifications' as TabType,
@@ -67,6 +73,7 @@ const SettingsPage: React.FC = () => {
       {/* Tab Content */}
       <div className="mt-6">
         {activeTab === 'organization' && <OrganizationSettingsPage />}
+        {activeTab === 'dashboard' && <DashboardSettingsPage />}
         {activeTab === 'notifications' && <NotificationSettingsPage />}
         {activeTab === 'mailings' && <MailingsPage />}
         {activeTab === 'integrations' && <IntegrationsPage />}

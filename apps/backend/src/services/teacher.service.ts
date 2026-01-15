@@ -9,7 +9,7 @@ interface CreateTeacherData {
   lastName: string;
   phone?: string;
   hourlyRate: number;
-  contractType: ContractType;
+  contractType?: ContractType;
   specializations?: string[];
   languages?: string[];
   bio?: string;
@@ -155,7 +155,6 @@ export class TeacherService {
             createdAt: true,
           },
         },
-        availability: true,
         _count: {
           select: {
             courses: true,
@@ -191,7 +190,6 @@ export class TeacherService {
             profile: true,
           },
         },
-        availability: true,
         courses: {
           include: {
             courseType: true,
@@ -347,56 +345,11 @@ export class TeacherService {
     };
   }
 
-  async setAvailability(
-    teacherId: string,
-    organizationId: string,
-    availability: Array<{
-      dayOfWeek: number;
-      startTime: string;
-      endTime: string;
-    }>
-  ) {
-    const teacher = await prisma.teacher.findFirst({
-      where: { id: teacherId, organizationId },
-    });
-
-    if (!teacher) {
-      throw new Error('Teacher not found');
-    }
-
-    // Delete existing availability and create new ones
-    await prisma.$transaction(async (tx) => {
-      // Delete old availability
-      await tx.teacherAvailability.deleteMany({
-        where: { teacherId },
-      });
-
-      // Create new availability
-      if (availability.length > 0) {
-        await tx.teacherAvailability.createMany({
-          data: availability.map((slot) => ({
-            teacherId,
-            dayOfWeek: slot.dayOfWeek,
-            startTime: slot.startTime,
-            endTime: slot.endTime,
-          })),
-        });
-      }
-    });
-
-    return { success: true, message: 'Availability updated' };
-  }
-
-  // ============================================
-  // TEACHER SCHEDULE MANAGEMENT
-  // ============================================
-
   async getTeacherByUserId(userId: string) {
     const teacher = await prisma.teacher.findUnique({
       where: { userId },
       include: {
         user: true,
-        availability: true,
       },
     });
 
@@ -440,113 +393,6 @@ export class TeacherService {
     });
 
     return lessons;
-  }
-
-  async getAvailabilityExceptions(teacherId: string, startDate?: Date, endDate?: Date) {
-    const where: any = { teacherId };
-
-    if (startDate || endDate) {
-      where.OR = [];
-      if (startDate) {
-        where.OR.push({ startDate: { gte: startDate } });
-        where.OR.push({ endDate: { gte: startDate } });
-      }
-      if (endDate) {
-        where.OR.push({ startDate: { lte: endDate } });
-      }
-    }
-
-    const exceptions = await prisma.teacherAvailabilityException.findMany({
-      where,
-      orderBy: {
-        startDate: 'asc',
-      },
-    });
-
-    return exceptions;
-  }
-
-  async addAvailabilityException(
-    teacherId: string,
-    startDate: Date,
-    endDate: Date,
-    reason?: string
-  ) {
-    const exception = await prisma.teacherAvailabilityException.create({
-      data: {
-        teacherId,
-        startDate,
-        endDate,
-        reason,
-      },
-    });
-
-    return exception;
-  }
-
-  async deleteAvailabilityException(exceptionId: string) {
-    await prisma.teacherAvailabilityException.delete({
-      where: { id: exceptionId },
-    });
-
-    return { success: true, message: 'Exception deleted' };
-  }
-
-  async getTeacherPreferences(teacherId: string) {
-    let preferences = await prisma.teacherSchedulePreferences.findUnique({
-      where: { teacherId },
-    });
-
-    // If no preferences exist, create default ones
-    if (!preferences) {
-      preferences = await prisma.teacherSchedulePreferences.create({
-        data: {
-          teacherId,
-          timezone: 'Europe/Warsaw',
-          prepTimeMinutes: 0,
-          minBreakBetweenMinutes: 0,
-        },
-      });
-    }
-
-    return preferences;
-  }
-
-  async updateTeacherPreferences(
-    teacherId: string,
-    data: {
-      timezone?: string;
-      prepTimeMinutes?: number;
-      maxLessonsPerDay?: number;
-      minBreakBetweenMinutes?: number;
-    }
-  ) {
-    const preferences = await prisma.teacherSchedulePreferences.upsert({
-      where: { teacherId },
-      update: data,
-      create: {
-        teacherId,
-        ...data,
-      },
-    });
-
-    return preferences;
-  }
-
-  async checkAvailabilityConflicts(teacherId: string, date: Date) {
-    // Check if date falls within any exception
-    const exceptions = await prisma.teacherAvailabilityException.findMany({
-      where: {
-        teacherId,
-        startDate: { lte: date },
-        endDate: { gte: date },
-      },
-    });
-
-    return {
-      hasConflict: exceptions.length > 0,
-      exceptions,
-    };
   }
 }
 

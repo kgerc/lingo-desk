@@ -14,7 +14,6 @@ import LessonsPage from './pages/LessonsPage'
 import PaymentsPage from './pages/PaymentsPage'
 import AlertsPage from './pages/AlertsPage'
 import TeacherSchedulePage from './pages/TeacherSchedulePage'
-import TeacherAvailabilityPage from './pages/TeacherAvailabilityPage'
 import SettingsPage from './pages/SettingsPage'
 import DebtorsPage from './pages/DebtorsPage'
 import NotificationSettingsPage from './pages/NotificationSettingsPage'
@@ -227,19 +226,6 @@ function App() {
             isAuthenticated ? (
               <Layout>
                 <TeacherSchedulePage />
-              </Layout>
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-
-        <Route
-          path="/teacher/availability"
-          element={
-            isAuthenticated ? (
-              <Layout>
-                <TeacherAvailabilityPage />
               </Layout>
             ) : (
               <Navigate to="/login" />

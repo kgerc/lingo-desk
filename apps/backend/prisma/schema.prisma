@@ -247,7 +247,7 @@ model Teacher {
   userId                 String       @unique @map("user_id")
   organizationId         String       @map("organization_id")
   hourlyRate             Decimal      @map("hourly_rate") @db.Decimal(10, 2)
-  contractType           ContractType @map("contract_type")
+  contractType           ContractType? @map("contract_type")
   specializations        String[]
   languages              String[]
   bio                    String?
@@ -258,9 +258,6 @@ model Teacher {
   // Relations
   user                     User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization             Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  availability             TeacherAvailability[]
-  availabilityExceptions   TeacherAvailabilityException[]
-  schedulePreferences      TeacherSchedulePreferences?
   courses                  Course[]
   lessons                  Lesson[]
   payouts                  TeacherPayout[]
@@ -269,54 +266,6 @@ model Teacher {
 
   @@index([organizationId])
   @@map("teachers")
-}
-
-model TeacherAvailability {
-  id           String    @id @default(uuid())
-  teacherId    String    @map("teacher_id")
-  dayOfWeek    Int       @map("day_of_week") // 0-6 (Sunday-Saturday)
-  startTime    String    @map("start_time") // HH:MM format
-  endTime      String    @map("end_time")   // HH:MM format
-  isRecurring  Boolean   @default(true) @map("is_recurring")
-  effectiveFrom DateTime? @map("effective_from")
-  effectiveTo   DateTime? @map("effective_to")
-
-  // Relations
-  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-
-  @@index([teacherId])
-  @@map("teacher_availability")
-}
-
-model TeacherAvailabilityException {
-  id        String   @id @default(uuid())
-  teacherId String   @map("teacher_id")
-  startDate DateTime @map("start_date")
-  endDate   DateTime @map("end_date")
-  reason    String?
-  createdAt DateTime @default(now()) @map("created_at")
-
-  // Relations
-  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-
-  @@index([teacherId, startDate])
-  @@map("teacher_availability_exceptions")
-}
-
-model TeacherSchedulePreferences {
-  id                     String   @id @default(uuid())
-  teacherId              String   @unique @map("teacher_id")
-  timezone               String   @default("Europe/Warsaw")
-  prepTimeMinutes        Int      @default(0) @map("prep_time_minutes")
-  maxLessonsPerDay       Int?     @map("max_lessons_per_day")
-  minBreakBetweenMinutes Int      @default(0) @map("min_break_between_minutes")
-  createdAt              DateTime @default(now()) @map("created_at")
-  updatedAt              DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  teacher                Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-
-  @@map("teacher_schedule_preferences")
 }
 
 // ============================================

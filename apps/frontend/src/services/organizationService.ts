@@ -1,5 +1,24 @@
 import api from '../lib/api';
 
+export interface DashboardSettings {
+  enabledMetrics: string[];
+  enabledCharts: string[];
+}
+
+export interface OrganizationSettingsData {
+  dashboard?: DashboardSettings;
+  [key: string]: any;
+}
+
+export interface OrganizationSettings {
+  id: string;
+  organizationId: string;
+  lessonReminderHours: number;
+  budgetAlertThresholdHours: number;
+  autoGenerateLessonsEnabled: boolean;
+  settings?: OrganizationSettingsData;
+}
+
 export interface Organization {
   id: string;
   name: string;
@@ -17,6 +36,7 @@ export interface Organization {
   website?: string;
   taxId?: string;
   description?: string;
+  settings?: OrganizationSettings;
   createdAt: string;
   updatedAt: string;
 }
@@ -78,6 +98,11 @@ const organizationService = {
 
   async switchOrganization(organizationId: string): Promise<UserOrganization> {
     const response = await api.post('/organizations/switch', { organizationId });
+    return response.data.data;
+  },
+
+  async updateOrganizationSettings(data: Partial<OrganizationSettings>): Promise<OrganizationSettings> {
+    const response = await api.put('/organizations/settings', data);
     return response.data.data;
   },
 };

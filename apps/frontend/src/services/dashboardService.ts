@@ -25,6 +25,14 @@ export interface DashboardStats {
     date: string;
     count: number;
   }>;
+  debtors: {
+    count: number;
+    totalAmount: number;
+  };
+  pendingPayments: {
+    count: number;
+    totalAmount: number;
+  };
 }
 
 export interface TeacherReminder {
