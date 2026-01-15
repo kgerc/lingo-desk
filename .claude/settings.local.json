@@ -17,7 +17,8 @@
       "Bash(powershell -Command \"Get-Process | Where-Object {$_ProcessName -eq ''node''} | Stop-Process -Force\")",
       "Bash(npx prisma migrate resolve:*)",
       "Bash(npx prisma migrate diff:*)",
-      "Bash(npx prisma migrate deploy)"
+      "Bash(npx prisma migrate deploy)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

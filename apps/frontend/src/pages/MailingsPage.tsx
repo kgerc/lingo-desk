@@ -1,15 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Mail, Users, Send, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Users, Send, Loader2, AlertCircle, Paperclip, X, FileText } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { studentService } from '../services/studentService';
 import mailingService from '../services/mailingService';
+
+const ALLOWED_FILE_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'text/plain',
+  'text/csv',
+  'application/zip',
+];
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25MB
 
 interface MailingFormData {
   subject: string;
   message: string;
   recipients: 'all' | 'selected' | 'debtors';
   selectedStudentIds: string[];
+  attachments: File[];
 }
 
 const MailingsPage: React.FC = () => {
@@ -18,9 +38,11 @@ const MailingsPage: React.FC = () => {
     message: '',
     recipients: 'all',
     selectedStudentIds: [],
+    attachments: [],
   });
 
   const [emailTemplate, setEmailTemplate] = useState<'welcome' | 'reminder' | 'payment' | 'custom'>('custom');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch all students for selection
   const { data: students = [] } = useQuery({
@@ -94,6 +116,61 @@ Zespół szkoły`,
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files: File[] = e.target.files ? Array.from(e.target.files) : [];
+
+    // Validate file types
+    const invalidFiles = files.filter(file => !ALLOWED_FILE_TYPES.includes(file.type));
+    if (invalidFiles.length > 0) {
+      toast.error(`Niedozwolony typ pliku: ${invalidFiles.map(f => f.name).join(', ')}`);
+      return;
+    }
+
+    // Validate individual file sizes
+    const oversizedFiles = files.filter(file => file.size > MAX_FILE_SIZE);
+    if (oversizedFiles.length > 0) {
+      toast.error(`Plik zbyt duży (max 10MB): ${oversizedFiles.map(f => f.name).join(', ')}`);
+      return;
+    }
+
+    // Validate total size
+    const currentTotalSize = formData.attachments.reduce((sum, f) => sum + f.size, 0);
+    const newTotalSize = currentTotalSize + files.reduce((sum, f) => sum + f.size, 0);
+    if (newTotalSize > MAX_TOTAL_SIZE) {
+      toast.error('Łączny rozmiar załączników nie może przekroczyć 25MB');
+      return;
+    }
+
+    // Limit total number of files
+    if (formData.attachments.length + files.length > 10) {
+      toast.error('Maksymalnie 10 załączników');
+      return;
+    }
+
+    setFormData({
+      ...formData,
+      attachments: [...formData.attachments, ...files],
+    });
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setFormData({
+      ...formData,
+      attachments: formData.attachments.filter((_, i) => i !== index),
+    });
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const sendMailingMutation = useMutation({
     mutationFn: async (data: MailingFormData) => {
       return await mailingService.sendBulkEmail({
@@ -101,22 +178,32 @@ Zespół szkoły`,
         message: data.message,
         recipients: data.recipients,
         selectedStudentIds: data.recipients === 'selected' ? data.selectedStudentIds : undefined,
+        attachments: data.attachments.length > 0 ? data.attachments : undefined,
       });
     },
     onSuccess: (result) => {
+      let message = `Wysłano ${result.totalSent} z ${result.totalRecipients} wiadomości.`;
       if (result.totalFailed > 0) {
-        toast.success(
-          `Wysłano ${result.totalSent} z ${result.totalRecipients} wiadomości. ${result.totalFailed} nie powiodło się.`,
-          { duration: 5000 }
-        );
+        message += ` ${result.totalFailed} nie powiodło się.`;
+      }
+      if (result.attachmentsIncluded && result.attachmentsIncluded > 0) {
+        message += ` Załączniki: ${result.attachmentsIncluded}.`;
+      }
+      if (result.attachmentFailures && result.attachmentFailures > 0) {
+        message += ` Błędy załączników: ${result.attachmentFailures}.`;
+      }
+
+      if (result.totalFailed > 0 || (result.attachmentFailures && result.attachmentFailures > 0)) {
+        toast.success(message, { duration: 5000 });
       } else {
-        toast.success(`Wysłano ${result.totalSent} wiadomości!`);
+        toast.success(message);
       }
       setFormData({
         subject: '',
         message: '',
         recipients: 'all',
         selectedStudentIds: [],
+        attachments: [],
       });
       setEmailTemplate('custom');
     },
@@ -286,6 +373,70 @@ Zespół szkoły`,
                 placeholder="Wpisz treść wiadomości"
               />
             </div>
+          </div>
+        </div>
+
+        {/* Attachments */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Załączniki
+          </h2>
+
+          <div className="space-y-4">
+            <div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                multiple
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.txt,.csv,.zip"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Paperclip className="h-5 w-5 text-gray-600" />
+                <span className="text-gray-700">Dodaj załącznik</span>
+              </button>
+              <p className="text-sm text-gray-500 mt-2">
+                Max 10 plików, 10MB każdy, 25MB łącznie. Dozwolone: PDF, Word, Excel, PowerPoint, obrazy, TXT, CSV, ZIP
+              </p>
+            </div>
+
+            {formData.attachments.length > 0 && (
+              <div className="space-y-2">
+                {formData.attachments.map((file, index) => (
+                  <div
+                    key={`${file.name}-${index}`}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <div className="font-medium text-gray-900 text-sm">
+                          {file.name}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {formatFileSize(file.size)}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(index)}
+                      className="p-1 hover:bg-gray-200 rounded transition-colors"
+                    >
+                      <X className="h-4 w-4 text-gray-600" />
+                    </button>
+                  </div>
+                ))}
+                <div className="text-sm text-gray-600 pt-2">
+                  Łącznie: {formatFileSize(formData.attachments.reduce((sum, f) => sum + f.size, 0))} / 25MB
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

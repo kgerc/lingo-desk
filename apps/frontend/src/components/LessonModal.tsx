@@ -6,7 +6,7 @@ import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
 import { courseService } from '../services/courseService';
 import substitutionService from '../services/substitutionService';
-import { X, Calendar, Users as UsersIcon, Check } from 'lucide-react';
+import { X, Users as UsersIcon, Clock, ClipboardList, Info } from 'lucide-react';
 import AttendanceSection from './AttendanceSection';
 
 interface LessonModalProps {
@@ -18,12 +18,13 @@ interface LessonModalProps {
   onSuccess: () => void;
 }
 
-type TabType = 'basic' | 'participants';
+type CreateTabType = 'basic' | 'schedule' | 'participants';
+type EditTabType = 'basic' | 'schedule' | 'participants' | 'attendance';
 
 const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialDuration, initialCourseId, onClose, onSuccess }) => {
   const queryClient = useQueryClient();
   const isEdit = !!lesson;
-  const [activeTab, setActiveTab] = useState<TabType>('basic');
+  const [activeTab, setActiveTab] = useState<CreateTabType | EditTabType>('basic');
 
   const [formData, setFormData] = useState({
     courseId: lesson?.courseId || initialCourseId || '',
@@ -37,7 +38,6 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
         ? new Date(initialDate).toISOString().slice(0, 16)
         : '',
     durationMinutes: lesson?.durationMinutes?.toString() || initialDuration?.toString() || '60',
-    teacherRate: lesson?.teacherRate?.toString() || '',
     pricePerLesson: lesson?.pricePerLesson?.toString() || '',
     currency: lesson?.currency || 'PLN',
     deliveryMode: (lesson?.deliveryMode || 'IN_PERSON') as LessonDeliveryMode,
@@ -57,6 +57,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
   const [substitutionNotes, setSubstitutionNotes] = useState('');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [priceWasManuallySet, setPriceWasManuallySet] = useState(!!lesson?.pricePerLesson);
 
   // Fetch existing substitution if editing
   const { data: existingSubstitution } = useQuery({
@@ -72,7 +73,6 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       setSubstituteTeacherId(existingSubstitution.substituteTeacherId);
       setSubstitutionReason(existingSubstitution.reason || '');
       setSubstitutionNotes(existingSubstitution.notes || '');
-      // Original teacher stays in the main teacherId field (from lesson data)
     }
   }, [existingSubstitution]);
 
@@ -107,11 +107,21 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     }
   }, [formData.courseId, courses, isEdit]);
 
+  // Auto-calculate lesson price based on teacher hourly rate and duration (only when creating)
+  useEffect(() => {
+    if (!isEdit && !priceWasManuallySet && formData.teacherId && formData.durationMinutes) {
+      const selectedTeacher = teachers.find(t => t.id === formData.teacherId);
+      if (selectedTeacher?.hourlyRate) {
+        const durationHours = Number(formData.durationMinutes) / 60;
+        const calculatedPrice = selectedTeacher.hourlyRate * durationHours;
+        setFormData(prev => ({ ...prev, pricePerLesson: calculatedPrice.toFixed(2) }));
+      }
+    }
+  }, [formData.teacherId, formData.durationMinutes, teachers, isEdit, priceWasManuallySet]);
+
   const createMutation = useMutation({
     mutationFn: async (data: { lessonData: CreateLessonData; studentIds: string[] }) => {
-      // Create multiple lessons, one for each student
       const promises = data.studentIds.map(studentId => {
-        // Find enrollment for this student in the selected course
         let enrollmentId = '';
         if (formData.courseId) {
           const course = courses.find(c => c.id === formData.courseId);
@@ -147,7 +157,6 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       pattern: any;
       studentIds: string[];
     }) => {
-      // Create recurring lessons for each student
       const promises = data.studentIds.map(studentId => {
         let enrollmentId = '';
         if (formData.courseId) {
@@ -189,11 +198,9 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     mutationFn: (data: { id: string; updates: any }) =>
       lessonService.updateLesson(data.id, data.updates),
     onSuccess: async (_data, variables) => {
-      // Handle substitution changes only if something actually changed
       const hadSubstitution = !!existingSubstitution;
       const hasSubstitutionNow = isSubstitution && !!substituteTeacherId;
 
-      // Check if substitution data changed
       const substitutionDataChanged = existingSubstitution && (
         existingSubstitution.substituteTeacherId !== substituteTeacherId ||
         (existingSubstitution.reason || '') !== substitutionReason ||
@@ -201,7 +208,6 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       );
 
       if (hasSubstitutionNow && !hadSubstitution) {
-        // Create new substitution
         try {
           await substitutionService.createSubstitution({
             lessonId: variables.id,
@@ -216,7 +222,6 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
           toast.error('Lekcja zaktualizowana, ale wystąpił błąd przy tworzeniu zastępstwa');
         }
       } else if (hasSubstitutionNow && hadSubstitution && substitutionDataChanged) {
-        // Update existing substitution only if data changed
         try {
           await substitutionService.updateSubstitution(existingSubstitution.id, {
             substituteTeacherId: substituteTeacherId,
@@ -229,7 +234,6 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
           toast.error('Lekcja zaktualizowana, ale wystąpił błąd przy aktualizacji zastępstwa');
         }
       } else if (!isSubstitution && hadSubstitution) {
-        // Remove substitution if checkbox was unchecked
         try {
           await substitutionService.deleteSubstitution(existingSubstitution.id);
           queryClient.invalidateQueries({ queryKey: ['substitutions'] });
@@ -238,7 +242,6 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
         }
       }
 
-      // Invalidate lessons query to refresh list
       queryClient.invalidateQueries({ queryKey: ['lessons'] });
 
       toast.success('Lekcja została pomyślnie zaktualizowana');
@@ -277,6 +280,12 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
     }
+  };
+
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, pricePerLesson: value }));
+    setPriceWasManuallySet(true);
   };
 
   const toggleStudent = (studentId: string) => {
@@ -332,9 +341,10 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     e.preventDefault();
 
     if (!validate()) {
-      // Switch to the tab with error
-      if (errors.title || errors.scheduledAt || errors.durationMinutes || errors.deliveryMode) {
+      if (errors.title || errors.deliveryMode) {
         setActiveTab('basic');
+      } else if (errors.scheduledAt || errors.durationMinutes) {
+        setActiveTab('schedule');
       } else if (errors.teacherId || errors.studentIds) {
         setActiveTab('participants');
       }
@@ -343,14 +353,13 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
 
     const lessonData: CreateLessonData = {
       courseId: formData.courseId || undefined,
-      enrollmentId: undefined, // Will be set per student
+      enrollmentId: undefined,
       teacherId: formData.teacherId,
-      studentId: '', // Will be set per student
+      studentId: '',
       title: formData.title,
       description: formData.description || undefined,
       scheduledAt: formData.scheduledAt,
       durationMinutes: Number(formData.durationMinutes),
-      teacherRate: formData.teacherRate ? Number(formData.teacherRate) : undefined,
       pricePerLesson: formData.pricePerLesson ? Number(formData.pricePerLesson) : undefined,
       currency: formData.currency,
       deliveryMode: formData.deliveryMode,
@@ -361,17 +370,15 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     };
 
     if (isEdit && lesson) {
-      // For edit mode, only update the single lesson
       updateMutation.mutate({
         id: lesson.id,
         updates: {
           ...lessonData,
-          studentId: formData.studentIds[0], // In edit mode we only have one student
+          studentId: formData.studentIds[0],
           enrollmentId: lesson.enrollmentId,
         },
       });
     } else {
-      // For create mode
       if (isRecurring) {
         const scheduledDate = new Date(formData.scheduledAt);
         const endDate = new Date(scheduledDate);
@@ -403,18 +410,23 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     }
   };
 
-  const tabs = [
-    {
-      id: 'basic' as TabType,
-      name: 'Podstawowe',
-      icon: Calendar,
-    },
-    {
-      id: 'participants' as TabType,
-      name: 'Uczestnicy',
-      icon: UsersIcon,
-    },
+  const createTabs = [
+    { id: 'basic' as CreateTabType, name: 'Podstawowe informacje', icon: Info },
+    { id: 'schedule' as CreateTabType, name: 'Harmonogram', icon: Clock },
+    { id: 'participants' as CreateTabType, name: 'Uczestnicy', icon: UsersIcon },
   ];
+
+  const editTabs = [
+    { id: 'basic' as EditTabType, name: 'Podstawowe informacje', icon: Info },
+    { id: 'schedule' as EditTabType, name: 'Harmonogram', icon: Clock },
+    { id: 'participants' as EditTabType, name: 'Uczestnicy', icon: UsersIcon },
+    { id: 'attendance' as EditTabType, name: 'Lista obecności', icon: ClipboardList },
+  ];
+
+  const tabs = isEdit ? editTabs : createTabs;
+
+  // Get selected teacher for displaying rate info
+  const selectedTeacher = teachers.find(t => t.id === formData.teacherId);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -436,31 +448,29 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
           </div>
 
           {/* Tabs */}
-          {!isEdit && (
-            <div className="border-b border-gray-200 bg-gray-50">
-              <nav className="flex gap-6 px-6">
-                {tabs.map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
+          <div className="border-b border-gray-200 bg-gray-50">
+            <nav className="flex gap-4 px-6 overflow-x-auto">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
 
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                        isActive
-                          ? 'border-primary text-primary'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      <Icon className="h-5 w-5" />
-                      {tab.name}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
-          )}
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex items-center gap-2 py-4 px-2 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                      isActive
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {tab.name}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
@@ -471,13 +481,11 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                 </div>
               )}
 
-              {/* Tab: Basic Information */}
-              {(activeTab === 'basic' || isEdit) && (
-                <>
+              {/* Tab: Podstawowe informacje */}
+              {activeTab === 'basic' && (
+                <div className="space-y-6">
                   {/* Basic Info */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Podstawowe informacje</h3>
-
                     <div className="grid grid-cols-1 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -495,6 +503,31 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                         />
                         {errors.title && (
                           <p className="mt-1 text-sm text-red-600">{errors.title}</p>
+                        )}
+                      </div>
+                      {/* Teacher */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Lektor *
+                        </label>
+                        <select
+                          name="teacherId"
+                          value={formData.teacherId}
+                          onChange={handleChange}
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                            errors.teacherId ? 'border-red-500' : 'border-gray-300'
+                          }`}
+                        >
+                          <option value="">Wybierz lektora</option>
+                          {teachers.map((teacher) => (
+                            <option key={teacher.id} value={teacher.id}>
+                              {teacher.user.firstName} {teacher.user.lastName}
+                              {teacher.hourlyRate ? ` (${teacher.hourlyRate} PLN/h)` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        {errors.teacherId && (
+                          <p className="mt-1 text-sm text-red-600">{errors.teacherId}</p>
                         )}
                       </div>
 
@@ -555,87 +588,30 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                     )}
                   </div>
 
-                  {/* Schedule */}
+                  {/* Price */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Harmonogram</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Cena</h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Data i godzina *
-                        </label>
-                        <input
-                          type="datetime-local"
-                          name="scheduledAt"
-                          value={formData.scheduledAt}
-                          onChange={handleChange}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                            errors.scheduledAt ? 'border-red-500' : 'border-gray-300'
-                          }`}
-                        />
-                        {errors.scheduledAt && (
-                          <p className="mt-1 text-sm text-red-600">{errors.scheduledAt}</p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Czas trwania (minuty) *
-                        </label>
-                        <input
-                          type="number"
-                          name="durationMinutes"
-                          value={formData.durationMinutes}
-                          onChange={handleChange}
-                          min="15"
-                          step="15"
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                            errors.durationMinutes ? 'border-red-500' : 'border-gray-300'
-                          }`}
-                        />
-                        {errors.durationMinutes && (
-                          <p className="mt-1 text-sm text-red-600">{errors.durationMinutes}</p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Stawka lektora (PLN)
-                        </label>
-                        <input
-                          type="number"
-                          name="teacherRate"
-                          value={formData.teacherRate}
-                          onChange={handleChange}
-                          min="0"
-                          step="0.01"
-                          placeholder="Automatycznie wyliczona"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                        />
-                        <p className="mt-1 text-xs text-gray-500">
-                          Pozostaw puste aby automatycznie wyliczyć na podstawie kursu lub stawki lektora
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Cena za lekcję (dla ucznia)
+                          Cena za lekcję
                         </label>
                         <input
                           type="number"
                           name="pricePerLesson"
                           value={formData.pricePerLesson}
-                          onChange={handleChange}
+                          onChange={handlePriceChange}
                           min="0"
                           step="0.01"
                           placeholder="Opcjonalnie"
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         />
-                        <p className="mt-1 text-xs text-gray-500">
-                          Cena lekcji dla ucznia (może się różnić od stawki lektora)
-                        </p>
+                        {!isEdit && selectedTeacher?.hourlyRate && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Sugerowana cena na podstawie stawki lektora ({selectedTeacher.hourlyRate} {formData.currency}/h)
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -658,104 +634,119 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                           <option value="NOK">NOK (Korona norweska)</option>
                           <option value="SEK">SEK (Korona szwedzka)</option>
                         </select>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Waluta, w której będą rozliczane płatności za tę lekcję
-                        </p>
                       </div>
                     </div>
-
-                    {/* Recurring Lessons - only show for new lessons */}
-                    {!isEdit && (
-                      <div className="pt-4 border-t border-gray-200">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={isRecurring}
-                            onChange={(e) => setIsRecurring(e.target.checked)}
-                            className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                          />
-                          <span className="text-sm font-medium text-gray-700">Utwórz serię lekcji</span>
-                        </label>
-
-                        {isRecurring && (
-                          <div className="mt-4 space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Liczba
-                                </label>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max="52"
-                                  value={recurringCount}
-                                  onChange={(e) => setRecurringCount(e.target.value)}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                  placeholder="np. 4"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Okres
-                                </label>
-                                <select
-                                  value={recurringType}
-                                  onChange={(e) => setRecurringType(e.target.value as 'weeks' | 'months')}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                  <option value="weeks">Tygodni</option>
-                                  <option value="months">Miesięcy</option>
-                                </select>
-                              </div>
-                            </div>
-
-                            <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded p-3">
-                              <p className="font-medium text-blue-800">Informacja:</p>
-                              <p className="mt-1">
-                                System utworzy {recurringCount || '0'} {recurringType === 'weeks' ? 'tygodni' : 'miesięcy'} lekcji
-                                w tym samym dniu tygodnia i o tej samej godzinie.
-                                Lekcje z konfliktami harmonogramu zostaną automatycznie pominięte.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
-                </>
+                </div>
               )}
 
-              {/* Tab: Participants */}
-              {(activeTab === 'participants' || isEdit) && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Uczestnicy</h3>
+              {/* Tab: Harmonogram */}
+              {activeTab === 'schedule' && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Data i godzina *
+                      </label>
+                      <input
+                        type="datetime-local"
+                        name="scheduledAt"
+                        value={formData.scheduledAt}
+                        onChange={handleChange}
+                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                          errors.scheduledAt ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      {errors.scheduledAt && (
+                        <p className="mt-1 text-sm text-red-600">{errors.scheduledAt}</p>
+                      )}
+                    </div>
 
-                  {/* Teacher */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Lektor *
-                    </label>
-                    <select
-                      name="teacherId"
-                      value={formData.teacherId}
-                      onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                        errors.teacherId ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    >
-                      <option value="">Wybierz lektora</option>
-                      {teachers.map((teacher) => (
-                        <option key={teacher.id} value={teacher.id}>
-                          {teacher.user.firstName} {teacher.user.lastName}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.teacherId && (
-                      <p className="mt-1 text-sm text-red-600">{errors.teacherId}</p>
-                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Czas trwania (minuty) *
+                      </label>
+                      <input
+                        type="number"
+                        name="durationMinutes"
+                        value={formData.durationMinutes}
+                        onChange={handleChange}
+                        min="15"
+                        step="15"
+                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                          errors.durationMinutes ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      {errors.durationMinutes && (
+                        <p className="mt-1 text-sm text-red-600">{errors.durationMinutes}</p>
+                      )}
+                    </div>
                   </div>
 
+                  {/* Recurring Lessons - only show for new lessons */}
+                  {!isEdit && (
+                    <div className="pt-4 border-t border-gray-200">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isRecurring}
+                          onChange={(e) => setIsRecurring(e.target.checked)}
+                          className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Utwórz serię lekcji</span>
+                      </label>
+
+                      {isRecurring && (
+                        <div className="mt-4 space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Liczba
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="52"
+                                value={recurringCount}
+                                onChange={(e) => setRecurringCount(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                placeholder="np. 4"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Okres
+                              </label>
+                              <select
+                                value={recurringType}
+                                onChange={(e) => setRecurringType(e.target.value as 'weeks' | 'months')}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                              >
+                                <option value="weeks">Tygodni</option>
+                                <option value="months">Miesięcy</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded p-3">
+                            <p className="font-medium text-blue-800">Informacja:</p>
+                            <p className="mt-1">
+                              System utworzy {recurringCount || '0'} {recurringType === 'weeks' ? 'tygodni' : 'miesięcy'} lekcji
+                              w tym samym dniu tygodnia i o tej samej godzinie.
+                              Lekcje z konfliktami harmonogramu zostaną automatycznie pominięte.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab: Uczestnicy */}
+              {activeTab === 'participants' && (
+                <div className="space-y-4">
                   {/* Substitution checkbox (only in edit mode) */}
                   {isEdit && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -914,8 +905,8 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                 </div>
               )}
 
-              {/* Attendance (only for edit mode) */}
-              {isEdit && lesson && (
+              {/* Tab: Lista obecności (only for edit mode) */}
+              {activeTab === 'attendance' && isEdit && lesson && (
                 <AttendanceSection lesson={lesson} />
               )}
             </div>
@@ -930,51 +921,29 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                 Anuluj
               </button>
 
-              {!isEdit && activeTab === 'basic' && (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('participants')}
-                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                >
-                  Dalej: Uczestnicy
-                </button>
-              )}
-
-              {(isEdit || activeTab === 'participants') && (
-                <div className="flex gap-2">
-                  {!isEdit && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('basic')}
-                      className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-                    >
-                      Wstecz
-                    </button>
-                  )}
-                  {isEdit && lesson && (lesson.status === 'SCHEDULED' || lesson.status === 'CONFIRMED') && (
-                    <button
-                      type="button"
-                      onClick={handleCompleteLesson}
-                      disabled={updateMutation.isPending || completeMutation.isPending}
-                      className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      <Check className="h-4 w-4" />
-                      {completeMutation.isPending ? 'Oznaczanie...' : 'Oznacz jako zakończoną'}
-                    </button>
-                  )}
+              <div className="flex gap-2">
+                {isEdit && lesson && (lesson.status === 'SCHEDULED' || lesson.status === 'CONFIRMED') && (
                   <button
-                    type="submit"
-                    disabled={createMutation.isPending || createRecurringMutation.isPending || updateMutation.isPending}
-                    className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    type="button"
+                    onClick={handleCompleteLesson}
+                    disabled={updateMutation.isPending || completeMutation.isPending}
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    {createMutation.isPending || createRecurringMutation.isPending || updateMutation.isPending
-                      ? 'Zapisywanie...'
-                      : isEdit
-                      ? 'Zapisz zmiany'
-                      : 'Utwórz lekcję'}
+                    {completeMutation.isPending ? 'Oznaczanie...' : 'Oznacz jako zakończoną'}
                   </button>
-                </div>
-              )}
+                )}
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending || createRecurringMutation.isPending || updateMutation.isPending}
+                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {createMutation.isPending || createRecurringMutation.isPending || updateMutation.isPending
+                    ? 'Zapisywanie...'
+                    : isEdit
+                    ? 'Zapisz zmiany'
+                    : 'Utwórz lekcję'}
+                </button>
+              </div>
             </div>
           </form>
         </div>

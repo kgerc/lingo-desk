@@ -2,11 +2,22 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// Max attachment size: 10MB
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+const MAX_TOTAL_ATTACHMENTS_SIZE = 25 * 1024 * 1024;
+
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer | string;
+  contentType?: string;
+}
+
 export interface SendEmailOptions {
   to: string | string[];
   subject: string;
   html: string;
   from?: string;
+  attachments?: EmailAttachment[];
 }
 
 class EmailService {
@@ -25,29 +36,104 @@ class EmailService {
   }
 
   /**
+   * Validate attachments before sending
+   */
+  private validateAttachments(attachments?: EmailAttachment[]): { valid: boolean; error?: string } {
+    if (!attachments || attachments.length === 0) {
+      return { valid: true };
+    }
+
+    let totalSize = 0;
+
+    for (const attachment of attachments) {
+      const size = Buffer.isBuffer(attachment.content)
+        ? attachment.content.length
+        : Buffer.byteLength(attachment.content, 'base64');
+
+      if (size > MAX_ATTACHMENT_SIZE) {
+        return {
+          valid: false,
+          error: `Attachment "${attachment.filename}" exceeds max size of 10MB`
+        };
+      }
+
+      totalSize += size;
+    }
+
+    if (totalSize > MAX_TOTAL_ATTACHMENTS_SIZE) {
+      return {
+        valid: false,
+        error: `Total attachments size exceeds max of 25MB`
+      };
+    }
+
+    return { valid: true };
+  }
+
+  /**
    * Send email using Resend
    */
-  async sendEmail(options: SendEmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  async sendEmail(options: SendEmailOptions): Promise<{ success: boolean; messageId?: string; error?: string; attachmentsFailed?: boolean }> {
     if (!this.isEnabled) {
       console.log('📧 Email (disabled):', options.subject, 'to', options.to);
       return { success: false, error: 'Email service not configured' };
     }
 
+    // Validate attachments
+    const attachmentValidation = this.validateAttachments(options.attachments);
+    let attachmentsToSend = options.attachments;
+    let attachmentsFailed = false;
+
+    if (!attachmentValidation.valid) {
+      console.warn('⚠️ Attachment validation failed:', attachmentValidation.error);
+      // Fallback: send email without attachments
+      attachmentsToSend = undefined;
+      attachmentsFailed = true;
+    }
+
     try {
+      // Prepare attachments for Resend format
+      const resendAttachments = attachmentsToSend?.map(att => ({
+        filename: att.filename,
+        content: Buffer.isBuffer(att.content) ? att.content : Buffer.from(att.content, 'base64'),
+      }));
+
       const { data, error } = await resend.emails.send({
         from: options.from || this.fromEmail,
         to: Array.isArray(options.to) ? options.to : [options.to],
         subject: options.subject,
         html: options.html,
+        attachments: resendAttachments,
       });
 
       if (error) {
+        // If error is related to attachments, try sending without them (fallback)
+        if (error.message?.toLowerCase().includes('attachment') && attachmentsToSend) {
+          console.warn('⚠️ Attachment error, retrying without attachments:', error.message);
+
+          const retryResult = await resend.emails.send({
+            from: options.from || this.fromEmail,
+            to: Array.isArray(options.to) ? options.to : [options.to],
+            subject: options.subject,
+            html: options.html,
+          });
+
+          if (retryResult.error) {
+            console.error('❌ Email send error (retry):', retryResult.error);
+            return { success: false, error: retryResult.error.message };
+          }
+
+          console.log('✅ Email sent (without attachments):', options.subject, 'to', options.to, '- ID:', retryResult.data?.id);
+          return { success: true, messageId: retryResult.data?.id, attachmentsFailed: true };
+        }
+
         console.error('❌ Email send error:', error);
         return { success: false, error: error.message };
       }
 
-      console.log('✅ Email sent:', options.subject, 'to', options.to, '- ID:', data?.id);
-      return { success: true, messageId: data?.id };
+      const attachmentCount = attachmentsToSend?.length || 0;
+      console.log('✅ Email sent:', options.subject, 'to', options.to, '- ID:', data?.id, attachmentCount > 0 ? `(${attachmentCount} attachments)` : '');
+      return { success: true, messageId: data?.id, attachmentsFailed };
     } catch (error) {
       console.error('❌ Email send exception:', error);
       return {

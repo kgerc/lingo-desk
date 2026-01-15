@@ -1,6 +1,12 @@
 import prisma from '../utils/prisma';
-import emailService from './email.service';
+import emailService, { EmailAttachment } from './email.service';
 import { PaymentStatus } from '@prisma/client';
+
+export interface AttachmentData {
+  filename: string;
+  content: string; // base64 encoded
+  contentType?: string;
+}
 
 interface SendBulkEmailData {
   subject: string;
@@ -8,11 +14,19 @@ interface SendBulkEmailData {
   recipients: 'all' | 'selected' | 'debtors';
   selectedStudentIds?: string[];
   organizationId: string;
+  attachments?: AttachmentData[];
 }
 
 class MailingService {
   async sendBulkEmail(data: SendBulkEmailData) {
-    const { subject, message, recipients, selectedStudentIds, organizationId } = data;
+    const { subject, message, recipients, selectedStudentIds, organizationId, attachments } = data;
+
+    // Convert attachments to EmailAttachment format
+    const emailAttachments: EmailAttachment[] | undefined = attachments?.map(att => ({
+      filename: att.filename,
+      content: att.content,
+      contentType: att.contentType,
+    }));
 
     // Get students to send email to
     let students;
@@ -93,6 +107,13 @@ class MailingService {
       throw new Error('No students found to send email to');
     }
 
+    // Build attachments info for email body if attachments present
+    const attachmentsInfoHtml = emailAttachments && emailAttachments.length > 0
+      ? `<p style="color: #6b7280; font-size: 14px; margin-top: 20px;">
+           📎 Załączniki: ${emailAttachments.map(a => a.filename).join(', ')}
+         </p>`
+      : '';
+
     // Send emails to all students
     const emailPromises = students.map((student) =>
       emailService.sendEmail({
@@ -104,22 +125,25 @@ class MailingService {
             <div style="white-space: pre-wrap; line-height: 1.6;">
               ${message}
             </div>
+            ${attachmentsInfoHtml}
             <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;" />
             <p style="color: #6b7280; font-size: 14px;">
               Ta wiadomość została wysłana z systemu zarządzania szkołą językową.
             </p>
           </div>
         `,
+        attachments: emailAttachments,
       }).catch((error) => {
         console.error(`Failed to send email to ${student.user.email}:`, error);
-        return { success: false, email: student.user.email };
+        return { success: false, email: student.user.email, attachmentsFailed: false };
       })
     );
 
     const results = await Promise.all(emailPromises);
 
-    // Count successful and failed emails
+    // Count successful, failed emails, and attachment failures
     const failedEmails = results.filter((r: any) => r?.success === false);
+    const attachmentFailures = results.filter((r: any) => r?.attachmentsFailed === true);
     const successCount = students.length - failedEmails.length;
 
     return {
@@ -127,6 +151,8 @@ class MailingService {
       totalFailed: failedEmails.length,
       totalRecipients: students.length,
       failedEmails: failedEmails.map((r: any) => r.email),
+      attachmentsIncluded: emailAttachments ? emailAttachments.length : 0,
+      attachmentFailures: attachmentFailures.length,
     };
   }
 }
