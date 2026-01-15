@@ -50,7 +50,7 @@ router.put('/:id', teacherController.updateTeacher.bind(teacherController));
 // DELETE /api/teachers/:id - Delete teacher
 router.delete(
   '/:id',
-  authorize(UserRole.ADMIN),
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
   teacherController.deleteTeacher.bind(teacherController)
 );
 

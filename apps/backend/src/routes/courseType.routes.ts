@@ -29,7 +29,7 @@ router.put(
 // DELETE /api/course-types/:id - Delete course type
 router.delete(
   '/:id',
-  authorize(UserRole.ADMIN),
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
   courseTypeController.deleteCourseType.bind(courseTypeController)
 );
 

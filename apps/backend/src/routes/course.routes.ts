@@ -54,7 +54,7 @@ router.delete(
 // DELETE /api/courses/:id - Delete course
 router.delete(
   '/:id',
-  authorize(UserRole.ADMIN),
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
   courseController.deleteCourse.bind(courseController)
 );
 

@@ -28,7 +28,7 @@ router.put('/:id', (req, res) => {
 });
 
 // DELETE /api/users/:id - Delete user
-router.delete('/:id', authorize(UserRole.ADMIN), (req, res) => {
+router.delete('/:id', authorize(UserRole.ADMIN, UserRole.MANAGER), (req, res) => {
   res.json({ message: `Delete user ${req.params.id} - TODO` });
 });
 

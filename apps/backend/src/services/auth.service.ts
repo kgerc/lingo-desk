@@ -41,60 +41,70 @@ export class AuthService {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create organization if registering as admin
-    let organizationId: string;
+    // Default role is MANAGER (not ADMIN)
+    const userRole = role || UserRole.MANAGER;
 
-    if (role === UserRole.ADMIN || !role) {
-      const organization = await prisma.organization.create({
+    // Use transaction to ensure all entities are created together
+    const result = await prisma.$transaction(async (tx) => {
+      // Create organization (always created during registration)
+      const organization = await tx.organization.create({
         data: {
           name: organizationName || `${firstName}'s School`,
           slug: this.generateSlug(organizationName || `${firstName}'s School`),
         },
       });
-      organizationId = organization.id;
 
-      // Create default settings
-      await prisma.organizationSettings.create({
+      // Create default organization settings
+      await tx.organizationSettings.create({
         data: {
           organizationId: organization.id,
         },
       });
-    } else {
-      throw new Error('Organization ID required for non-admin users');
-    }
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        firstName,
-        lastName,
-        organizationId,
-        role: role || UserRole.ADMIN,
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        organizationId: true,
-      },
-    });
+      // Create user with MANAGER role by default
+      const user = await tx.user.create({
+        data: {
+          email,
+          passwordHash,
+          firstName,
+          lastName,
+          organizationId: organization.id,
+          role: userRole,
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          organizationId: true,
+        },
+      });
 
-    // Create user profile
-    await prisma.userProfile.create({
-      data: {
-        userId: user.id,
-      },
+      // Create UserOrganization link (for multi-org support)
+      await tx.userOrganization.create({
+        data: {
+          userId: user.id,
+          organizationId: organization.id,
+          role: userRole,
+        },
+      });
+
+      // Create user profile
+      await tx.userProfile.create({
+        data: {
+          userId: user.id,
+        },
+      });
+
+      return user;
     });
 
     // Generate token
-    const token = this.generateToken(user);
+    const token = this.generateToken(result);
 
     return {
-      user,
+      user: result,
       token,
     };
   }

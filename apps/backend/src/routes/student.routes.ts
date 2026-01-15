@@ -56,7 +56,7 @@ router.put('/:id', studentController.updateStudent.bind(studentController));
 // DELETE /api/students/:id - Delete student
 router.delete(
   '/:id',
-  authorize(UserRole.ADMIN),
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
   studentController.deleteStudent.bind(studentController)
 );
 
