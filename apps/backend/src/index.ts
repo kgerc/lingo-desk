@@ -110,7 +110,7 @@ app.use('/api/substitutions', substitutionRoutes);
 // ============================================
 
 app.use(notFoundHandler);
-app.use(errorHandler);
+app.use(errorHandler as any);
 
 // ============================================
 // START SERVER
