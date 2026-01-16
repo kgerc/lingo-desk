@@ -105,7 +105,7 @@ export class StudentController {
       }
 
       const { id } = req.params;
-      const student = await studentService.getStudentById(id, req.user.organizationId);
+      const student = await studentService.getStudentById(id as string, req.user.organizationId);
 
       return res.json({
         data: student,
@@ -138,7 +138,7 @@ export class StudentController {
         data.paymentDueDays = null;
       }
       const student = await studentService.updateStudent(
-        id,
+        id as string,
         req.user.organizationId,
         data
       );
@@ -164,7 +164,7 @@ export class StudentController {
       }
 
       const { id } = req.params;
-      const result = await studentService.deleteStudent(id, req.user.organizationId);
+      const result = await studentService.deleteStudent(id as string, req.user.organizationId);
 
       return res.json(result);
     } catch (error) {
@@ -206,7 +206,7 @@ export class StudentController {
 
       const { enrollmentId } = req.params;
       const budget = await studentService.getEnrollmentBudget(
-        enrollmentId,
+        enrollmentId as string,
         req.user.organizationId
       );
 

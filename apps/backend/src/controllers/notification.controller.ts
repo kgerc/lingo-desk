@@ -70,7 +70,7 @@ class NotificationController {
       const userId = req.user!.id;
       const { id } = req.params;
 
-      const notification = await notificationService.markAsRead(id, userId);
+      const notification = await notificationService.markAsRead(id as string, userId);
 
       res.json({
         success: true,

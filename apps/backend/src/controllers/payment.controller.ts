@@ -48,7 +48,7 @@ class PaymentController {
       const organizationId = req.user!.organizationId;
       const { id } = req.params;
 
-      const payment = await paymentService.getPaymentById(id, organizationId);
+      const payment = await paymentService.getPaymentById(id as string, organizationId);
 
       res.json({
         success: true,
@@ -118,7 +118,7 @@ class PaymentController {
       const { id } = req.params;
       const { amount, currency, status, paymentMethod, notes, paidAt, exchangeRateOverride } = req.body;
 
-      const payment = await paymentService.updatePayment(id, organizationId, {
+      const payment = await paymentService.updatePayment(id as string, organizationId, {
         amount: amount !== undefined ? parseFloat(amount) : undefined,
         currency,
         status,
@@ -151,7 +151,7 @@ class PaymentController {
       const organizationId = req.user!.organizationId;
       const { id } = req.params;
 
-      await paymentService.deletePayment(id, organizationId);
+      await paymentService.deletePayment(id as string, organizationId);
 
       res.json({
         success: true,
@@ -197,7 +197,7 @@ class PaymentController {
       const organizationId = req.user!.organizationId;
       const { studentId } = req.params;
 
-      const payments = await paymentService.getStudentPaymentHistory(studentId, organizationId);
+      const payments = await paymentService.getStudentPaymentHistory(studentId as string, organizationId);
 
       res.json({
         success: true,

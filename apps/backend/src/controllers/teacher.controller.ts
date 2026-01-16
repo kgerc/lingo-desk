@@ -105,7 +105,7 @@ export class TeacherController {
       }
 
       const { id } = req.params;
-      const teacher = await teacherService.getTeacherById(id, req.user.organizationId);
+      const teacher = await teacherService.getTeacherById(id as string, req.user.organizationId);
 
       return res.json({
         data: teacher,
@@ -130,7 +130,7 @@ export class TeacherController {
       const data = updateTeacherSchema.parse(req.body);
 
       const teacher = await teacherService.updateTeacher(
-        id,
+        id as string,
         req.user.organizationId,
         data
       );
@@ -156,7 +156,7 @@ export class TeacherController {
       }
 
       const { id } = req.params;
-      const result = await teacherService.deleteTeacher(id, req.user.organizationId);
+      const result = await teacherService.deleteTeacher(id as string, req.user.organizationId);
 
       return res.json(result);
     } catch (error) {

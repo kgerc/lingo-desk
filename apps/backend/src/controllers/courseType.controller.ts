@@ -41,7 +41,7 @@ class CourseTypeController {
   async getCourseTypeById(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const courseType = await courseTypeService.getCourseTypeById(id, req.user!.organizationId);
+      const courseType = await courseTypeService.getCourseTypeById(id as string, req.user!.organizationId);
       res.json({ message: 'Course type retrieved successfully', data: courseType });
     } catch (error) {
       next(error);
@@ -69,7 +69,7 @@ class CourseTypeController {
         data.description = null;
       }
       const courseType = await courseTypeService.updateCourseType(
-        id,
+        id as string,
         req.user!.organizationId,
         data
       );
@@ -82,7 +82,7 @@ class CourseTypeController {
   async deleteCourseType(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const result = await courseTypeService.deleteCourseType(id, req.user!.organizationId);
+      const result = await courseTypeService.deleteCourseType(id as string, req.user!.organizationId);
       res.json(result);
     } catch (error) {
       next(error);

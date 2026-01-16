@@ -6,7 +6,7 @@ class MaterialController {
   async getMaterialsByCourse(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { courseId } = req.params;
-      const materials = await materialService.getMaterialsByCourse(courseId);
+      const materials = await materialService.getMaterialsByCourse(courseId as string);
 
       res.json({
         success: true,
@@ -20,7 +20,7 @@ class MaterialController {
   async getMaterialById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const material = await materialService.getMaterialById(id);
+      const material = await materialService.getMaterialById(id as string);
 
       res.json({
         success: true,
@@ -49,7 +49,7 @@ class MaterialController {
     try {
       const { id } = req.params;
       const data: UpdateMaterialData = req.body;
-      const material = await materialService.updateMaterial(id, data, req.user!.organizationId);
+      const material = await materialService.updateMaterial(id as string, data, req.user!.organizationId);
 
       res.json({
         success: true,
@@ -63,7 +63,7 @@ class MaterialController {
   async deleteMaterial(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      await materialService.deleteMaterial(id, req.user!.organizationId);
+      await materialService.deleteMaterial(id as string, req.user!.organizationId);
 
       res.json({
         success: true,
@@ -79,7 +79,7 @@ class MaterialController {
       const { courseId } = req.params;
       const { materialIds } = req.body;
 
-      await materialService.reorderMaterials(courseId, materialIds, req.user!.organizationId);
+      await materialService.reorderMaterials(courseId as string, materialIds, req.user!.organizationId);
 
       res.json({
         success: true,

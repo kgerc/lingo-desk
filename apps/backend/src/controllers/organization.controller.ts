@@ -126,7 +126,7 @@ class OrganizationController {
 
       const result = await organizationService.removeUserFromOrganization(
         organizationId,
-        userId,
+        userId as string,
         requestingUserId
       );
 

@@ -62,7 +62,7 @@ class CourseController {
   async getCourseById(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const course = await courseService.getCourseById(id, req.user!.organizationId);
+      const course = await courseService.getCourseById(id as string, req.user!.organizationId);
       res.json({ message: 'Course retrieved successfully', data: course });
     } catch (error) {
       next(error);
@@ -86,7 +86,7 @@ class CourseController {
     try {
       const { id } = req.params;
       const data = updateCourseSchema.parse(req.body);
-      const course = await courseService.updateCourse(id, req.user!.organizationId, data);
+      const course = await courseService.updateCourse(id as string, req.user!.organizationId, data);
       res.json({ message: 'Course updated successfully', data: course });
     } catch (error) {
       next(error);
@@ -96,7 +96,7 @@ class CourseController {
   async deleteCourse(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const result = await courseService.deleteCourse(id, req.user!.organizationId);
+      const result = await courseService.deleteCourse(id as string, req.user!.organizationId);
       res.json(result);
     } catch (error) {
       next(error);
@@ -117,8 +117,8 @@ class CourseController {
       const { id: courseId } = req.params;
       const { studentId, paymentMode, hoursPurchased } = enrollStudentSchema.parse(req.body);
       const enrollment = await courseService.enrollStudent(
-        courseId,
-        studentId,
+        courseId as string,
+        studentId as string,
         req.user!.organizationId,
         paymentMode,
         hoursPurchased
@@ -132,7 +132,7 @@ class CourseController {
   async unenrollStudent(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { enrollmentId } = req.params;
-      const result = await courseService.unenrollStudent(enrollmentId, req.user!.organizationId);
+      const result = await courseService.unenrollStudent(enrollmentId as string, req.user!.organizationId);
       res.json(result);
     } catch (error) {
       next(error);

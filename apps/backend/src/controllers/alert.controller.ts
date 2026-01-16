@@ -48,8 +48,8 @@ class AlertController {
         return;
       }
 
-      const { id } = req.params;
-      const alert = await alertService.markAsRead(id, req.user.organizationId);
+      const { id  } = req.params ;
+      const alert = await alertService.markAsRead(id as string, req.user.organizationId);
 
       res.json({ data: alert });
     } catch (error) {

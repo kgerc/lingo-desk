@@ -63,7 +63,7 @@ class SubstitutionController {
       const { id } = req.params;
       const organizationId = req.user!.organizationId;
 
-      const substitution = await substitutionService.getSubstitutionById(id, organizationId);
+      const substitution = await substitutionService.getSubstitutionById(id as string, organizationId);
 
       res.json({
         success: true,
@@ -83,7 +83,7 @@ class SubstitutionController {
       const { lessonId } = req.params;
       const organizationId = req.user!.organizationId;
 
-      const substitution = await substitutionService.getSubstitutionByLessonId(lessonId, organizationId);
+      const substitution = await substitutionService.getSubstitutionByLessonId(lessonId as string, organizationId);
 
       if (!substitution) {
         return res.status(404).json({
@@ -135,7 +135,7 @@ class SubstitutionController {
       const organizationId = req.user!.organizationId;
       const data = updateSubstitutionSchema.parse(req.body);
 
-      const substitution = await substitutionService.updateSubstitution(id, organizationId, data);
+      const substitution = await substitutionService.updateSubstitution(id as string, organizationId, data);
 
       res.json({
         success: true,
@@ -156,7 +156,7 @@ class SubstitutionController {
       const { id } = req.params;
       const organizationId = req.user!.organizationId;
 
-      await substitutionService.deleteSubstitution(id, organizationId);
+      await substitutionService.deleteSubstitution(id as string, organizationId);
 
       res.json({
         success: true,

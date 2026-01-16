@@ -42,9 +42,9 @@ class AttendanceController {
       const { lessonId, studentId } = req.params;
       const data = updateAttendanceSchema.parse(req.body);
       const attendance = await attendanceService.updateAttendance(
-        lessonId,
-        studentId,
-        data,
+        lessonId as string,
+        studentId as string,
+        data, 
         req.user!.organizationId
       );
       res.json({ message: 'Attendance updated successfully', data: attendance });
@@ -56,7 +56,7 @@ class AttendanceController {
   async getAttendanceByLesson(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { lessonId } = req.params;
-      const attendances = await attendanceService.getAttendanceByLesson(lessonId, req.user!.organizationId);
+      const attendances = await attendanceService.getAttendanceByLesson(lessonId as string, req.user!.organizationId);
       res.json({ message: 'Attendances retrieved successfully', data: attendances });
     } catch (error) {
       next(error);
@@ -66,7 +66,7 @@ class AttendanceController {
   async deleteAttendance(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { lessonId, studentId } = req.params;
-      const result = await attendanceService.deleteAttendance(lessonId, studentId, req.user!.organizationId);
+      const result = await attendanceService.deleteAttendance(lessonId as string, studentId as string, req.user!.organizationId);
       res.json(result);
     } catch (error) {
       next(error);

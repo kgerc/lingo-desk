@@ -64,7 +64,7 @@ class LessonController {
   async getLessonById(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const lesson = await lessonService.getLessonById(id, req.user!.organizationId);
+      const lesson = await lessonService.getLessonById(id as string, req.user!.organizationId);
       res.json({ message: 'Lesson retrieved successfully', data: lesson });
     } catch (error) {
       next(error);
@@ -96,11 +96,11 @@ class LessonController {
     try {
       const { id } = req.params;
       const data = updateLessonSchema.parse(req.body);
-      const lesson = await lessonService.updateLesson(id, req.user!.organizationId, data, req.user!.id);
+      const lesson = await lessonService.updateLesson(id as string, req.user!.organizationId, data, req.user!.id);
 
       // Sync to Google Calendar asynchronously (don't block response)
       if (req.user?.id) {
-        googleCalendarService.updateEventFromLesson(id, req.user.id).catch(error => {
+        googleCalendarService.updateEventFromLesson(id as string, req.user.id).catch(error => {
           console.error('Failed to update lesson in Google Calendar:', error);
         });
       }
@@ -117,12 +117,12 @@ class LessonController {
 
       // Sync to Google Calendar asynchronously before deleting (don't block response)
       if (req.user?.id) {
-        googleCalendarService.deleteEventFromLesson(id).catch(error => {
+        googleCalendarService.deleteEventFromLesson(id as string).catch(error => {
           console.error('Failed to delete lesson from Google Calendar:', error);
         });
       }
 
-      const result = await lessonService.deleteLesson(id, req.user!.organizationId);
+      const result = await lessonService.deleteLesson(id as string, req.user!.organizationId);
       res.json(result);
     } catch (error) {
       next(error);
@@ -132,7 +132,7 @@ class LessonController {
   async confirmLesson(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const lesson = await lessonService.confirmLesson(id, req.user!.organizationId);
+      const lesson = await lessonService.confirmLesson(id as string, req.user!.organizationId);
       res.json({ message: 'Lesson confirmed successfully', data: lesson });
     } catch (error) {
       next(error);
