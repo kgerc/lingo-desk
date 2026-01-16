@@ -59,7 +59,7 @@ if (process.env.NODE_ENV === 'development') {
 
 // CORS
 app.use((req, res, next) => {
-  const origin = 'https://lingo-desk-front.vercel.app';
+  const origin = process.env.FRONTEND_URL;
   
   res.header('Access-Control-Allow-Origin', origin);
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,PATCH,OPTIONS');

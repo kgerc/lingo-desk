@@ -16,8 +16,10 @@ const AVAILABLE_METRICS = [
 
 // Available charts configuration
 const AVAILABLE_CHARTS = [
-  { id: 'revenue', name: 'Przychody (ostatnie 30 dni)', description: 'Wykres przychodów z płatności' },
-  { id: 'lessons', name: 'Zajęcia (ostatnie 30 dni)', description: 'Wykres liczby zajęć' },
+  { id: 'revenue', name: 'Przychody (ostatnie 30 dni)', description: 'Wykres przychodów z płatności', inProgress: false },
+  { id: 'lessons', name: 'Zajęcia (ostatnie 30 dni)', description: 'Wykres liczby zajęć', inProgress: false },
+  { id: 'newClients', name: 'Nowi klienci', description: 'Wykres nowych klientów', inProgress: true },
+  { id: 'revenueFromNewClients', name: 'Przychody z nowych klientów', description: 'Wykres przychodów wygenerowanych przez nowych klientów', inProgress: true }
 ] as const;
 
 export type MetricId = typeof AVAILABLE_METRICS[number]['id'];
@@ -211,12 +213,15 @@ const DashboardSettingsPage: React.FC = () => {
                     className={`relative flex items-start p-4 rounded-lg border-2 cursor-pointer transition-all ${
                       isEnabled
                         ? 'border-primary bg-primary/5'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : chart.inProgress
+                        ? 'border-gray-200 hover:border-gray-300'
+                        : 'border-gray-200 opacity-50 cursor-not-allowed'
                     }`}
                   >
                     <div className="flex items-center h-5">
                       <input
                         type="checkbox"
+                        disabled={chart.inProgress}
                         checked={isEnabled}
                         onChange={() => handleChartToggle(chart.id)}
                         className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
