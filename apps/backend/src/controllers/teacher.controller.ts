@@ -49,12 +49,12 @@ export class TeacherController {
         organizationId: req.user.organizationId,
       });
 
-      res.status(201).json({
+      return res.status(201).json({
         message: 'Teacher created successfully',
         data: teacher,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -85,11 +85,11 @@ export class TeacherController {
         }
       );
 
-      res.json({
+      return res.json({
         data: teachers,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -107,11 +107,11 @@ export class TeacherController {
       const { id } = req.params;
       const teacher = await teacherService.getTeacherById(id, req.user.organizationId);
 
-      res.json({
+      return res.json({
         data: teacher,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -135,12 +135,12 @@ export class TeacherController {
         data
       );
 
-      res.json({
+      return res.json({
         message: 'Teacher updated successfully',
         data: teacher,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -158,9 +158,9 @@ export class TeacherController {
       const { id } = req.params;
       const result = await teacherService.deleteTeacher(id, req.user.organizationId);
 
-      res.json(result);
+      return res.json(result);
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -177,11 +177,11 @@ export class TeacherController {
 
       const stats = await teacherService.getTeacherStats(req.user.organizationId);
 
-      res.json({
+      return res.json({
         data: stats,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 

@@ -54,7 +54,7 @@ class LessonController {
       if (startDate) filters.startDate = String(startDate);
       if (endDate) filters.endDate = String(endDate);
 
-      const lessons = await lessonService.getLessons(req.user.organizationId, filters);
+      const lessons = await lessonService.getLessons(req.user!.organizationId, filters);
       res.json({ message: 'Lessons retrieved successfully', data: lessons });
     } catch (error) {
       next(error);
@@ -64,7 +64,7 @@ class LessonController {
   async getLessonById(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const lesson = await lessonService.getLessonById(id, req.user.organizationId);
+      const lesson = await lessonService.getLessonById(id, req.user!.organizationId);
       res.json({ message: 'Lesson retrieved successfully', data: lesson });
     } catch (error) {
       next(error);
@@ -76,7 +76,7 @@ class LessonController {
       const data = createLessonSchema.parse(req.body);
       const lesson = await lessonService.createLesson({
         ...data,
-        organizationId: req.user.organizationId,
+        organizationId: req.user!.organizationId
       });
 
       // Sync to Google Calendar asynchronously (don't block response)
@@ -96,7 +96,7 @@ class LessonController {
     try {
       const { id } = req.params;
       const data = updateLessonSchema.parse(req.body);
-      const lesson = await lessonService.updateLesson(id, req.user.organizationId, data, req.user.id);
+      const lesson = await lessonService.updateLesson(id, req.user!.organizationId, data, req.user!.id);
 
       // Sync to Google Calendar asynchronously (don't block response)
       if (req.user?.id) {
@@ -122,7 +122,7 @@ class LessonController {
         });
       }
 
-      const result = await lessonService.deleteLesson(id, req.user.organizationId);
+      const result = await lessonService.deleteLesson(id, req.user!.organizationId);
       res.json(result);
     } catch (error) {
       next(error);
@@ -132,7 +132,7 @@ class LessonController {
   async confirmLesson(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const lesson = await lessonService.confirmLesson(id, req.user.organizationId);
+      const lesson = await lessonService.confirmLesson(id, req.user!.organizationId);
       res.json({ message: 'Lesson confirmed successfully', data: lesson });
     } catch (error) {
       next(error);
@@ -141,7 +141,7 @@ class LessonController {
 
   async getStats(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const stats = await lessonService.getLessonStats(req.user.organizationId);
+      const stats = await lessonService.getLessonStats(req.user!.organizationId);
       res.json({ message: 'Lesson stats retrieved successfully', data: stats });
     } catch (error) {
       next(error);
@@ -162,7 +162,7 @@ class LessonController {
       }
 
       const conflicts = await lessonService.checkConflicts(
-        req.user.organizationId,
+        req.user!.organizationId,
         String(teacherId),
         String(studentId),
         new Date(String(scheduledAt)),
@@ -170,9 +170,9 @@ class LessonController {
         excludeLessonId ? String(excludeLessonId) : undefined
       );
 
-      res.json({ message: 'Conflict check completed', data: conflicts });
+      return res.json({ message: 'Conflict check completed', data: conflicts });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -190,7 +190,7 @@ class LessonController {
       }
 
       const result = await lessonService.createRecurringLessons(
-        req.user.organizationId,
+        req.user!.organizationId,
         {
           ...lessonData,
           durationMinutes: Number(lessonData.durationMinutes),
@@ -204,12 +204,12 @@ class LessonController {
         }
       );
 
-      res.status(201).json({
+      return res.status(201).json({
         message: `Successfully created ${result.totalCreated} recurring lessons`,
         data: result,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 }

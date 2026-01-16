@@ -203,7 +203,7 @@ export class AuthService {
     organizationId: string;
   }): string {
     return jwt.sign(payload, this.JWT_SECRET, {
-      expiresIn: this.JWT_EXPIRES_IN,
+      expiresIn: this.JWT_EXPIRES_IN as any,
     });
   }
 

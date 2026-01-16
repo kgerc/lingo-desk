@@ -30,7 +30,7 @@ class AttendanceController {
   async createAttendance(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const data = createAttendanceSchema.parse(req.body);
-      const attendance = await attendanceService.createAttendance(data, req.user.organizationId);
+      const attendance = await attendanceService.createAttendance(data, req.user!.organizationId);
       res.status(201).json({ message: 'Attendance created successfully', data: attendance });
     } catch (error) {
       next(error);
@@ -45,7 +45,7 @@ class AttendanceController {
         lessonId,
         studentId,
         data,
-        req.user.organizationId
+        req.user!.organizationId
       );
       res.json({ message: 'Attendance updated successfully', data: attendance });
     } catch (error) {
@@ -56,7 +56,7 @@ class AttendanceController {
   async getAttendanceByLesson(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { lessonId } = req.params;
-      const attendances = await attendanceService.getAttendanceByLesson(lessonId, req.user.organizationId);
+      const attendances = await attendanceService.getAttendanceByLesson(lessonId, req.user!.organizationId);
       res.json({ message: 'Attendances retrieved successfully', data: attendances });
     } catch (error) {
       next(error);
@@ -66,7 +66,7 @@ class AttendanceController {
   async deleteAttendance(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { lessonId, studentId } = req.params;
-      const result = await attendanceService.deleteAttendance(lessonId, studentId, req.user.organizationId);
+      const result = await attendanceService.deleteAttendance(lessonId, studentId, req.user!.organizationId);
       res.json(result);
     } catch (error) {
       next(error);
@@ -79,7 +79,7 @@ class AttendanceController {
       const result = await attendanceService.bulkUpsertAttendance(
         lessonId,
         attendances,
-        req.user.organizationId
+        req.user!.organizationId
       );
       res.json({ message: 'Attendances updated successfully', data: result });
     } catch (error) {

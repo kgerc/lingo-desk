@@ -17,7 +17,7 @@ const createCourseTypeSchema = z.object({
 
 const updateCourseTypeSchema = z.object({
   name: z.string().min(2).optional(),
-  description: z.string().optional(),
+  description: z.string().optional().nullable(),
   language: z.string().optional(),
   level: z.string().optional(),
   format: z.string().optional(),
@@ -30,7 +30,7 @@ const updateCourseTypeSchema = z.object({
 class CourseTypeController {
   async getCourseTypes(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const courseTypes = await courseTypeService.getCourseTypes(req.user.organizationId);
+      const courseTypes = await courseTypeService.getCourseTypes(req.user!.organizationId);
       res.json({ message: 'Course types retrieved successfully', data: courseTypes });
     } catch (error) {
       next(error);
@@ -40,7 +40,7 @@ class CourseTypeController {
   async getCourseTypeById(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const courseType = await courseTypeService.getCourseTypeById(id, req.user.organizationId);
+      const courseType = await courseTypeService.getCourseTypeById(id, req.user!.organizationId);
       res.json({ message: 'Course type retrieved successfully', data: courseType });
     } catch (error) {
       next(error);
@@ -52,7 +52,7 @@ class CourseTypeController {
       const data = createCourseTypeSchema.parse(req.body);
       const courseType = await courseTypeService.createCourseType({
         ...data,
-        organizationId: req.user.organizationId,
+        organizationId: req.user!.organizationId,
       });
       res.status(201).json({ message: 'Course type created successfully', data: courseType });
     } catch (error) {
@@ -69,7 +69,7 @@ class CourseTypeController {
       }
       const courseType = await courseTypeService.updateCourseType(
         id,
-        req.user.organizationId,
+        req.user!.organizationId,
         data
       );
       res.json({ message: 'Course type updated successfully', data: courseType });
@@ -81,7 +81,7 @@ class CourseTypeController {
   async deleteCourseType(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const result = await courseTypeService.deleteCourseType(id, req.user.organizationId);
+      const result = await courseTypeService.deleteCourseType(id, req.user!.organizationId);
       res.json(result);
     } catch (error) {
       next(error);

@@ -1,4 +1,4 @@
-import { PrismaClient, PaymentStatus, PaymentMethod } from '@prisma/client';
+import { PaymentStatus, PaymentMethod } from '@prisma/client';
 import prisma from '../utils/prisma';
 import emailService from './email.service';
 import exchangeRateService from './exchange-rate.service';
@@ -19,11 +19,11 @@ export interface CreatePaymentData {
 export interface UpdatePaymentData {
   amount?: number;
   currency?: string;
-  exchangeRateOverride?: number;
+  exchangeRateOverride?: number | null;
   status?: PaymentStatus;
   paymentMethod?: PaymentMethod;
   notes?: string;
-  paidAt?: Date;
+  paidAt?: Date | null;
 }
 
 export interface GetPaymentsFilters {

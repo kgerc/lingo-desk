@@ -51,15 +51,15 @@ export class StudentController {
       const data = createStudentSchema.parse(req.body);
       const student = await studentService.createStudent({
         ...data,
-        organizationId: req.user.organizationId,
+        organizationId: req.user.organizationId
       });
 
-      res.status(201).json({
+      return res.status(201).json({
         message: 'Student created successfully',
         data: student,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -85,11 +85,11 @@ export class StudentController {
         }
       );
 
-      res.json({
+      return res.json({
         data: students,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -107,11 +107,11 @@ export class StudentController {
       const { id } = req.params;
       const student = await studentService.getStudentById(id, req.user.organizationId);
 
-      res.json({
+      return res.json({
         data: student,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -143,12 +143,12 @@ export class StudentController {
         data
       );
 
-      res.json({
+      return res.json({
         message: 'Student updated successfully',
         data: student,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -166,9 +166,9 @@ export class StudentController {
       const { id } = req.params;
       const result = await studentService.deleteStudent(id, req.user.organizationId);
 
-      res.json(result);
+      return res.json(result);
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -185,11 +185,11 @@ export class StudentController {
 
       const stats = await studentService.getStudentStats(req.user.organizationId);
 
-      res.json({
+      return res.json({
         data: stats,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -210,11 +210,11 @@ export class StudentController {
         req.user.organizationId
       );
 
-      res.json({
+      return res.json({
         data: budget,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -242,11 +242,11 @@ export class StudentController {
 
       const preview = await studentService.previewCSV(csvContent);
 
-      res.json({
+      return res.json({
         data: preview,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -288,12 +288,12 @@ export class StudentController {
         req.user.organizationId
       );
 
-      res.json({
+      return res.json({
         message: 'Import completed',
         data: results,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 }

@@ -15,8 +15,8 @@ interface CreateStudentData {
   language?: string; // Language being learned (ISO 639-1 code)
   goals?: string;
   isMinor?: boolean;
-  paymentDueDays?: number;
-  paymentDueDayOfMonth?: number;
+  paymentDueDays?: number | null;
+  paymentDueDayOfMonth?: number | null;
   organizationId: string;
 }
 
@@ -31,8 +31,8 @@ interface UpdateStudentData {
   language?: string; // Language being learned
   goals?: string;
   isMinor?: boolean;
-  paymentDueDays?: number;
-  paymentDueDayOfMonth?: number;
+  paymentDueDays?: number | null;
+  paymentDueDayOfMonth?: number | null;
   isActive?: boolean;
 }
 
@@ -530,7 +530,7 @@ export class StudentService {
 
     // Process each row
     for (let i = 0; i < records.length; i++) {
-      const row = records[i];
+      const row = records[i] as any;
       const rowNumber = i + 2; // +2 because: 1 for header, 1 for 0-based index
 
       try {
@@ -667,7 +667,7 @@ export class StudentService {
       skip_empty_lines: true,
       trim: true,
       to: 5, // Only parse first 5 rows
-    });
+    }) as any;
 
     if (records.length === 0) {
       throw new Error('Plik CSV jest pusty lub nieprawidłowy');

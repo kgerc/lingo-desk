@@ -24,13 +24,11 @@ class NotificationService {
       data: {
         organizationId: data.organizationId,
         userId: data.userId,
-        type: data.type,
-        title: data.title,
-        message: data.message,
-        relatedEntityType: data.relatedEntityType,
-        relatedEntityId: data.relatedEntityId,
-        status: NotificationStatus.PENDING,
-        scheduledFor: data.scheduledFor || new Date(),
+        type: NotificationType.IN_APP,
+        channel: 'IN_APP',
+        subject: data.title,
+        body: data.message,
+        status: 'SENT'
       },
     });
 
@@ -66,13 +64,13 @@ class NotificationService {
     // Send email
     const result = await emailService.sendEmail({
       to: notification.user.email,
-      subject: notification.title,
+      subject: notification.subject!,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #2d4a65;">${notification.title}</h2>
+          <h2 style="color: #2d4a65;">${notification.subject}</h2>
           <p>Dzień dobry ${notification.user.firstName},</p>
           <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            ${notification.message}
+            ${notification.body}
           </div>
           <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
         </div>
@@ -212,6 +210,7 @@ class NotificationService {
           include: {
             user: {
               select: {
+                id: true,
                 email: true,
                 firstName: true,
                 lastName: true,
@@ -223,6 +222,7 @@ class NotificationService {
           include: {
             user: {
               select: {
+                id: true,
                 email: true,
                 firstName: true,
                 lastName: true,

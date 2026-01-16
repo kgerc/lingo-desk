@@ -52,7 +52,7 @@ class CourseController {
       if (courseTypeId) filters.courseTypeId = String(courseTypeId);
       if (isActive !== undefined) filters.isActive = isActive === 'true';
 
-      const courses = await courseService.getCourses(req.user.organizationId, filters);
+      const courses = await courseService.getCourses(req.user!.organizationId, filters);
       res.json({ message: 'Courses retrieved successfully', data: courses });
     } catch (error) {
       next(error);
@@ -62,7 +62,7 @@ class CourseController {
   async getCourseById(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const course = await courseService.getCourseById(id, req.user.organizationId);
+      const course = await courseService.getCourseById(id, req.user!.organizationId);
       res.json({ message: 'Course retrieved successfully', data: course });
     } catch (error) {
       next(error);
@@ -74,7 +74,7 @@ class CourseController {
       const data = createCourseSchema.parse(req.body);
       const course = await courseService.createCourse({
         ...data,
-        organizationId: req.user.organizationId,
+        organizationId: req.user!.organizationId,
       });
       res.status(201).json({ message: 'Course created successfully', data: course });
     } catch (error) {
@@ -86,7 +86,7 @@ class CourseController {
     try {
       const { id } = req.params;
       const data = updateCourseSchema.parse(req.body);
-      const course = await courseService.updateCourse(id, req.user.organizationId, data);
+      const course = await courseService.updateCourse(id, req.user!.organizationId, data);
       res.json({ message: 'Course updated successfully', data: course });
     } catch (error) {
       next(error);
@@ -96,7 +96,7 @@ class CourseController {
   async deleteCourse(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const result = await courseService.deleteCourse(id, req.user.organizationId);
+      const result = await courseService.deleteCourse(id, req.user!.organizationId);
       res.json(result);
     } catch (error) {
       next(error);
@@ -105,7 +105,7 @@ class CourseController {
 
   async getStats(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const stats = await courseService.getCourseStats(req.user.organizationId);
+      const stats = await courseService.getCourseStats(req.user!.organizationId);
       res.json({ message: 'Course stats retrieved successfully', data: stats });
     } catch (error) {
       next(error);
@@ -119,7 +119,7 @@ class CourseController {
       const enrollment = await courseService.enrollStudent(
         courseId,
         studentId,
-        req.user.organizationId,
+        req.user!.organizationId,
         paymentMode,
         hoursPurchased
       );
@@ -132,7 +132,7 @@ class CourseController {
   async unenrollStudent(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { enrollmentId } = req.params;
-      const result = await courseService.unenrollStudent(enrollmentId, req.user.organizationId);
+      const result = await courseService.unenrollStudent(enrollmentId, req.user!.organizationId);
       res.json(result);
     } catch (error) {
       next(error);

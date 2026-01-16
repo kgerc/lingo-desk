@@ -92,12 +92,12 @@ class SubstitutionController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: substitution,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 

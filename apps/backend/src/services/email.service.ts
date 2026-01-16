@@ -430,7 +430,7 @@ class EmailService {
     currency: string;
     paymentMethod: string;
     courseName?: string;
-    invoiceUrl?: string;
+    invoiceUrl?: string | null;
   }) {
     const { studentEmail, studentName, amount, currency, paymentMethod, courseName, invoiceUrl } = data;
 

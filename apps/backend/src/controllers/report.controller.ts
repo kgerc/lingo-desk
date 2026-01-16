@@ -12,7 +12,7 @@ class ReportController {
    */
   async getTeacherPayoutsReport(req: AuthRequest, res: Response) {
     try {
-      const organizationId = req.user.organizationId;
+      const organizationId = req.user!.organizationId;
       const { startDate, endDate, teacherId } = req.query;
 
       const filters = {
@@ -40,7 +40,7 @@ class ReportController {
    */
   async getNewStudentsReport(req: AuthRequest, res: Response) {
     try {
-      const organizationId = req.user.organizationId;
+      const organizationId = req.user!.organizationId;
       const { month, year } = req.query;
 
       if (!month || !year) {
@@ -69,7 +69,7 @@ class ReportController {
    */
   async getMarginsReport(req: AuthRequest, res: Response) {
     try {
-      const organizationId = req.user.organizationId;
+      const organizationId = req.user!.organizationId;
       const { startDate, endDate, courseTypeId } = req.query;
 
       const filters = {
@@ -97,7 +97,7 @@ class ReportController {
    */
   async getDebtorsReport(req: AuthRequest, res: Response) {
     try {
-      const organizationId = req.user.organizationId;
+      const organizationId = req.user!.organizationId;
       const { minAmount, daysPastDue } = req.query;
 
       const data = await reportService.generateDebtorsReport(
@@ -122,7 +122,7 @@ class ReportController {
    */
   async getRetentionReport(req: AuthRequest, res: Response) {
     try {
-      const organizationId = req.user.organizationId;
+      const organizationId = req.user!.organizationId;
       const { periodDays } = req.query;
 
       const data = await reportService.generateRetentionReport(
@@ -146,7 +146,7 @@ class ReportController {
    */
   async exportReport(req: AuthRequest, res: Response) {
     try {
-      const organizationId = req.user.organizationId;
+      const organizationId = req.user!.organizationId;
       const { reportType } = req.params;
       const { format, ...filters } = req.query;
 

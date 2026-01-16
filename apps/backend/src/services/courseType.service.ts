@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 export interface CreateCourseTypeData {
   organizationId: string;
   name: string;
-  description?: string;
+  description?: string | null;
   language: string;
   level: string; // LanguageLevel enum value
   format: string; // CourseFormat enum value

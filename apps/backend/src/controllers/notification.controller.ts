@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth';
 import notificationService from '../services/notification.service';
 import { NotificationType, NotificationStatus } from '@prisma/client';
 
@@ -7,7 +8,7 @@ class NotificationController {
    * Get current user's notifications
    * GET /api/notifications
    */
-  async getNotifications(req: Request, res: Response) {
+  async getNotifications(req: AuthRequest, res: Response) {
     try {
       const userId = req.user!.id;
       const { type, status, limit } = req.query;
@@ -42,7 +43,7 @@ class NotificationController {
    * Get unread notification count
    * GET /api/notifications/unread-count
    */
-  async getUnreadCount(req: Request, res: Response) {
+  async getUnreadCount(req: AuthRequest, res: Response) {
     try {
       const userId = req.user!.id;
       const count = await notificationService.getUnreadCount(userId);
@@ -64,7 +65,7 @@ class NotificationController {
    * Mark notification as read
    * PUT /api/notifications/:id/read
    */
-  async markAsRead(req: Request, res: Response) {
+  async markAsRead(req: AuthRequest, res: Response) {
     try {
       const userId = req.user!.id;
       const { id } = req.params;
@@ -88,7 +89,7 @@ class NotificationController {
    * Mark all notifications as read
    * PUT /api/notifications/read-all
    */
-  async markAllAsRead(req: Request, res: Response) {
+  async markAllAsRead(req: AuthRequest, res: Response) {
     try {
       const userId = req.user!.id;
       await notificationService.markAllAsRead(userId);

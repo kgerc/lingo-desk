@@ -58,11 +58,11 @@ export class AuthController {
 
       const user = await authService.getMe(req.user.id);
 
-      res.json({
+      return res.json({
         data: user,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 }

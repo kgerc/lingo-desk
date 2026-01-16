@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth';
 import paymentService from '../services/payment.service';
 import { PaymentStatus, PaymentMethod } from '@prisma/client';
 
@@ -7,7 +8,7 @@ class PaymentController {
    * Get all payments with filters
    * GET /api/payments
    */
-  async getPayments(req: Request, res: Response) {
+  async getPayments(req: AuthRequest, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
       const { studentId, status, paymentMethod, dateFrom, dateTo, limit, offset, currency, convertToCurrency } = req.query;
@@ -42,7 +43,7 @@ class PaymentController {
    * Get payment by ID
    * GET /api/payments/:id
    */
-  async getPaymentById(req: Request, res: Response) {
+  async getPaymentById(req: AuthRequest, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
       const { id } = req.params;
@@ -66,7 +67,7 @@ class PaymentController {
    * Create payment
    * POST /api/payments
    */
-  async createPayment(req: Request, res: Response) {
+  async createPayment(req: AuthRequest, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
       const { studentId, enrollmentId, amount, currency, status, paymentMethod, notes, paidAt, exchangeRateOverride } =
@@ -93,14 +94,14 @@ class PaymentController {
         exchangeRateOverride: exchangeRateOverride !== undefined ? parseFloat(exchangeRateOverride) : undefined,
       });
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: payment,
         message: 'Payment created successfully',
       });
     } catch (error) {
       console.error('Error creating payment:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to create payment',
       });
@@ -111,7 +112,7 @@ class PaymentController {
    * Update payment
    * PUT /api/payments/:id
    */
-  async updatePayment(req: Request, res: Response) {
+  async updatePayment(req: AuthRequest, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
       const { id } = req.params;
@@ -145,7 +146,7 @@ class PaymentController {
    * Delete payment
    * DELETE /api/payments/:id
    */
-  async deletePayment(req: Request, res: Response) {
+  async deletePayment(req: AuthRequest, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
       const { id } = req.params;
@@ -169,7 +170,7 @@ class PaymentController {
    * Get payment statistics
    * GET /api/payments/stats
    */
-  async getPaymentStats(req: Request, res: Response) {
+  async getPaymentStats(req: AuthRequest, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
       const stats = await paymentService.getPaymentStats(organizationId);
@@ -191,7 +192,7 @@ class PaymentController {
    * Get student payment history
    * GET /api/payments/student/:studentId
    */
-  async getStudentPaymentHistory(req: Request, res: Response) {
+  async getStudentPaymentHistory(req: AuthRequest, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
       const { studentId } = req.params;
@@ -215,7 +216,7 @@ class PaymentController {
    * Get debtors - students with pending payments
    * GET /api/payments/debtors
    */
-  async getDebtors(req: Request, res: Response) {
+  async getDebtors(req: AuthRequest, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
       const debtors = await paymentService.getDebtors(organizationId);
@@ -237,7 +238,7 @@ class PaymentController {
    * Import payments from CSV
    * POST /api/payments/import
    */
-  async importPayments(req: Request, res: Response) {
+  async importPayments(req: AuthRequest, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
       const { csvData } = req.body;
@@ -251,14 +252,14 @@ class PaymentController {
 
       const results = await paymentService.importPayments(csvData, organizationId);
 
-      res.json({
+      return res.json({
         success: true,
         data: results,
         message: `Import zakończony: ${results.success} sukces, ${results.failed} błędów`,
       });
     } catch (error) {
       console.error('Error importing payments:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to import payments',
       });

@@ -138,7 +138,11 @@ class ReportService {
       const lessonsCount = teacher.lessons.length;
       const totalMinutes = teacher.lessons.reduce((sum, lesson) => sum + lesson.durationMinutes, 0);
       const totalHours = totalMinutes / 60;
-      const totalPayout = teacher.lessons.reduce((sum, lesson) => sum + (lesson.teacherRate || 0), 0);
+      const totalPayout = teacher.lessons.reduce((sum, lesson) => {
+        // Zamieniamy Decimal na number przed dodawaniem
+        const rate = lesson.teacherRate ? lesson.teacherRate.toNumber() : 0;
+        return sum + rate;
+      }, 0);
 
       return {
         teacherId: teacher.id,
@@ -426,8 +430,6 @@ class ReportService {
     const now = new Date();
     const activeCutoff = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
     const churnCutoff = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000); // 60 days
-    const atRiskStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-    const atRiskEnd = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // Get all students with their lessons
     const students = await prisma.student.findMany({

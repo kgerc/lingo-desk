@@ -1,4 +1,4 @@
-import { PrismaClient, NotificationType } from '@prisma/client';
+import { PrismaClient, NotificationType, LessonDeliveryMode, LessonStatus, RecurringFrequency } from '@prisma/client';
 import emailService from './email.service';
 import googleCalendarService from './google-calendar.service';
 
@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 export interface CreateLessonData {
   organizationId: string;
   courseId?: string;
-  enrollmentId: string;
+  enrollmentId?: string | undefined;
   teacherId: string;
   studentId: string;
   title: string;
@@ -178,7 +178,7 @@ class LessonService {
       data: {
         organizationId,
         courseId: courseId || enrollment.courseId,
-        enrollmentId: contractEnrollmentId,
+        enrollmentId: contractEnrollmentId!,
         teacherId,
         studentId,
         status: data.status || 'SCHEDULED',
@@ -1106,12 +1106,12 @@ class LessonService {
       durationMinutes: number;
       locationId?: string;
       classroomId?: string;
-      deliveryMode: 'ONLINE' | 'IN_PERSON' | 'HYBRID';
+      deliveryMode: LessonDeliveryMode;
       meetingUrl?: string;
-      status: 'SCHEDULED' | 'CONFIRMED' | 'PENDING_CONFIRMATION';
+      status: LessonStatus;
     },
     pattern: {
-      frequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+      frequency: RecurringFrequency;
       interval?: number;
       daysOfWeek?: number[]; // 0 = Sunday, 1 = Monday, etc.
       startDate: Date;

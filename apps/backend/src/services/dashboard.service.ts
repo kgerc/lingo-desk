@@ -137,7 +137,6 @@ export class DashboardService {
    * Get recent payments grouped by day
    */
   private async getRecentPayments(organizationId: string, days: number) {
-    const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     startDate.setHours(0, 0, 0, 0);
