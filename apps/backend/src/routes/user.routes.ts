@@ -8,7 +8,7 @@ const router = Router();
 router.use(authenticate);
 
 // GET /api/users - List all users (admin/manager only)
-router.get('/', authorize(UserRole.ADMIN, UserRole.MANAGER), (req, res) => {
+router.get('/', authorize(UserRole.ADMIN, UserRole.MANAGER), (_, res) => {
   res.json({ message: 'List users - TODO' });
 });
 
@@ -18,7 +18,7 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /api/users - Create user
-router.post('/', authorize(UserRole.ADMIN, UserRole.MANAGER), (req, res) => {
+router.post('/', authorize(UserRole.ADMIN, UserRole.MANAGER), (_, res) => {
   res.json({ message: 'Create user - TODO' });
 });
 

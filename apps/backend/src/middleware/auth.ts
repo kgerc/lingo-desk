@@ -43,7 +43,7 @@ export const authenticate = async (
     };
 
     req.user = decoded;
-    next();
+    return next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({
@@ -54,7 +54,7 @@ export const authenticate = async (
       });
     }
 
-    next(error);
+    return next(error);
   }
 };
 
@@ -78,6 +78,6 @@ export const authorize = (...allowedRoles: UserRole[]) => {
       });
     }
 
-    next();
+    return next();
   };
 };

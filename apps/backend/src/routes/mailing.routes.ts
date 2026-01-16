@@ -22,6 +22,6 @@ router.use(authenticate);
 router.get('/debtors-count', authorize(UserRole.ADMIN, UserRole.MANAGER), getDebtorsCount);
 
 // Send bulk email with attachments - only ADMIN and MANAGER can send bulk emails
-router.post('/send-bulk', authorize(UserRole.ADMIN, UserRole.MANAGER), upload.array('attachments', 10), sendBulkEmail);
+router.post('/send-bulk', authorize(UserRole.ADMIN, UserRole.MANAGER), upload.array('attachments', 10), sendBulkEmail as any);
 
 export default router;

@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { ZodError } from 'zod';
 
@@ -10,9 +10,7 @@ export interface ApiError extends Error {
 
 export const errorHandler = (
   err: ApiError,
-  req: Request,
-  res: Response,
-  next: NextFunction
+  res: Response
 ) => {
   console.error('Error:', err);
 
@@ -66,7 +64,7 @@ export const errorHandler = (
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal server error';
 
-  res.status(statusCode).json({
+  return res.status(statusCode).json({
     error: {
       code: err.code || 'INTERNAL_ERROR',
       message,

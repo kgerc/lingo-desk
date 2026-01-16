@@ -2,14 +2,15 @@ import { Response, NextFunction } from 'express';
 import { z } from 'zod';
 import courseTypeService from '../services/courseType.service';
 import { AuthRequest } from '../middleware/auth';
+import { LanguageLevel, CourseDeliveryMode, CourseFormat } from '@prisma/client';
 
 const createCourseTypeSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
   language: z.string().min(2),
-  level: z.string(),
-  format: z.string(),
-  deliveryMode: z.string(),
+  level: z.nativeEnum(LanguageLevel),
+  format: z.nativeEnum(CourseFormat),
+  deliveryMode: z.nativeEnum(CourseDeliveryMode),
   defaultDurationMinutes: z.number().int().positive(),
   maxStudents: z.number().int().positive().optional(),
   pricePerLesson: z.number().nonnegative(),
@@ -19,9 +20,9 @@ const updateCourseTypeSchema = z.object({
   name: z.string().min(2).optional(),
   description: z.string().optional().nullable(),
   language: z.string().optional(),
-  level: z.string().optional(),
-  format: z.string().optional(),
-  deliveryMode: z.string().optional(),
+  level: z.nativeEnum(LanguageLevel),
+  format: z.nativeEnum(CourseFormat),
+  deliveryMode: z.nativeEnum(CourseDeliveryMode),
   defaultDurationMinutes: z.number().int().positive().optional(),
   maxStudents: z.number().int().positive().optional(),
   pricePerLesson: z.coerce.number().nonnegative().optional(),

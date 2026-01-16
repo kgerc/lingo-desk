@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, LanguageLevel, CourseFormat, CourseDeliveryMode } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -7,9 +7,9 @@ export interface CreateCourseTypeData {
   name: string;
   description?: string | null;
   language: string;
-  level: string; // LanguageLevel enum value
-  format: string; // CourseFormat enum value
-  deliveryMode: string; // CourseDeliveryMode enum value
+  level: LanguageLevel; // LanguageLevel enum value
+  format: CourseFormat; // CourseFormat enum value
+  deliveryMode: CourseDeliveryMode; // CourseDeliveryMode enum value
   defaultDurationMinutes: number;
   maxStudents?: number;
   pricePerLesson: number;
