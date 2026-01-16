@@ -41,7 +41,7 @@ class GoogleCalendarService {
    * Get Google Calendar sync status
    */
   async getSyncStatus(): Promise<GoogleCalendarSyncStatus> {
-    const response = await api.get('/google-calendar/status');
+    const response = await api.get('/google-calendar/status') as any;
     return response.data;
   }
 
@@ -49,7 +49,7 @@ class GoogleCalendarService {
    * Initiate OAuth connection flow
    */
   async connect(): Promise<GoogleCalendarAuthResponse> {
-    const response = await api.get('/google-calendar/auth');
+    const response = await api.get('/google-calendar/auth') as any;
     return response.data;
   }
 
@@ -78,7 +78,7 @@ class GoogleCalendarService {
    * Manually trigger sync from Google Calendar
    */
   async syncFromGoogleCalendar(): Promise<GoogleCalendarSyncResult> {
-    const response = await api.post('/google-calendar/sync');
+    const response = await api.post('/google-calendar/sync') as any;
     return response.data;
   }
 
@@ -90,7 +90,7 @@ class GoogleCalendarService {
     if (startDate) params.append('startDate', startDate.toISOString());
     if (endDate) params.append('endDate', endDate.toISOString());
 
-    const response = await api.get(`/google-calendar/external-events?${params.toString()}`);
+    const response = await api.get(`/google-calendar/external-events?${params.toString()}`) as any;
     return response.data.data;
   }
 }

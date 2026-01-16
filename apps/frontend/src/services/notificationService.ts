@@ -28,7 +28,7 @@ const notificationService = {
    * Get current user's notifications
    */
   async getNotifications(params?: GetNotificationsParams): Promise<Notification[]> {
-    const response = await api.get('/notifications', { params });
+    const response = await api.get('/notifications', { params }) as any;
     return response.data.data;
   },
 
@@ -36,7 +36,7 @@ const notificationService = {
    * Get unread notification count
    */
   async getUnreadCount(): Promise<number> {
-    const response = await api.get('/notifications/unread-count');
+    const response = await api.get('/notifications/unread-count') as any;
     return response.data.data.count;
   },
 
@@ -44,7 +44,7 @@ const notificationService = {
    * Mark notification as read
    */
   async markAsRead(id: string): Promise<Notification> {
-    const response = await api.put(`/notifications/${id}/read`);
+    const response = await api.put(`/notifications/${id}/read`) as any;
     return response.data.data;
   },
 

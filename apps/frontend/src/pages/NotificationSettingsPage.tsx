@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import userProfileService, { NotificationPreferences } from '../services/userProfileService';
@@ -9,15 +9,16 @@ const NotificationSettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [hasChanges, setHasChanges] = useState(false);
   const [preferences, setPreferences] = useState<NotificationPreferences>({});
-
-  // Fetch current preferences
   const { data: currentPreferences, isLoading } = useQuery({
-    queryKey: ['notificationPreferences'],
-    queryFn: () => userProfileService.getNotificationPreferences(),
-    onSuccess: (data) => {
-      setPreferences(data);
-    },
+  queryKey: ['notificationPreferences'],
+  queryFn: () => userProfileService.getNotificationPreferences(),
   });
+
+  useEffect(() => {
+    if (currentPreferences) {
+      setPreferences(currentPreferences);
+    }
+  }, [currentPreferences]);
 
   // Update preferences mutation
   const updateMutation = useMutation({

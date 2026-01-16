@@ -42,22 +42,22 @@ export interface UpdateProfileData {
 
 class UserProfileService {
   async getProfile(): Promise<UserProfile> {
-    const response = await api.get('/profile');
+    const response = await api.get('/profile') as any;
     return response.data.data;
   }
 
   async updateProfile(data: UpdateProfileData): Promise<UserProfile> {
-    const response = await api.put('/profile', data);
+    const response = await api.put('/profile', data) as any;
     return response.data.data;
   }
 
   async getNotificationPreferences(): Promise<NotificationPreferences> {
-    const response = await api.get('/profile/notification-preferences');
+    const response = await api.get('/profile/notification-preferences') as any;
     return response.data.data;
   }
 
   async updateNotificationPreferences(preferences: NotificationPreferences): Promise<UserProfile> {
-    const response = await api.put('/profile/notification-preferences', preferences);
+    const response = await api.put('/profile/notification-preferences', preferences) as any;
     return response.data.data;
   }
 }

@@ -47,12 +47,12 @@ export interface BulkUpsertAttendanceData {
 
 class AttendanceService {
   async getAttendanceByLesson(lessonId: string): Promise<Attendance[]> {
-    const response = await api.get(`/attendance/lesson/${lessonId}`);
+    const response = await api.get(`/attendance/lesson/${lessonId}`) as any;
     return response.data.data;
   }
 
   async createAttendance(data: CreateAttendanceData): Promise<Attendance> {
-    const response = await api.post('/attendance', data);
+    const response = await api.post('/attendance', data) as any;
     return response.data.data;
   }
 
@@ -61,7 +61,7 @@ class AttendanceService {
     studentId: string,
     data: UpdateAttendanceData
   ): Promise<Attendance> {
-    const response = await api.put(`/attendance/${lessonId}/${studentId}`, data);
+    const response = await api.put(`/attendance/${lessonId}/${studentId}`, data) as any;
     return response.data.data;
   }
 
@@ -70,7 +70,7 @@ class AttendanceService {
   }
 
   async bulkUpsertAttendance(data: BulkUpsertAttendanceData): Promise<Attendance[]> {
-    const response = await api.post('/attendance/bulk-upsert', data);
+    const response = await api.post('/attendance/bulk-upsert', data) as any;
     return response.data.data;
   }
 }

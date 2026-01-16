@@ -77,32 +77,32 @@ export interface CreateOrganizationData extends UpdateOrganizationData {
 
 const organizationService = {
   async getOrganization(): Promise<Organization> {
-    const response = await api.get('/organizations');
+    const response = await api.get('/organizations') as any;
     return response.data.data;
   },
 
   async getUserOrganizations(): Promise<UserOrganization[]> {
-    const response = await api.get('/organizations/my-organizations');
+    const response = await api.get('/organizations/my-organizations') as any;
     return response.data.data;
   },
 
   async updateOrganization(data: UpdateOrganizationData): Promise<Organization> {
-    const response = await api.put('/organizations', data);
+    const response = await api.put('/organizations', data) as any;
     return response.data.data;
   },
 
   async createOrganization(data: CreateOrganizationData): Promise<Organization> {
-    const response = await api.post('/organizations', data);
+    const response = await api.post('/organizations', data) as any;
     return response.data.data;
   },
 
   async switchOrganization(organizationId: string): Promise<UserOrganization> {
-    const response = await api.post('/organizations/switch', { organizationId });
+    const response = await api.post('/organizations/switch', { organizationId }) as any;
     return response.data.data;
   },
 
   async updateOrganizationSettings(data: Partial<OrganizationSettings>): Promise<OrganizationSettings> {
-    const response = await api.put('/organizations/settings', data);
+    const response = await api.put('/organizations/settings', data) as any;
     return response.data.data;
   },
 };

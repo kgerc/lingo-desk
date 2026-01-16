@@ -14,6 +14,7 @@ export interface CourseType {
   pricePerLesson: number;
   createdAt: string;
   updatedAt: string;
+  currency: string;
 }
 
 export interface CreateCourseTypeData {
@@ -42,22 +43,22 @@ export interface UpdateCourseTypeData {
 
 export const courseTypeService = {
   async getCourseTypes() {
-    const response = await api.get('/course-types');
+    const response = await api.get('/course-types') as any;
     return response.data.data as CourseType[];
   },
 
   async getCourseTypeById(id: string) {
-    const response = await api.get(`/course-types/${id}`);
+    const response = await api.get(`/course-types/${id}`) as any;
     return response.data.data as CourseType;
   },
 
   async createCourseType(data: CreateCourseTypeData) {
-    const response = await api.post('/course-types', data);
+    const response = await api.post('/course-types', data) as any;
     return response.data.data as CourseType;
   },
 
   async updateCourseType(id: string, data: UpdateCourseTypeData) {
-    const response = await api.put(`/course-types/${id}`, data);
+    const response = await api.put(`/course-types/${id}`, data) as any;
     return response.data.data as CourseType;
   },
 

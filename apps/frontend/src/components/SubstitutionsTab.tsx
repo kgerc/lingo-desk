@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import substitutionService, { Substitution } from '../services/substitutionService';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
-import { GraduationCap, User, Clock, AlertCircle, Trash2, Calendar } from 'lucide-react';
+import { GraduationCap, User, AlertCircle, Trash2, Calendar } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 
 interface SubstitutionsTabProps {

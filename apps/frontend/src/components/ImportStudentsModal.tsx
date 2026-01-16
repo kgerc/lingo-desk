@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Upload, Download, AlertCircle, CheckCircle, FileText } from 'lucide-react';
+import { X, Upload, Download, AlertCircle, CheckCircle } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { studentService } from '../services/studentService';
 import toast from 'react-hot-toast';
@@ -94,7 +94,7 @@ const ImportStudentsModal: React.FC<ImportStudentsModalProps> = ({ onClose, onSu
     if (droppedFile && droppedFile.name.endsWith('.csv')) {
       const fakeEvent = {
         target: { files: [droppedFile] },
-      } as React.ChangeEvent<HTMLInputElement>;
+      } as unknown as React.ChangeEvent<HTMLInputElement>;
       handleFileSelect(fakeEvent);
     } else {
       toast.error('Proszę wybrać plik CSV');

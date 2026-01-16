@@ -72,22 +72,22 @@ export const studentService = {
     if (filters?.languageLevel) params.append('languageLevel', filters.languageLevel);
     if (filters?.isActive !== undefined) params.append('isActive', String(filters.isActive));
 
-    const response = await api.get(`/students?${params.toString()}`);
+    const response = await api.get(`/students?${params.toString()}`) as any;
     return response.data.data as Student[];
   },
 
   async getStudentById(id: string) {
-    const response = await api.get(`/students/${id}`);
+    const response = await api.get(`/students/${id}`) as any;
     return response.data.data as Student;
   },
 
   async createStudent(data: CreateStudentData) {
-    const response = await api.post('/students', data);
+    const response = await api.post('/students', data) as any;
     return response.data.data as Student;
   },
 
   async updateStudent(id: string, data: UpdateStudentData) {
-    const response = await api.put(`/students/${id}`, data);
+    const response = await api.put(`/students/${id}`, data) as any;
     return response.data.data as Student;
   },
 
@@ -97,12 +97,12 @@ export const studentService = {
   },
 
   async getStats() {
-    const response = await api.get('/students/stats');
+    const response = await api.get('/students/stats') as any;
     return response.data.data as { total: number; active: number; lowBudget: number };
   },
 
   async getEnrollmentBudget(enrollmentId: string) {
-    const response = await api.get(`/students/enrollment/${enrollmentId}/budget`);
+    const response = await api.get(`/students/enrollment/${enrollmentId}/budget`) as any;
     return response.data.data as {
       enrollmentId: string;
       studentName: string;
@@ -132,7 +132,7 @@ export const studentService = {
 
     for (const student of students) {
       if (student.enrollments) {
-        for (const enrollment: any of student.enrollments) {
+        for (const enrollment of student.enrollments) {
           const hoursPurchased = parseFloat(enrollment.hoursPurchased?.toString() || '0');
           const hoursUsed = parseFloat(enrollment.hoursUsed?.toString() || '0');
           const hoursRemaining = hoursPurchased - hoursUsed;
@@ -154,7 +154,7 @@ export const studentService = {
   },
 
   async previewCSV(csvContent: string) {
-    const response = await api.post('/students/import/preview', { csvContent });
+    const response = await api.post('/students/import/preview', { csvContent }) as any;
     return response.data.data as {
       headers: string[];
       preview: Record<string, string>[];
@@ -163,7 +163,7 @@ export const studentService = {
   },
 
   async importCSV(csvContent: string, columnMapping: Record<string, string>) {
-    const response = await api.post('/students/import', { csvContent, columnMapping });
+    const response = await api.post('/students/import', { csvContent, columnMapping }) as any;
     return response.data.data as {
       total: number;
       successful: number;

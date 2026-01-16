@@ -54,7 +54,7 @@ export interface UpdateTeacherData {
 
 export const teacherService = {
   async getMe() {
-    const response = await api.get('/teachers/me');
+    const response = await api.get('/teachers/me') as any;
     return response.data.data as Teacher;
   },
 
@@ -69,22 +69,22 @@ export const teacherService = {
     if (filters?.isAvailableForBooking !== undefined)
       params.append('isAvailableForBooking', String(filters.isAvailableForBooking));
 
-    const response = await api.get(`/teachers?${params.toString()}`);
+    const response = await api.get(`/teachers?${params.toString()}`) as any;
     return response.data.data as Teacher[];
   },
 
   async getTeacherById(id: string) {
-    const response = await api.get(`/teachers/${id}`);
+    const response = await api.get(`/teachers/${id}`) as any;
     return response.data.data as Teacher;
   },
 
   async createTeacher(data: CreateTeacherData) {
-    const response = await api.post('/teachers', data);
+    const response = await api.post('/teachers', data) as any;
     return response.data.data as Teacher;
   },
 
   async updateTeacher(id: string, data: UpdateTeacherData) {
-    const response = await api.put(`/teachers/${id}`, data);
+    const response = await api.put(`/teachers/${id}`, data) as any;
     return response.data.data as Teacher;
   },
 
@@ -94,7 +94,7 @@ export const teacherService = {
   },
 
   async getStats() {
-    const response = await api.get('/teachers/stats');
+    const response = await api.get('/teachers/stats') as any;
     return response.data.data as { total: number; active: number; available: number };
   },
 };

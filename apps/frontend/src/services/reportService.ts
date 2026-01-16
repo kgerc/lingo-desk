@@ -97,7 +97,7 @@ class ReportService {
    * Get teacher payouts report
    */
   async getTeacherPayouts(filters: ReportFilters): Promise<TeacherPayoutData[]> {
-    const response = await api.get('/reports/teacher-payouts', { params: filters });
+    const response = await api.get('/reports/teacher-payouts', { params: filters }) as any;
     return response.data.data;
   }
 
@@ -107,7 +107,7 @@ class ReportService {
   async getNewStudents(month: number, year: number): Promise<NewStudentData[]> {
     const response = await api.get('/reports/new-students', {
       params: { month, year },
-    });
+    }) as any;
     return response.data.data;
   }
 
@@ -115,7 +115,7 @@ class ReportService {
    * Get margins report
    */
   async getMargins(filters: ReportFilters): Promise<MarginData[]> {
-    const response = await api.get('/reports/margins', { params: filters });
+    const response = await api.get('/reports/margins', { params: filters }) as any;
     return response.data.data;
   }
 
@@ -123,7 +123,7 @@ class ReportService {
    * Get debtors report
    */
   async getDebtors(filters?: { minAmount?: number; daysPastDue?: number }): Promise<DebtorData[]> {
-    const response = await api.get('/reports/debtors', { params: filters });
+    const response = await api.get('/reports/debtors', { params: filters }) as any;
     return response.data.data;
   }
 
@@ -133,7 +133,7 @@ class ReportService {
   async getRetention(periodDays: number = 30): Promise<RetentionData> {
     const response = await api.get('/reports/retention', {
       params: { periodDays },
-    });
+    }) as any;
     return response.data.data;
   }
 
@@ -148,7 +148,7 @@ class ReportService {
     const response = await api.get(`/reports/export/${reportType}`, {
       params: { ...filters, format },
       responseType: 'blob',
-    });
+    }) as any;
     return response.data;
   }
 

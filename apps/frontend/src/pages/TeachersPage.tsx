@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { teacherService, Teacher } from '../services/teacherService';
-import { Plus, Search, Mail, Phone, BookOpen, Calendar, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Mail, Phone, BookOpen, Calendar, MoreVertical } from 'lucide-react';
 import TeacherModal from '../components/TeacherModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';

@@ -91,22 +91,22 @@ export const courseService = {
     if (filters?.courseTypeId) params.append('courseTypeId', filters.courseTypeId);
     if (filters?.isActive !== undefined) params.append('isActive', String(filters.isActive));
 
-    const response = await api.get(`/courses?${params.toString()}`);
+    const response = await api.get(`/courses?${params.toString()}`) as any;
     return response.data.data as Course[];
   },
 
   async getCourseById(id: string) {
-    const response = await api.get(`/courses/${id}`);
+    const response = await api.get(`/courses/${id}`) as any;
     return response.data.data as Course;
   },
 
   async createCourse(data: CreateCourseData) {
-    const response = await api.post('/courses', data);
+    const response = await api.post('/courses', data) as any;
     return response.data.data as Course;
   },
 
   async updateCourse(id: string, data: UpdateCourseData) {
-    const response = await api.put(`/courses/${id}`, data);
+    const response = await api.put(`/courses/${id}`, data) as any;
     return response.data.data as Course;
   },
 
@@ -125,7 +125,7 @@ export const courseService = {
       studentId,
       paymentMode,
       hoursPurchased,
-    });
+    }) as any;
     return response.data.data;
   },
 
@@ -135,7 +135,7 @@ export const courseService = {
   },
 
   async getStats() {
-    const response = await api.get('/courses/stats');
+    const response = await api.get('/courses/stats') as any;
     return response.data.data as { total: number; active: number; withEnrollments: number };
   },
 };

@@ -38,7 +38,7 @@ const alertService = {
     if (options?.limit) params.append('limit', options.limit.toString());
     if (options?.isRead !== undefined) params.append('isRead', options.isRead.toString());
 
-    const response = await api.get(`/alerts?${params.toString()}`);
+    const response = await api.get(`/alerts?${params.toString()}`) as any;
     return response.data.data;
   },
 
@@ -46,7 +46,7 @@ const alertService = {
    * Get count of unread alerts
    */
   async getUnreadCount(): Promise<number> {
-    const response = await api.get('/alerts/unread-count');
+    const response = await api.get('/alerts/unread-count') as any;
     return response.data.data.count;
   },
 
@@ -54,7 +54,7 @@ const alertService = {
    * Mark specific alert as read
    */
   async markAsRead(alertId: string): Promise<Alert> {
-    const response = await api.patch(`/alerts/${alertId}/read`);
+    const response = await api.patch(`/alerts/${alertId}/read`) as any;
     return response.data.data;
   },
 
@@ -69,7 +69,7 @@ const alertService = {
    * Generate system alerts
    */
   async generateSystemAlerts(): Promise<Alert[]> {
-    const response = await api.post('/alerts/generate');
+    const response = await api.post('/alerts/generate') as any;
     return response.data.data;
   },
 };

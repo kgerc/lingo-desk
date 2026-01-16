@@ -5,7 +5,7 @@ import 'moment/locale/pl';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { useQuery } from '@tanstack/react-query';
 import teacherScheduleService from '../services/teacherScheduleService';
-import { Lesson, LessonStatus } from '../services/lessonService';
+import { Lesson } from '../services/lessonService';
 import LessonModal from '../components/LessonModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Calendar as CalendarIcon, Clock, Users, BookOpen } from 'lucide-react';
@@ -245,7 +245,7 @@ const TeacherSchedulePage: React.FC = () => {
 
       {/* Lesson Modal */}
       {isModalOpen && selectedLesson && (
-        <LessonModal lesson={selectedLesson} onClose={handleCloseModal} />
+        <LessonModal lesson={selectedLesson} onClose={handleCloseModal} onSuccess={() => {}}/>
       )}
     </div>
   );

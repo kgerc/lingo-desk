@@ -1,24 +1,24 @@
 import toast from 'react-hot-toast';
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { courseService, Course } from '../services/courseService';
-import { Plus, Search, Edit, Trash2, Users, BookOpen, Calendar, MapPin, Wifi, Home, UserPlus, MoreVertical } from 'lucide-react';
+import { Plus, Search, Users, BookOpen, Calendar, MapPin, Wifi, Home } from 'lucide-react';
 import CourseModal from '../components/CourseModal';
-import EnrollStudentModal from '../components/EnrollStudentModal';
+//import EnrollStudentModal from '../components/EnrollStudentModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
-import Dropdown from '../components/Dropdown';
+//import Dropdown from '../components/Dropdown';
 
 const GroupsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Course | null>(null);
-  const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
-  const [groupForEnrollment, setGroupForEnrollment] = useState<Course | null>(null);
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  //const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
+  //const [groupForEnrollment, setGroupForEnrollment] = useState<Course | null>(null);
+  //const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; groupId: string | null }>({ isOpen: false, groupId: null });
-  const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  //const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   // Fetch only group courses
   const { data: groups = [], isLoading } = useQuery({
@@ -43,14 +43,14 @@ const GroupsPage: React.FC = () => {
     },
   });
 
-  const handleEdit = (group: Course) => {
-    setSelectedGroup(group);
-    setIsModalOpen(true);
-  };
+  // const handleEdit = (group: Course) => {
+  //   setSelectedGroup(group);
+  //   setIsModalOpen(true);
+  // };
 
-  const handleDelete = (id: string) => {
-    setConfirmDialog({ isOpen: true, groupId: id });
-  };
+  // const handleDelete = (id: string) => {
+  //   setConfirmDialog({ isOpen: true, groupId: id });
+  // };
 
   const confirmDelete = async () => {
     if (confirmDialog.groupId) {
@@ -59,20 +59,20 @@ const GroupsPage: React.FC = () => {
     }
   };
 
-  const handleManageStudents = (group: Course) => {
-    setGroupForEnrollment(group);
-    setIsEnrollModalOpen(true);
-  };
+  // const handleManageStudents = (group: Course) => {
+  //   //setGroupForEnrollment(group);
+  //   //setIsEnrollModalOpen(true);
+  // };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedGroup(null);
   };
 
-  const handleCloseEnrollModal = () => {
-    setIsEnrollModalOpen(false);
-    setGroupForEnrollment(null);
-  };
+  // const handleCloseEnrollModal = () => {
+  //   //setIsEnrollModalOpen(false);
+  //   //setGroupForEnrollment(null);
+  // };
 
   const handleSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['groups'] });
@@ -181,9 +181,9 @@ const GroupsPage: React.FC = () => {
                 </div>
 
                 {/* Dropdown */}
-                <Dropdown
+                {/* <Dropdown
                   isOpen={openDropdownId === group.id}
-                  onOpenChange={(isOpen) => setOpenDropdownId(isOpen ? group.id : null)}
+                  onOpenChange={(isOpen: any) => setOpenDropdownId(isOpen ? group.id : null)}
                   trigger={
                     <button
                       ref={(el) => {
@@ -228,7 +228,7 @@ const GroupsPage: React.FC = () => {
                       Usuń
                     </button>
                   </div>
-                </Dropdown>
+                </Dropdown> */}
               </div>
 
               {/* Course Details */}
@@ -278,12 +278,12 @@ const GroupsPage: React.FC = () => {
                 </div>
 
                 {/* Location */}
-                {group.location && (
+                {/* {group.location && (
                   <div className="flex items-center gap-2">
                     <MapPin className="h-4 w-4 text-gray-400" />
                     <span className="text-sm text-gray-600">{group.location.name}</span>
                   </div>
-                )}
+                )} */}
               </div>
 
               {/* Status Badge */}
@@ -313,7 +313,7 @@ const GroupsPage: React.FC = () => {
       )}
 
       {/* Enroll Student Modal */}
-      {isEnrollModalOpen && groupForEnrollment && (
+      {/* {isEnrollModalOpen && groupForEnrollment && (
         <EnrollStudentModal
           course={groupForEnrollment}
           onClose={handleCloseEnrollModal}
@@ -323,17 +323,16 @@ const GroupsPage: React.FC = () => {
             handleCloseEnrollModal();
           }}
         />
-      )}
+      )} */}
 
       {/* Confirm Delete Dialog */}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         title="Usuń grupę"
         message="Czy na pewno chcesz usunąć tę grupę? Tej operacji nie można cofnąć."
-        confirmLabel="Usuń"
-        cancelLabel="Anuluj"
+        confirmText="Usuń"
         onConfirm={confirmDelete}
-        onCancel={() => setConfirmDialog({ isOpen: false, groupId: null })}
+        onClose={() => setConfirmDialog({ isOpen: false, groupId: null })}
         variant="danger"
       />
     </div>

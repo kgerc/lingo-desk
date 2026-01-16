@@ -54,32 +54,6 @@ const IntegrationsPage: React.FC = () => {
     },
   });
 
-  // Setup watch
-  const setupWatchMutation = useMutation({
-    mutationFn: () => googleCalendarService.setupWatch(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['googleCalendarStatus'] });
-      alert('Powiadomienia push zostały włączone');
-    },
-    onError: (error) => {
-      console.error('Error setting up watch:', error);
-      alert('Błąd podczas włączania powiadomień push');
-    },
-  });
-
-  // Stop watch
-  const stopWatchMutation = useMutation({
-    mutationFn: () => googleCalendarService.stopWatch(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['googleCalendarStatus'] });
-      alert('Powiadomienia push zostały wyłączone');
-    },
-    onError: (error) => {
-      console.error('Error stopping watch:', error);
-      alert('Błąd podczas wyłączania powiadomień push');
-    },
-  });
-
   // Manual sync
   const syncMutation = useMutation({
     mutationFn: () => googleCalendarService.syncFromGoogleCalendar(),
@@ -126,14 +100,6 @@ const IntegrationsPage: React.FC = () => {
     if (window.confirm('Czy na pewno chcesz rozłączyć Google Calendar?')) {
       disconnectMutation.mutate();
     }
-  };
-
-  const handleSetupWatch = () => {
-    setupWatchMutation.mutate();
-  };
-
-  const handleStopWatch = () => {
-    stopWatchMutation.mutate();
   };
 
   const handleSync = () => {

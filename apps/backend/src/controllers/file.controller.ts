@@ -25,7 +25,7 @@ class FileController {
   async getFileById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const file = await fileService.getFileById(id, req.user!.organizationId);
+      const file = await fileService.getFileById(id as string, req.user!.organizationId);
 
       res.json({
         success: true,
@@ -92,7 +92,7 @@ class FileController {
   async deleteFile(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const result = await fileService.deleteFile(id, req.user!.organizationId);
+      const result = await fileService.deleteFile(id as string, req.user!.organizationId);
 
       res.json({
         success: true,

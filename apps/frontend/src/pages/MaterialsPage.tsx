@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { courseService } from '../services/courseService';
-import materialService, { Material } from '../services/materialService';
+import materialService from '../services/materialService';
 import { FileText, Search, FolderOpen, Download, Trash2, Plus } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -226,10 +226,9 @@ const MaterialsPage: React.FC = () => {
         isOpen={confirmDialog.isOpen}
         title="Usuń materiał"
         message="Czy na pewno chcesz usunąć ten materiał? Tej operacji nie można cofnąć."
-        confirmLabel="Usuń"
-        cancelLabel="Anuluj"
+        confirmText="Usuń"
         onConfirm={confirmDelete}
-        onCancel={() => setConfirmDialog({ isOpen: false, materialId: null })}
+        onClose={() => setConfirmDialog({ isOpen: false, materialId: null })}
         variant="danger"
       />
     </div>

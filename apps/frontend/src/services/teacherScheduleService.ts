@@ -6,9 +6,12 @@ export interface TeacherScheduleFilters {
 }
 
 const teacherScheduleService = {
-  // Get logged-in teacher's schedule
   getMySchedule: (filters?: TeacherScheduleFilters) =>
-    api.get('/teachers/me/schedule', { params: filters }).then((res) => res.data.data),
+    // Zakładamy, że odpowiedź to obiekt z polem data, które zawiera tablicę lekcji
+    api.get<{ data: any }>(
+      '/teachers/me/schedule', 
+      { params: filters }
+    ).then((res) => res.data.data), 
 };
 
 export default teacherScheduleService;

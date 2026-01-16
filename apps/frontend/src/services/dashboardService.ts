@@ -81,7 +81,7 @@ export interface ChartData {
 
 class DashboardService {
   async getStats(): Promise<DashboardStats> {
-    const response = await api.get('/dashboard/stats');
+    const response = await api.get('/dashboard/stats') as any;
     return response.data.data;
   }
 
@@ -91,12 +91,12 @@ class DashboardService {
     if (params.year) queryParams.append('year', params.year.toString());
     if (params.month) queryParams.append('month', params.month.toString());
 
-    const response = await api.get(`/dashboard/charts?${queryParams.toString()}`);
+    const response = await api.get(`/dashboard/charts?${queryParams.toString()}`) as any;
     return response.data.data;
   }
 
   async getReminders(): Promise<TeacherReminders> {
-    const response = await api.get('/dashboard/reminders');
+    const response = await api.get('/dashboard/reminders') as any;
     return response.data.data;
   }
 }

@@ -60,22 +60,6 @@ const CourseTypesPage: React.FC = () => {
     return languages[code] || code;
   };
 
-  const getLevelLabel = (level: string) => {
-    const levels: Record<string, string> = {
-      A1: 'A1 - Początkujący',
-      A2: 'A2 - Podstawowy',
-      B1: 'B1 - Średniozaawansowany',
-      B2: 'B2 - Średniozaawansowany wyższy',
-      C1: 'C1 - Zaawansowany',
-      C2: 'C2 - Biegły',
-      BEGINNER: 'Początkujący',
-      INTERMEDIATE: 'Średniozaawansowany',
-      ADVANCED: 'Zaawansowany',
-      ALL_LEVELS: 'Wszystkie poziomy',
-    };
-    return levels[level] || level;
-  };
-
   const getFormatLabel = (format: string) => {
     const formats: Record<string, string> = {
       INDIVIDUAL: 'Indywidualne',

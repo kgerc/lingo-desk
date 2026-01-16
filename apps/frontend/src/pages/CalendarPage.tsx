@@ -15,7 +15,7 @@ import { Plus, Filter } from 'lucide-react';
 // Set Polish locale
 moment.locale('pl');
 const localizer = momentLocalizer(moment);
-const DnDCalendar = withDragAndDrop(Calendar);
+const DnDCalendar = withDragAndDrop<CalendarEvent>(Calendar);
 
 // Calendar event type
 interface CalendarEvent {
@@ -279,7 +279,7 @@ const CalendarPage: React.FC = () => {
 
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => setStatusFilter(e.target.value as LessonStatus | "")}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">Wszystkie statusy</option>

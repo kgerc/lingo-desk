@@ -38,12 +38,12 @@ const mailingService = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-    });
+    }) as any;
     return response.data;
   },
 
   getDebtorsCount: async (): Promise<number> => {
-    const response = await api.get('/mailings/debtors-count');
+    const response = await api.get('/mailings/debtors-count') as any;
     return response.data.count;
   },
 };

@@ -14,7 +14,7 @@ const StudentDashboard: React.FC = () => {
   // Fetch student data
   const { data: studentData, isLoading: isLoadingStudent } = useQuery({
     queryKey: ['currentStudent', user?.id],
-    queryFn: () => studentService.getStudent(user?.id || ''),
+    queryFn: () => studentService.getStudentById(user?.id || ''),
     enabled: !!user?.id,
   });
 

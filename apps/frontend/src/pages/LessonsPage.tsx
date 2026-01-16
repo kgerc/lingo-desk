@@ -45,7 +45,7 @@ moment.updateLocale('pl', {
   },
 });
 const localizer = momentLocalizer(moment);
-const DnDCalendar = withDragAndDrop(Calendar);
+const DnDCalendar = withDragAndDrop<CalendarEvent>(Calendar);
 
 // Calendar event type
 interface CalendarEvent {
@@ -331,7 +331,21 @@ const LessonsPage: React.FC = () => {
     // Don't open modal for external events
     if (event.isExternal) {
       const externalEvent = event.resource as ExternalCalendarEvent;
-      toast.info(`${externalEvent.title}\n${externalEvent.description || ''}`);
+      toast(
+        (_) => (
+          <span>
+            <b>{externalEvent.title}</b>
+            {externalEvent.description && (
+              <p style={{ fontSize: '12px', marginTop: '4px', opacity: 0.8 }}>
+                {externalEvent.description}
+              </p>
+            )}
+          </span>
+        ),
+        {
+          icon: 'ℹ️',
+        }
+      );
       return;
     }
 
@@ -603,15 +617,14 @@ const LessonsPage: React.FC = () => {
   };
 
   const formats = {
-    monthHeaderFormat: 'MMMM YYYY',
+    dayFormat: (date: Date, culture?: string, localizer?: any) => 
+      localizer.format(date, 'DD', culture),
 
-// Nagłówki kolumn w widoku tygodnia (np. Poniedziałek 13.01)
-    dayFormat: (date: Date, culture: string, localizer: any) =>
-      localizer.format(date, 'dddd DD.MM', culture),
-
-    // Nagłówki dni w widoku miesiąca (Pn, Wt...)
-    weekdayFormat: (date: Date, culture: string, localizer: any) =>
+    weekdayFormat: (date: Date, culture?: string, localizer?: any) => 
       localizer.format(date, 'dd', culture),
+
+    monthHeaderFormat: (date: Date, culture?: string, localizer?: any) =>
+      localizer.format(date, 'MMMM YYYY', culture),
 
     dayHeaderFormat: 'dddd, D MMMM',
 

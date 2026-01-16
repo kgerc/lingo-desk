@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import paymentService, { Payment, CreatePaymentData, UpdatePaymentData } from '../services/paymentService';
@@ -35,7 +35,7 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
   // Fetch enrollments for selected student
   const { data: selectedStudent } = useQuery({
     queryKey: ['student', formData.studentId],
-    queryFn: () => studentService.getStudent(formData.studentId),
+    queryFn: () => studentService.getStudentById(formData.studentId),
     enabled: !!formData.studentId,
   });
 

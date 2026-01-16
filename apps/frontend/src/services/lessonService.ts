@@ -146,22 +146,22 @@ export const lessonService = {
     if (filters?.startDate) params.append('startDate', filters.startDate);
     if (filters?.endDate) params.append('endDate', filters.endDate);
 
-    const response = await api.get(`/lessons?${params.toString()}`);
+    const response = await api.get(`/lessons?${params.toString()}`) as any;
     return response.data.data as Lesson[];
   },
 
   async getLessonById(id: string) {
-    const response = await api.get(`/lessons/${id}`);
+    const response = await api.get(`/lessons/${id}`) as any;
     return response.data.data as Lesson;
   },
 
   async createLesson(data: CreateLessonData) {
-    const response = await api.post('/lessons', data);
+    const response = await api.post('/lessons', data) as any;
     return response.data.data as Lesson;
   },
 
   async updateLesson(id: string, data: UpdateLessonData) {
-    const response = await api.put(`/lessons/${id}`, data);
+    const response = await api.put(`/lessons/${id}`, data) as any;
     return response.data.data as Lesson;
   },
 
@@ -171,12 +171,12 @@ export const lessonService = {
   },
 
   async confirmLesson(id: string) {
-    const response = await api.post(`/lessons/${id}/confirm`);
+    const response = await api.post(`/lessons/${id}/confirm`) as any;
     return response.data.data as Lesson;
   },
 
   async getStats() {
-    const response = await api.get('/lessons/stats');
+    const response = await api.get('/lessons/stats') as any;
     return response.data.data as {
       total: number;
       scheduled: number;
@@ -200,7 +200,7 @@ export const lessonService = {
     params.append('durationMinutes', durationMinutes.toString());
     if (excludeLessonId) params.append('excludeLessonId', excludeLessonId);
 
-    const response = await api.get(`/lessons/check-conflicts?${params.toString()}`);
+    const response = await api.get(`/lessons/check-conflicts?${params.toString()}`) as any;
     return response.data.data as {
       hasConflicts: boolean;
       teacherConflicts: Array<{
@@ -231,7 +231,7 @@ export const lessonService = {
       occurrencesCount?: number;
     }
   ) {
-    const response = await api.post('/lessons/recurring', { lessonData, pattern });
+    const response = await api.post('/lessons/recurring', { lessonData, pattern }) as any;
     return response.data.data as {
       recurringPattern: any;
       createdLessons: Lesson[];

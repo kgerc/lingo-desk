@@ -37,12 +37,12 @@ const fileService = {
     relatedToType?: string;
     relatedToId?: string;
   }): Promise<File[]> {
-    const response = await api.get('/files', { params: filters });
+    const response = await api.get('/files', { params: filters }) as any;
     return response.data.data;
   },
 
   async getFileById(id: string): Promise<File> {
-    const response = await api.get(`/files/${id}`);
+    const response = await api.get(`/files/${id}`) as any;
     return response.data.data;
   },
 
@@ -71,12 +71,12 @@ const fileService = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-    });
+    }) as any;
     return response.data.data;
   },
 
   async createFile(data: CreateFileData): Promise<File> {
-    const response = await api.post('/files', data);
+    const response = await api.post('/files', data) as any;
     return response.data.data;
   },
 

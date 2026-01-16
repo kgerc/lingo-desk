@@ -75,7 +75,7 @@ class SubstitutionService {
    * Get all substitutions
    */
   async getSubstitutions(params?: GetSubstitutionsParams): Promise<Substitution[]> {
-    const response = await api.get('/substitutions', { params });
+    const response = await api.get('/substitutions', { params }) as any;
     return response.data.data;
   }
 
@@ -83,7 +83,7 @@ class SubstitutionService {
    * Get substitution by ID
    */
   async getSubstitutionById(id: string): Promise<Substitution> {
-    const response = await api.get(`/substitutions/${id}`);
+    const response = await api.get(`/substitutions/${id}`) as any;
     return response.data.data;
   }
 
@@ -92,7 +92,7 @@ class SubstitutionService {
    */
   async getSubstitutionByLessonId(lessonId: string): Promise<Substitution | null> {
     try {
-      const response = await api.get(`/substitutions/lesson/${lessonId}`);
+      const response = await api.get(`/substitutions/lesson/${lessonId}`) as any;
       return response.data.data;
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -106,7 +106,7 @@ class SubstitutionService {
    * Create a new substitution
    */
   async createSubstitution(data: CreateSubstitutionData): Promise<Substitution> {
-    const response = await api.post('/substitutions', data);
+    const response = await api.post('/substitutions', data) as any;
     return response.data.data;
   }
 
@@ -114,7 +114,7 @@ class SubstitutionService {
    * Update substitution
    */
   async updateSubstitution(id: string, data: UpdateSubstitutionData): Promise<Substitution> {
-    const response = await api.put(`/substitutions/${id}`, data);
+    const response = await api.put(`/substitutions/${id}`, data) as any;
     return response.data.data;
   }
 

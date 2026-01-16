@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import attendanceService, { AttendanceStatus, Attendance } from '../services/attendanceService';
+import attendanceService, { AttendanceStatus } from '../services/attendanceService';
 import { Lesson } from '../services/lessonService';
 import { Users, Save, Check, X, Clock, AlertCircle } from 'lucide-react';
 

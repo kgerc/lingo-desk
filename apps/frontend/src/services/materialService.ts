@@ -45,22 +45,22 @@ export interface UpdateMaterialData {
 
 const materialService = {
   async getMaterialsByCourse(courseId: string): Promise<Material[]> {
-    const response = await api.get(`/materials/course/${courseId}`);
+    const response = await api.get(`/materials/course/${courseId}`) as any;
     return response.data.data;
   },
 
   async getMaterialById(id: string): Promise<Material> {
-    const response = await api.get(`/materials/${id}`);
+    const response = await api.get(`/materials/${id}`) as any;
     return response.data.data;
   },
 
   async createMaterial(data: CreateMaterialData): Promise<Material> {
-    const response = await api.post('/materials', data);
+    const response = await api.post('/materials', data) as any;
     return response.data.data;
   },
 
   async updateMaterial(id: string, data: UpdateMaterialData): Promise<Material> {
-    const response = await api.put(`/materials/${id}`, data);
+    const response = await api.put(`/materials/${id}`, data) as any;
     return response.data.data;
   },
 

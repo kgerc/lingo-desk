@@ -50,8 +50,8 @@ const DashboardSettingsPage: React.FC = () => {
     const dashboardConfig = organization?.settings?.settings?.dashboard;
     if (dashboardConfig) {
       setSettings({
-        enabledMetrics: dashboardConfig.enabledMetrics || DEFAULT_SETTINGS.enabledMetrics,
-        enabledCharts: dashboardConfig.enabledCharts || DEFAULT_SETTINGS.enabledCharts,
+        enabledMetrics: (dashboardConfig.enabledMetrics as typeof DEFAULT_SETTINGS.enabledMetrics) || DEFAULT_SETTINGS.enabledMetrics,
+        enabledCharts: (dashboardConfig.enabledCharts as typeof DEFAULT_SETTINGS.enabledCharts) || DEFAULT_SETTINGS.enabledCharts,
       });
     }
   }, [organization]);

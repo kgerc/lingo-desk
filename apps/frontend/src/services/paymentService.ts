@@ -88,7 +88,7 @@ const paymentService = {
    * Get all payments with filters
    */
   async getPayments(filters?: GetPaymentsFilters): Promise<Payment[]> {
-    const response = await api.get('/payments', { params: filters });
+    const response = await api.get('/payments', { params: filters }) as any;
     return response.data.data;
   },
 
@@ -96,7 +96,7 @@ const paymentService = {
    * Get payment by ID
    */
   async getPaymentById(id: string): Promise<Payment> {
-    const response = await api.get(`/payments/${id}`);
+    const response = await api.get(`/payments/${id}`) as any;
     return response.data.data;
   },
 
@@ -104,7 +104,7 @@ const paymentService = {
    * Create new payment
    */
   async createPayment(data: CreatePaymentData): Promise<Payment> {
-    const response = await api.post('/payments', data);
+    const response = await api.post('/payments', data) as any;
     return response.data.data;
   },
 
@@ -112,7 +112,7 @@ const paymentService = {
    * Update payment
    */
   async updatePayment(id: string, data: UpdatePaymentData): Promise<Payment> {
-    const response = await api.put(`/payments/${id}`, data);
+    const response = await api.put(`/payments/${id}`, data) as any;
     return response.data.data;
   },
 
@@ -127,7 +127,7 @@ const paymentService = {
    * Get payment statistics
    */
   async getPaymentStats(): Promise<PaymentStats> {
-    const response = await api.get('/payments/stats');
+    const response = await api.get('/payments/stats') as any;
     return response.data.data;
   },
 
@@ -135,7 +135,7 @@ const paymentService = {
    * Get student payment history
    */
   async getStudentPaymentHistory(studentId: string): Promise<Payment[]> {
-    const response = await api.get(`/payments/student/${studentId}`);
+    const response = await api.get(`/payments/student/${studentId}`) as any;
     return response.data.data;
   },
 
@@ -147,7 +147,7 @@ const paymentService = {
     failed: number;
     errors: Array<{ row: number; error: string; data: string }>;
   }> {
-    const response = await api.post('/payments/import', { csvData });
+    const response = await api.post('/payments/import', { csvData }) as any;
     return response.data.data;
   },
 
@@ -178,7 +178,7 @@ const paymentService = {
       notes?: string;
     }>;
   }>> {
-    const response = await api.get('/payments/debtors');
+    const response = await api.get('/payments/debtors') as any;
     return response.data.data;
   },
 };
