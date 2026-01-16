@@ -1,6 +1,5 @@
 import express, { Application } from 'express';
 import dotenv from 'dotenv';
-import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { errorHandler } from './middleware/errorHandler';
