@@ -29,6 +29,47 @@ export interface UpdateOrganizationSettingsData {
   settings?: Record<string, any>;
 }
 
+// Visibility settings for manager role
+export interface VisibilitySettings {
+  teacher: {
+    hourlyRate: boolean;
+    contractType: boolean;
+    email: boolean;
+    phone: boolean;
+    notes: boolean;
+    payouts: boolean;
+  };
+  student: {
+    email: boolean;
+    phone: boolean;
+    address: boolean;
+    dateOfBirth: boolean;
+    notes: boolean;
+    payments: boolean;
+    budget: boolean;
+  };
+}
+
+export const DEFAULT_VISIBILITY_SETTINGS: VisibilitySettings = {
+  teacher: {
+    hourlyRate: true,
+    contractType: true,
+    email: true,
+    phone: true,
+    notes: true,
+    payouts: true,
+  },
+  student: {
+    email: true,
+    phone: true,
+    address: true,
+    dateOfBirth: true,
+    notes: true,
+    payments: true,
+    budget: true,
+  },
+};
+
 class OrganizationService {
   async getOrganizationById(id: string) {
     const organization = await prisma.organization.findUnique({
@@ -308,6 +349,66 @@ class OrganizationService {
         ...data,
       },
       update: data,
+    });
+
+    return settings;
+  }
+
+  /**
+   * Get visibility settings for organization
+   */
+  async getVisibilitySettings(organizationId: string): Promise<VisibilitySettings> {
+    const settings = await prisma.organizationSettings.findUnique({
+      where: { organizationId },
+    });
+
+    if (!settings?.settings) {
+      return DEFAULT_VISIBILITY_SETTINGS;
+    }
+
+    const customSettings = settings.settings as Record<string, any>;
+    return customSettings.visibility || DEFAULT_VISIBILITY_SETTINGS;
+  }
+
+  /**
+   * Update visibility settings - ADMIN only
+   */
+  async updateVisibilitySettings(
+    organizationId: string,
+    visibility: VisibilitySettings,
+    userId: string
+  ) {
+    // Verify user is ADMIN (not MANAGER - only admin can change visibility)
+    const userOrg = await prisma.userOrganization.findFirst({
+      where: {
+        userId,
+        organizationId,
+        role: 'ADMIN',
+      },
+    });
+
+    if (!userOrg) {
+      throw new Error('Only administrators can change visibility settings');
+    }
+
+    // Get current settings
+    const currentSettings = await prisma.organizationSettings.findUnique({
+      where: { organizationId },
+    });
+
+    const existingSettings = (currentSettings?.settings as Record<string, any>) || {};
+    const mergedSettings = { ...existingSettings, visibility } as Record<string, any>;
+
+    // Upsert with merged settings
+    const settings = await prisma.organizationSettings.upsert({
+      where: { organizationId },
+      create: {
+        organizationId,
+        settings: mergedSettings,
+      },
+      update: {
+        settings: mergedSettings,
+      },
     });
 
     return settings;

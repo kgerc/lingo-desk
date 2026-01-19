@@ -1,37 +1,53 @@
-import React, { useState } from 'react';
-import { Building2, Bell, Plug, LayoutDashboard } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Building2, Bell, Plug, LayoutDashboard, Eye } from 'lucide-react';
 import OrganizationSettingsPage from './OrganizationSettingsPage';
 import NotificationSettingsPage from './NotificationSettingsPage';
 import IntegrationsPage from './IntegrationsPage';
 import DashboardSettingsPage from './DashboardSettingsPage';
+import VisibilitySettingsPage from './VisibilitySettingsPage';
+import { useAuthStore } from '../stores/authStore';
 
-type TabType = 'organization' | 'dashboard' | 'notifications' | 'integrations';
+type TabType = 'organization' | 'dashboard' | 'notifications' | 'integrations' | 'visibility';
 
 const SettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('organization');
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'ADMIN';
 
-  const tabs = [
-    {
-      id: 'organization' as TabType,
-      name: 'Organizacja',
-      icon: Building2,
-    },
-    {
-      id: 'dashboard' as TabType,
-      name: 'Dashboard',
-      icon: LayoutDashboard,
-    },
-    {
-      id: 'notifications' as TabType,
-      name: 'Powiadomienia',
-      icon: Bell,
-    },
-    {
-      id: 'integrations' as TabType,
-      name: 'Integracje',
-      icon: Plug,
-    },
-  ];
+  const tabs = useMemo(() => {
+    const baseTabs = [
+      {
+        id: 'organization' as TabType,
+        name: 'Organizacja',
+        icon: Building2,
+      },
+      {
+        id: 'dashboard' as TabType,
+        name: 'Dashboard',
+        icon: LayoutDashboard,
+      },
+      {
+        id: 'notifications' as TabType,
+        name: 'Powiadomienia',
+        icon: Bell,
+      },
+      {
+        id: 'integrations' as TabType,
+        name: 'Integracje',
+        icon: Plug,
+      },
+    ];
+
+    if (isAdmin) {
+      baseTabs.push({
+        id: 'visibility' as TabType,
+        name: 'Widoczność',
+        icon: Eye,
+      });
+    }
+
+    return baseTabs;
+  }, [isAdmin]);
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -70,6 +86,7 @@ const SettingsPage: React.FC = () => {
         {activeTab === 'dashboard' && <DashboardSettingsPage />}
         {activeTab === 'notifications' && <NotificationSettingsPage />}
         {activeTab === 'integrations' && <IntegrationsPage />}
+        {activeTab === 'visibility' && isAdmin && <VisibilitySettingsPage />}
       </div>
     </div>
   );

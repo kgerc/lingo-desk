@@ -2,6 +2,7 @@ import prisma from '../utils/prisma';
 import { LanguageLevel, UserRole } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { parse } from 'csv-parse/sync';
+import { organizationService, VisibilitySettings } from './organization.service';
 
 interface CreateStudentData {
   email: string;
@@ -724,6 +725,110 @@ export class StudentService {
       preview: records,
       suggestedMapping,
     };
+  }
+
+  /**
+   * Filter student data based on visibility settings for manager role
+   */
+  filterStudentForManager(student: any, visibility: VisibilitySettings['student']): any {
+    const filtered = { ...student };
+
+    // Filter user email
+    if (!visibility.email && filtered.user) {
+      filtered.user = { ...filtered.user };
+      delete filtered.user.email;
+    }
+
+    // Filter user phone
+    if (!visibility.phone && filtered.user) {
+      filtered.user = { ...filtered.user };
+      delete filtered.user.phone;
+    }
+
+    // Filter address
+    if (!visibility.address && filtered.user?.profile) {
+      filtered.user = { ...filtered.user, profile: { ...filtered.user.profile } };
+      delete filtered.user.profile.address;
+    }
+
+    // Filter dateOfBirth
+    if (!visibility.dateOfBirth && filtered.user?.profile) {
+      filtered.user = { ...filtered.user, profile: { ...filtered.user.profile } };
+      delete filtered.user.profile.dateOfBirth;
+    }
+
+    // Filter goals/notes
+    if (!visibility.notes) {
+      delete filtered.goals;
+    }
+
+    // Filter payments
+    if (!visibility.payments) {
+      delete filtered.payments;
+    }
+
+    // Filter budget
+    if (!visibility.budget) {
+      delete filtered.budget;
+    }
+
+    return filtered;
+  }
+
+  /**
+   * Get students with visibility filtering based on user role
+   */
+  async getStudentsWithVisibility(
+    organizationId: string,
+    userRole: UserRole,
+    filters?: { search?: string; languageLevel?: LanguageLevel; isActive?: boolean }
+  ) {
+    const students = await this.getStudents(organizationId, filters);
+
+    // ADMIN sees everything
+    if (userRole === UserRole.ADMIN) {
+      return students;
+    }
+
+    // MANAGER - apply visibility settings
+    if (userRole === UserRole.MANAGER) {
+      const visibility = await organizationService.getVisibilitySettings(organizationId);
+      return students.map(student => this.filterStudentForManager(student, visibility.student));
+    }
+
+    // Other roles - return basic info
+    return students.map(student => ({
+      id: student.id,
+      studentNumber: student.studentNumber,
+      user: {
+        id: student.user.id,
+        firstName: student.user.firstName,
+        lastName: student.user.lastName,
+        avatarUrl: student.user.avatarUrl,
+      },
+      languageLevel: student.languageLevel,
+      language: student.language,
+    }));
+  }
+
+  /**
+   * Get single student with visibility filtering based on user role
+   */
+  async getStudentByIdWithVisibility(id: string, organizationId: string, userRole: UserRole) {
+    const student = await this.getStudentById(id, organizationId);
+
+    // ADMIN sees everything
+    if (userRole === UserRole.ADMIN) {
+      return student;
+    }
+
+    // MANAGER - apply visibility settings
+    if (userRole === UserRole.MANAGER) {
+      const visibility = await organizationService.getVisibilitySettings(organizationId);
+      return this.filterStudentForManager(student, visibility.student);
+    }
+
+    return student;
   }
 }
 

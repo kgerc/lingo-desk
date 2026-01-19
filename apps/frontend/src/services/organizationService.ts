@@ -75,6 +75,26 @@ export interface CreateOrganizationData extends UpdateOrganizationData {
   slug: string;
 }
 
+export interface VisibilitySettings {
+  teacher: {
+    hourlyRate: boolean;
+    contractType: boolean;
+    email: boolean;
+    phone: boolean;
+    notes: boolean;
+    payouts: boolean;
+  };
+  student: {
+    email: boolean;
+    phone: boolean;
+    address: boolean;
+    dateOfBirth: boolean;
+    notes: boolean;
+    payments: boolean;
+    budget: boolean;
+  };
+}
+
 const organizationService = {
   async getOrganization(): Promise<Organization> {
     const response = await api.get('/organizations') as any;
@@ -103,6 +123,16 @@ const organizationService = {
 
   async updateOrganizationSettings(data: Partial<OrganizationSettings>): Promise<OrganizationSettings> {
     const response = await api.put('/organizations/settings', data) as any;
+    return response.data.data;
+  },
+
+  async getVisibilitySettings(): Promise<VisibilitySettings> {
+    const response = await api.get('/organizations/visibility') as any;
+    return response.data.data;
+  },
+
+  async updateVisibilitySettings(data: VisibilitySettings): Promise<OrganizationSettings> {
+    const response = await api.put('/organizations/visibility', data) as any;
     return response.data.data;
   },
 };

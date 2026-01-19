@@ -84,8 +84,9 @@ export class StudentController {
 
       const { search, languageLevel, isActive } = req.query;
 
-      const students = await studentService.getStudents(
+      const students = await studentService.getStudentsWithVisibility(
         req.user.organizationId,
+        req.user.role,
         {
           search: search as string,
           languageLevel: languageLevel as LanguageLevel,
@@ -113,7 +114,11 @@ export class StudentController {
       }
 
       const { id } = req.params;
-      const student = await studentService.getStudentById(id as string, req.user.organizationId);
+      const student = await studentService.getStudentByIdWithVisibility(
+        id as string,
+        req.user.organizationId,
+        req.user.role
+      );
 
       return res.json({
         data: student,

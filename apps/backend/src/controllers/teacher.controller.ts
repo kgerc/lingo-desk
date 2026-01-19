@@ -71,8 +71,9 @@ export class TeacherController {
 
       const { search, isActive, isAvailableForBooking } = req.query;
 
-      const teachers = await teacherService.getTeachers(
+      const teachers = await teacherService.getTeachersWithVisibility(
         req.user.organizationId,
+        req.user.role,
         {
           search: search as string,
           isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
@@ -105,7 +106,11 @@ export class TeacherController {
       }
 
       const { id } = req.params;
-      const teacher = await teacherService.getTeacherById(id as string, req.user.organizationId);
+      const teacher = await teacherService.getTeacherByIdWithVisibility(
+        id as string,
+        req.user.organizationId,
+        req.user.role
+      );
 
       return res.json({
         data: teacher,

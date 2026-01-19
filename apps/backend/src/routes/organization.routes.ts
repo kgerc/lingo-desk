@@ -49,4 +49,18 @@ router.put(
   organizationController.updateOrganizationSettings.bind(organizationController)
 );
 
+// Get visibility settings (ADMIN or MANAGER can view)
+router.get(
+  '/visibility',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  organizationController.getVisibilitySettings.bind(organizationController)
+);
+
+// Update visibility settings (ADMIN only)
+router.put(
+  '/visibility',
+  authorize(UserRole.ADMIN),
+  organizationController.updateVisibilitySettings.bind(organizationController)
+);
+
 export default router;

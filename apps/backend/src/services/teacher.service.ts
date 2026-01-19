@@ -1,6 +1,7 @@
 import prisma from '../utils/prisma';
 import { ContractType, UserRole } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import { organizationService, VisibilitySettings } from './organization.service';
 
 interface CreateTeacherData {
   email: string;
@@ -393,6 +394,101 @@ export class TeacherService {
     });
 
     return lessons;
+  }
+
+  /**
+   * Filter teacher data based on visibility settings for manager role
+   */
+  filterTeacherForManager(teacher: any, visibility: VisibilitySettings['teacher']): any {
+    const filtered = { ...teacher };
+
+    // Filter hourlyRate
+    if (!visibility.hourlyRate) {
+      delete filtered.hourlyRate;
+    }
+
+    // Filter contractType
+    if (!visibility.contractType) {
+      delete filtered.contractType;
+    }
+
+    // Filter user email
+    if (!visibility.email && filtered.user) {
+      filtered.user = { ...filtered.user };
+      delete filtered.user.email;
+    }
+
+    // Filter user phone
+    if (!visibility.phone && filtered.user) {
+      filtered.user = { ...filtered.user };
+      delete filtered.user.phone;
+    }
+
+    // Filter bio/notes
+    if (!visibility.notes) {
+      delete filtered.bio;
+    }
+
+    // Filter payouts
+    if (!visibility.payouts) {
+      delete filtered.payouts;
+    }
+
+    return filtered;
+  }
+
+  /**
+   * Get teachers with visibility filtering based on user role
+   */
+  async getTeachersWithVisibility(
+    organizationId: string,
+    userRole: UserRole,
+    filters?: { search?: string; isActive?: boolean; isAvailableForBooking?: boolean }
+  ) {
+    const teachers = await this.getTeachers(organizationId, filters);
+
+    // ADMIN sees everything
+    if (userRole === UserRole.ADMIN) {
+      return teachers;
+    }
+
+    // MANAGER - apply visibility settings
+    if (userRole === UserRole.MANAGER) {
+      const visibility = await organizationService.getVisibilitySettings(organizationId);
+      return teachers.map(teacher => this.filterTeacherForManager(teacher, visibility.teacher));
+    }
+
+    // Other roles - return basic info
+    return teachers.map(teacher => ({
+      id: teacher.id,
+      user: {
+        id: teacher.user.id,
+        firstName: teacher.user.firstName,
+        lastName: teacher.user.lastName,
+        avatarUrl: teacher.user.avatarUrl,
+      },
+      isAvailableForBooking: teacher.isAvailableForBooking,
+    }));
+  }
+
+  /**
+   * Get single teacher with visibility filtering based on user role
+   */
+  async getTeacherByIdWithVisibility(id: string, organizationId: string, userRole: UserRole) {
+    const teacher = await this.getTeacherById(id, organizationId);
+
+    // ADMIN sees everything
+    if (userRole === UserRole.ADMIN) {
+      return teacher;
+    }
+
+    // MANAGER - apply visibility settings
+    if (userRole === UserRole.MANAGER) {
+      const visibility = await organizationService.getVisibilitySettings(organizationId);
+      return this.filterTeacherForManager(teacher, visibility.teacher);
+    }
+
+    return teacher;
   }
 }
 

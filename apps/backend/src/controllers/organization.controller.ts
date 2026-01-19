@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { organizationService, UpdateOrganizationData, CreateOrganizationData, UpdateOrganizationSettingsData } from '../services/organization.service';
+import { organizationService, UpdateOrganizationData, CreateOrganizationData, UpdateOrganizationSettingsData, VisibilitySettings } from '../services/organization.service';
 
 class OrganizationController {
   async getOrganization(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -146,6 +146,37 @@ class OrganizationController {
       const userId = req.user!.id;
 
       const settings = await organizationService.updateOrganizationSettings(organizationId, data, userId);
+
+      res.json({
+        success: true,
+        data: settings,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getVisibilitySettings(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizationId = req.user!.organizationId;
+      const visibility = await organizationService.getVisibilitySettings(organizationId);
+
+      res.json({
+        success: true,
+        data: visibility,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateVisibilitySettings(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizationId = req.user!.organizationId;
+      const visibility: VisibilitySettings = req.body;
+      const userId = req.user!.id;
+
+      const settings = await organizationService.updateVisibilitySettings(organizationId, visibility, userId);
 
       res.json({
         success: true,
