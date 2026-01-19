@@ -6,8 +6,9 @@ import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
 import { courseService } from '../services/courseService';
 import substitutionService from '../services/substitutionService';
-import { X, Users as UsersIcon, Clock, ClipboardList, Info } from 'lucide-react';
+import { X, Users as UsersIcon, Clock, ClipboardList, Info, XCircle } from 'lucide-react';
 import AttendanceSection from './AttendanceSection';
+import CancelLessonDialog from './CancelLessonDialog';
 
 interface LessonModalProps {
   lesson: Lesson | null;
@@ -58,6 +59,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [priceWasManuallySet, setPriceWasManuallySet] = useState(!!lesson?.pricePerLesson);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
 
   // Fetch existing substitution if editing
   const { data: existingSubstitution } = useQuery({
@@ -913,13 +915,25 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
 
             {/* Footer */}
             <div className="border-t border-gray-200 p-6 bg-gray-50 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                Anuluj
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  Zamknij
+                </button>
+                {isEdit && lesson && lesson.status !== 'CANCELLED' && lesson.status !== 'COMPLETED' && (
+                  <button
+                    type="button"
+                    onClick={() => setIsCancelDialogOpen(true)}
+                    className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-2"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    Anuluj lekcję
+                  </button>
+                )}
+              </div>
 
               <div className="flex gap-2">
                 {isEdit && lesson && (lesson.status === 'SCHEDULED' || lesson.status === 'CONFIRMED') && (
@@ -946,6 +960,19 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
               </div>
             </div>
           </form>
+
+          {/* Cancel Lesson Dialog */}
+          {lesson && (
+            <CancelLessonDialog
+              lesson={lesson}
+              isOpen={isCancelDialogOpen}
+              onClose={() => setIsCancelDialogOpen(false)}
+              onSuccess={() => {
+                setIsCancelDialogOpen(false);
+                onSuccess();
+              }}
+            />
+          )}
         </div>
       </div>
     </div>

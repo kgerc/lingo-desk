@@ -10,6 +10,35 @@ export type LessonStatus =
 
 export type LessonDeliveryMode = 'IN_PERSON' | 'ONLINE';
 
+export interface CancellationFeePreview {
+  feeApplies: boolean;
+  feeAmount: number | null;
+  feePercent: number | null;
+  hoursThreshold: number | null;
+  hoursUntilLesson: number;
+  lessonPrice: number | null;
+  currency: string;
+}
+
+export interface CancellationStats {
+  limitEnabled: boolean;
+  limit: number | null;
+  used: number;
+  remaining: number | null;
+  period: string | null;
+  periodStart: string | null;
+  canCancel: boolean;
+  cancelledLessons: Array<{
+    id: string;
+    title: string;
+    scheduledAt: string;
+    cancelledAt: string;
+    cancellationReason: string | null;
+    cancellationFeeApplied: boolean;
+    cancellationFeeAmount: number | null;
+  }>;
+}
+
 export interface Lesson {
   id: string;
   organizationId: string;
@@ -32,6 +61,9 @@ export interface Lesson {
   recurringPatternId?: string;
   cancelledAt?: string;
   cancellationReason?: string;
+  cancellationFeeApplied?: boolean;
+  cancellationFeeAmount?: number;
+  cancellationFeePaymentId?: string;
   completedAt?: string;
   confirmedByTeacherAt?: string;
   createdAt: string;
@@ -239,5 +271,15 @@ export const lessonService = {
       totalCreated: number;
       totalErrors: number;
     };
+  },
+
+  async getCancellationFeePreview(lessonId: string) {
+    const response = await api.get(`/lessons/${lessonId}/cancellation-fee-preview`) as any;
+    return response.data.data as CancellationFeePreview;
+  },
+
+  async getCancellationStats(studentId: string) {
+    const response = await api.get(`/lessons/student/${studentId}/cancellation-stats`) as any;
+    return response.data.data as CancellationStats;
   },
 };

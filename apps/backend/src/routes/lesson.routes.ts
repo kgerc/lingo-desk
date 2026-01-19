@@ -22,6 +22,12 @@ router.post(
   lessonController.createRecurringLessons.bind(lessonController)
 );
 
+// Get cancellation fee preview for a lesson
+router.get('/:id/cancellation-fee-preview', lessonController.getCancellationFeePreview.bind(lessonController));
+
+// Get cancellation stats for a student
+router.get('/student/:studentId/cancellation-stats', lessonController.getCancellationStats.bind(lessonController));
+
 // Get lesson by ID
 router.get('/:id', lessonController.getLessonById.bind(lessonController));
 

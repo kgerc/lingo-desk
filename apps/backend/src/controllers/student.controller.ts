@@ -33,7 +33,15 @@ const updateStudentSchema = z.object({
   isMinor: z.boolean().optional(),
   isActive: z.boolean().optional(),
   paymentDueDays: z.number().nullable().optional(),
-  paymentDueDayOfMonth: z.number().nullable().optional()
+  paymentDueDayOfMonth: z.number().nullable().optional(),
+  // Cancellation fee settings
+  cancellationFeeEnabled: z.boolean().optional(),
+  cancellationHoursThreshold: z.number().nullable().optional(),
+  cancellationFeePercent: z.number().min(0).max(100).nullable().optional(),
+  // Cancellation limit settings
+  cancellationLimitEnabled: z.boolean().optional(),
+  cancellationLimitCount: z.number().min(1).nullable().optional(),
+  cancellationLimitPeriod: z.enum(['month', 'quarter', 'year', 'enrollment']).nullable().optional(),
 });
 
 export class StudentController {

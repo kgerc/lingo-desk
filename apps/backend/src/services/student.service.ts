@@ -33,6 +33,14 @@ interface UpdateStudentData {
   isMinor?: boolean;
   paymentDueDays?: number | null;
   paymentDueDayOfMonth?: number | null;
+  // Cancellation fee settings
+  cancellationFeeEnabled?: boolean;
+  cancellationHoursThreshold?: number | null;
+  cancellationFeePercent?: number | null;
+  // Cancellation limit settings
+  cancellationLimitEnabled?: boolean;
+  cancellationLimitCount?: number | null;
+  cancellationLimitPeriod?: string | null;
   isActive?: boolean;
 }
 
@@ -311,6 +319,14 @@ export class StudentService {
           isMinor: data.isMinor,
           paymentDueDays: data.paymentDueDays,
           paymentDueDayOfMonth: data.paymentDueDayOfMonth,
+          // Cancellation fee settings
+          cancellationFeeEnabled: data.cancellationFeeEnabled,
+          cancellationHoursThreshold: data.cancellationHoursThreshold,
+          cancellationFeePercent: data.cancellationFeePercent,
+          // Cancellation limit settings
+          cancellationLimitEnabled: data.cancellationLimitEnabled,
+          cancellationLimitCount: data.cancellationLimitCount,
+          cancellationLimitPeriod: data.cancellationLimitPeriod,
         },
         include: {
           user: {

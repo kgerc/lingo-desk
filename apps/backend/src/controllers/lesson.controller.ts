@@ -212,6 +212,26 @@ class LessonController {
       return next(error);
     }
   }
+
+  async getCancellationFeePreview(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const preview = await lessonService.getCancellationFeePreview(id as string, req.user!.organizationId);
+      return res.json({ message: 'Cancellation fee preview retrieved', data: preview });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async getCancellationStats(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { studentId } = req.params;
+      const stats = await lessonService.getCancellationStats(studentId as string, req.user!.organizationId);
+      return res.json({ message: 'Cancellation stats retrieved', data: stats });
+    } catch (error) {
+      return next(error);
+    }
+  }
 }
 
 export default new LessonController();

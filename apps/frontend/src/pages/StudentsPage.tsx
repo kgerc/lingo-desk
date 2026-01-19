@@ -2,9 +2,10 @@ import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { studentService, Student } from '../services/studentService';
-import { Plus, Search, Mail, Phone, MoreVertical, Upload } from 'lucide-react';
+import { Plus, Search, Mail, Phone, MoreVertical, Upload, X } from 'lucide-react';
 import StudentModal from '../components/StudentModal';
 import ImportStudentsModal from '../components/ImportStudentsModal';
+import StudentCancellationsTab from '../components/StudentCancellationsTab';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Dropdown from '../components/Dropdown';
@@ -14,6 +15,7 @@ const StudentsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isCancellationsModalOpen, setIsCancellationsModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; studentId: string | null }>({ isOpen: false, studentId: null });
@@ -40,6 +42,11 @@ const StudentsPage: React.FC = () => {
   const handleEdit = (student: Student) => {
     setSelectedStudent(student);
     setIsModalOpen(true);
+  };
+
+  const handleShowCancellations = (student: Student) => {
+    setSelectedStudent(student);
+    setIsCancellationsModalOpen(true);
   };
 
   const handleDelete = (id: string) => {
@@ -231,6 +238,10 @@ const StudentsPage: React.FC = () => {
                             onClick: () => handleEdit(student),
                           },
                           {
+                            label: 'Odwołania',
+                            onClick: () => handleShowCancellations(student),
+                          },
+                          {
                             label: 'Usuń ucznia',
                             onClick: () => handleDelete(student.id),
                             variant: 'danger',
@@ -277,6 +288,50 @@ const StudentsPage: React.FC = () => {
         cancelText="Anuluj"
         variant="danger"
       />
+
+      {/* Cancellations Modal */}
+      {isCancellationsModalOpen && selectedStudent && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setIsCancellationsModalOpen(false)} />
+            <div className="relative bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Odwołania - {selectedStudent.user.firstName} {selectedStudent.user.lastName}
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Historia i limity odwołań lekcji
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsCancellationsModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                <StudentCancellationsTab student={selectedStudent} />
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+                <button
+                  type="button"
+                  onClick={() => setIsCancellationsModalOpen(false)}
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Zamknij
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

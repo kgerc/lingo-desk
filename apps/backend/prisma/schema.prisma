@@ -286,6 +286,14 @@ model Student {
   isMinor             Boolean       @default(false) @map("is_minor")
   paymentDueDays      Int?          @map("payment_due_days")
   paymentDueDayOfMonth Int?         @map("payment_due_day_of_month")
+  // Paid cancellation settings
+  cancellationFeeEnabled    Boolean  @default(false) @map("cancellation_fee_enabled")
+  cancellationHoursThreshold Int?    @map("cancellation_hours_threshold") // Hours before lesson when fee applies
+  cancellationFeePercent    Int?     @map("cancellation_fee_percent") // Percentage of lesson price (0-100)
+  // Cancellation limit settings
+  cancellationLimitEnabled  Boolean  @default(false) @map("cancellation_limit_enabled")
+  cancellationLimitCount    Int?     @map("cancellation_limit_count") // Max cancellations allowed per period
+  cancellationLimitPeriod   String?  @map("cancellation_limit_period") // Period: 'month', 'quarter', 'year', 'enrollment'
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
@@ -485,6 +493,9 @@ model Lesson {
   recurringPatternId    String?            @map("recurring_pattern_id")
   cancelledAt           DateTime?          @map("cancelled_at")
   cancellationReason    String?            @map("cancellation_reason")
+  cancellationFeeApplied Boolean           @default(false) @map("cancellation_fee_applied")
+  cancellationFeeAmount  Decimal?          @map("cancellation_fee_amount") @db.Decimal(10, 2)
+  cancellationFeePaymentId String?         @map("cancellation_fee_payment_id")
   completedAt           DateTime?          @map("completed_at")
   confirmedByTeacherAt  DateTime?          @map("confirmed_by_teacher_at")
   createdAt             DateTime           @default(now()) @map("created_at")

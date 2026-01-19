@@ -21,8 +21,11 @@ const LANGUAGES = [
   { value: 'pl', label: 'Polski' },
 ];
 
+type TabType = 'personal' | 'cancellation';
+
 const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess }) => {
   const isEdit = !!student;
+  const [activeTab, setActiveTab] = useState<TabType>('personal');
 
   const [formData, setFormData] = useState({
     firstName: student?.user.firstName || '',
@@ -38,6 +41,14 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
     isMinor: student?.isMinor || false,
     paymentDueDays: student?.paymentDueDays || null,
     paymentDueDayOfMonth: student?.paymentDueDayOfMonth || null,
+    // Cancellation fee settings
+    cancellationFeeEnabled: student?.cancellationFeeEnabled || false,
+    cancellationHoursThreshold: student?.cancellationHoursThreshold || null,
+    cancellationFeePercent: student?.cancellationFeePercent || null,
+    // Cancellation limit settings
+    cancellationLimitEnabled: student?.cancellationLimitEnabled || false,
+    cancellationLimitCount: student?.cancellationLimitCount || null,
+    cancellationLimitPeriod: student?.cancellationLimitPeriod || 'month',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -105,6 +116,14 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
           isMinor: formData.isMinor,
           paymentDueDays: formData.paymentDueDays || undefined,
           paymentDueDayOfMonth: formData.paymentDueDayOfMonth || undefined,
+          // Cancellation fee settings
+          cancellationFeeEnabled: formData.cancellationFeeEnabled,
+          cancellationHoursThreshold: formData.cancellationFeeEnabled ? formData.cancellationHoursThreshold : null,
+          cancellationFeePercent: formData.cancellationFeeEnabled ? formData.cancellationFeePercent : null,
+          // Cancellation limit settings
+          cancellationLimitEnabled: formData.cancellationLimitEnabled,
+          cancellationLimitCount: formData.cancellationLimitEnabled ? formData.cancellationLimitCount : null,
+          cancellationLimitPeriod: formData.cancellationLimitEnabled ? formData.cancellationLimitPeriod : null,
         },
       });
     } else {
@@ -150,6 +169,34 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
           </button>
         </div>
 
+        {/* Tabs */}
+        <div className="border-b border-gray-200">
+          <nav className="flex -mb-px px-6">
+            <button
+              type="button"
+              onClick={() => setActiveTab('personal')}
+              className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'personal'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Dane osobowe
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('cancellation')}
+              className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'cancellation'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Ustawienia odwołań
+            </button>
+          </nav>
+        </div>
+
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {errors.form && (
@@ -158,7 +205,8 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
             </div>
           )}
 
-          {/* Personal Info */}
+          {/* Personal Info Tab */}
+          {activeTab === 'personal' && (
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Dane osobowe</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -396,6 +444,172 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
               </div>
             </div>
           </div>
+          )}
+
+          {/* Cancellation Settings Tab */}
+          {activeTab === 'cancellation' && (
+          <>
+          {/* Cancellation Fee Settings */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Płatne odwołanie lekcji</h3>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="cancellationFeeEnabled"
+                  checked={formData.cancellationFeeEnabled}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    cancellationFeeEnabled: e.target.checked,
+                  })}
+                  className="rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <label htmlFor="cancellationFeeEnabled" className="text-sm font-medium text-gray-700">
+                  Włącz opłatę za późne odwołanie
+                </label>
+              </div>
+
+              {formData.cancellationFeeEnabled && (
+                <div className="grid grid-cols-2 gap-4 pl-6 border-l-2 border-primary/30">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Próg godzinowy *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="168"
+                      value={formData.cancellationHoursThreshold ?? ''}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        cancellationHoursThreshold: e.target.value ? parseInt(e.target.value) : null,
+                      })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      placeholder="np. 24"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Liczba godzin przed lekcją, po których naliczana jest opłata
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Procent opłaty *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={formData.cancellationFeePercent ?? ''}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          cancellationFeePercent: e.target.value ? parseInt(e.target.value) : null,
+                        })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent pr-8"
+                        placeholder="np. 70"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Procent ceny lekcji naliczany przy późnym odwołaniu
+                    </p>
+                  </div>
+
+                  <div className="col-span-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="text-sm text-amber-800">
+                      <strong>Przykład:</strong> Przy progu {formData.cancellationHoursThreshold || 24}h i opłacie {formData.cancellationFeePercent || 70}%,
+                      jeśli uczeń odwoła lekcję za 100 PLN mniej niż {formData.cancellationHoursThreshold || 24} godziny przed jej rozpoczęciem,
+                      zostanie naliczona opłata {((formData.cancellationFeePercent || 70) / 100 * 100).toFixed(0)} PLN.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Cancellation Limit Settings */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Limit odwołań</h3>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="cancellationLimitEnabled"
+                  checked={formData.cancellationLimitEnabled}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    cancellationLimitEnabled: e.target.checked,
+                  })}
+                  className="rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <label htmlFor="cancellationLimitEnabled" className="text-sm font-medium text-gray-700">
+                  Włącz limit odwołań lekcji
+                </label>
+              </div>
+
+              {formData.cancellationLimitEnabled && (
+                <div className="grid grid-cols-2 gap-4 pl-6 border-l-2 border-blue-300">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Maksymalna liczba odwołań *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={formData.cancellationLimitCount ?? ''}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        cancellationLimitCount: e.target.value ? parseInt(e.target.value) : null,
+                      })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      placeholder="np. 5"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Ile razy uczeń może odwołać lekcję w okresie
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Okres rozliczeniowy *
+                    </label>
+                    <select
+                      value={formData.cancellationLimitPeriod || 'month'}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        cancellationLimitPeriod: e.target.value,
+                      })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="month">Miesiąc</option>
+                      <option value="quarter">Kwartał</option>
+                      <option value="year">Rok</option>
+                      <option value="enrollment">Od zapisania</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Okres, w którym liczony jest limit
+                    </p>
+                  </div>
+
+                  <div className="col-span-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-800">
+                      <strong>Przykład:</strong> Przy limicie {formData.cancellationLimitCount || 5} odwołań na {
+                        formData.cancellationLimitPeriod === 'month' ? 'miesiąc' :
+                        formData.cancellationLimitPeriod === 'quarter' ? 'kwartał' :
+                        formData.cancellationLimitPeriod === 'year' ? 'rok' : 'cały okres nauki'
+                      },
+                      uczeń może odwołać maksymalnie {formData.cancellationLimitCount || 5} lekcji w tym okresie.
+                      Po przekroczeniu limitu nie będzie mógł odwoływać kolejnych lekcji.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          </>
+          )}
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">

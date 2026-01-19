@@ -532,7 +532,14 @@ const LessonsPage: React.FC = () => {
                 {lesson.deliveryMode === 'ONLINE' ? 'Online' : 'Stacjonarne'}
               </span>
             </div>
-            {getStatusBadge(lesson.status)}
+            <div className="flex flex-col gap-1 items-start">
+              {getStatusBadge(lesson.status)}
+              {lesson.cancellationFeeApplied && lesson.cancellationFeeAmount && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                  Opłata: {lesson.cancellationFeeAmount} {lesson.currency || 'PLN'}
+                </span>
+              )}
+            </div>
           </div>
           <div className="ml-4">
             <button

@@ -10,6 +10,14 @@ export interface Student {
   isMinor: boolean;
   paymentDueDays?: number | null;
   paymentDueDayOfMonth?: number | null;
+  // Cancellation fee settings
+  cancellationFeeEnabled?: boolean;
+  cancellationHoursThreshold?: number | null;
+  cancellationFeePercent?: number | null;
+  // Cancellation limit settings
+  cancellationLimitEnabled?: boolean;
+  cancellationLimitCount?: number | null;
+  cancellationLimitPeriod?: string | null;
   enrollmentDate: string;
   user: {
     id: string;
@@ -62,6 +70,14 @@ export interface UpdateStudentData {
   isMinor?: boolean;
   paymentDueDays?: number | null;
   paymentDueDayOfMonth?: number | null;
+  // Cancellation fee settings
+  cancellationFeeEnabled?: boolean;
+  cancellationHoursThreshold?: number | null;
+  cancellationFeePercent?: number | null;
+  // Cancellation limit settings
+  cancellationLimitEnabled?: boolean;
+  cancellationLimitCount?: number | null;
+  cancellationLimitPeriod?: string | null;
   isActive?: boolean;
 }
 

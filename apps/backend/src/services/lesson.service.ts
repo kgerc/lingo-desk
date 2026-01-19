@@ -447,11 +447,30 @@ class LessonService {
     const isRescheduling = data.scheduledAt &&
       new Date(data.scheduledAt).getTime() !== new Date(existingLesson.scheduledAt).getTime();
 
-    // If cancelling, set cancelled timestamp
+    // If cancelling, set cancelled timestamp and check for cancellation fee
     const updateData: any = { ...data };
     const isCancellingLesson = data.status === 'CANCELLED' && existingLesson.status !== 'CANCELLED' && !existingLesson.cancelledAt;
+
     if (isCancellingLesson) {
+      // Check if cancellation limit is exceeded
+      const limitCheck = await this.checkCancellationLimit(existingLesson.studentId);
+      if (!limitCheck.canCancel) {
+        throw new Error(`Limit odwołań został przekroczony. Wykorzystano ${limitCheck.used} z ${limitCheck.limit} dozwolonych odwołań w tym okresie.`);
+      }
+
       updateData.cancelledAt = new Date();
+
+      // Check if cancellation fee should be applied
+      const cancellationFeeResult = await this.checkAndApplyCancellationFee(
+        existingLesson,
+        organizationId
+      );
+
+      if (cancellationFeeResult) {
+        updateData.cancellationFeeApplied = true;
+        updateData.cancellationFeeAmount = cancellationFeeResult.feeAmount;
+        updateData.cancellationFeePaymentId = cancellationFeeResult.paymentId;
+      }
     }
 
     // If completing, set completed timestamp and deduct from budget
@@ -553,6 +572,328 @@ class LessonService {
     }
 
     return lesson;
+  }
+
+  /**
+   * Check if cancellation fee should be applied and create payment if needed
+   * Returns null if no fee applies, or an object with fee details and payment ID
+   */
+  private async checkAndApplyCancellationFee(
+    lesson: any,
+    organizationId: string
+  ): Promise<{ feeAmount: number; paymentId: string } | null> {
+    // Get student with cancellation fee settings
+    const student = await prisma.student.findUnique({
+      where: { id: lesson.studentId },
+      select: {
+        id: true,
+        cancellationFeeEnabled: true,
+        cancellationHoursThreshold: true,
+        cancellationFeePercent: true,
+        organizationId: true,
+        paymentDueDays: true,
+        paymentDueDayOfMonth: true,
+      },
+    });
+
+    // Check if cancellation fee is enabled for this student
+    if (!student || !student.cancellationFeeEnabled) {
+      return null;
+    }
+
+    // Check if thresholds are configured
+    if (!student.cancellationHoursThreshold || !student.cancellationFeePercent) {
+      return null;
+    }
+
+    // Calculate hours until lesson
+    const now = new Date();
+    const lessonTime = new Date(lesson.scheduledAt);
+    const hoursUntilLesson = (lessonTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    // Check if cancellation is within the threshold (late cancellation)
+    if (hoursUntilLesson >= student.cancellationHoursThreshold) {
+      // Cancelled early enough - no fee
+      return null;
+    }
+
+    // Calculate fee amount
+    const lessonPrice = lesson.pricePerLesson ? Number(lesson.pricePerLesson) : 0;
+    if (lessonPrice <= 0) {
+      return null; // No price set for the lesson
+    }
+
+    const feeAmount = (lessonPrice * student.cancellationFeePercent) / 100;
+
+    // Calculate due date for payment
+    const calculateDueDate = (): Date => {
+      if (student.paymentDueDayOfMonth) {
+        const dueDate = new Date();
+        dueDate.setDate(student.paymentDueDayOfMonth);
+        if (dueDate <= now) {
+          dueDate.setMonth(dueDate.getMonth() + 1);
+        }
+        return dueDate;
+      } else if (student.paymentDueDays) {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + student.paymentDueDays);
+        return dueDate;
+      }
+      return now;
+    };
+
+    // Create pending payment for cancellation fee
+    const payment = await prisma.payment.create({
+      data: {
+        organizationId,
+        studentId: student.id,
+        enrollmentId: lesson.enrollmentId,
+        lessonId: lesson.id,
+        amount: feeAmount,
+        currency: lesson.currency || 'PLN',
+        status: 'PENDING',
+        paymentMethod: 'CASH',
+        dueAt: calculateDueDate(),
+        notes: `Opłata za późne odwołanie lekcji "${lesson.title}" (${student.cancellationFeePercent}% ceny lekcji)`,
+      },
+    });
+
+    return {
+      feeAmount,
+      paymentId: payment.id,
+    };
+  }
+
+  /**
+   * Calculate cancellation fee preview (without creating payment)
+   * Used by frontend to show fee info before confirming cancellation
+   */
+  async getCancellationFeePreview(
+    lessonId: string,
+    organizationId: string
+  ): Promise<{
+    feeApplies: boolean;
+    feeAmount: number | null;
+    feePercent: number | null;
+    hoursThreshold: number | null;
+    hoursUntilLesson: number;
+    lessonPrice: number | null;
+    currency: string;
+  }> {
+    const lesson = await prisma.lesson.findFirst({
+      where: {
+        id: lessonId,
+        organizationId,
+      },
+      include: {
+        student: {
+          select: {
+            cancellationFeeEnabled: true,
+            cancellationHoursThreshold: true,
+            cancellationFeePercent: true,
+          },
+        },
+      },
+    });
+
+    if (!lesson) {
+      throw new Error('Lesson not found');
+    }
+
+    const now = new Date();
+    const lessonTime = new Date(lesson.scheduledAt);
+    const hoursUntilLesson = (lessonTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const lessonPrice = lesson.pricePerLesson ? Number(lesson.pricePerLesson) : null;
+
+    const result = {
+      feeApplies: false,
+      feeAmount: null as number | null,
+      feePercent: lesson.student.cancellationFeePercent,
+      hoursThreshold: lesson.student.cancellationHoursThreshold,
+      hoursUntilLesson: Math.max(0, hoursUntilLesson),
+      lessonPrice,
+      currency: lesson.currency || 'PLN',
+    };
+
+    // Check if fee should apply
+    if (
+      lesson.student.cancellationFeeEnabled &&
+      lesson.student.cancellationHoursThreshold &&
+      lesson.student.cancellationFeePercent &&
+      lessonPrice &&
+      lessonPrice > 0 &&
+      hoursUntilLesson < lesson.student.cancellationHoursThreshold
+    ) {
+      result.feeApplies = true;
+      result.feeAmount = (lessonPrice * lesson.student.cancellationFeePercent) / 100;
+    }
+
+    return result;
+  }
+
+  /**
+   * Check if student can cancel a lesson based on their cancellation limit
+   */
+  private async checkCancellationLimit(studentId: string): Promise<{
+    canCancel: boolean;
+    used: number;
+    limit: number | null;
+    limitEnabled: boolean;
+    period: string | null;
+  }> {
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      select: {
+        cancellationLimitEnabled: true,
+        cancellationLimitCount: true,
+        cancellationLimitPeriod: true,
+        enrollmentDate: true,
+      },
+    });
+
+    if (!student || !student.cancellationLimitEnabled || !student.cancellationLimitCount) {
+      return {
+        canCancel: true,
+        used: 0,
+        limit: null,
+        limitEnabled: false,
+        period: null,
+      };
+    }
+
+    // Calculate period start date
+    const periodStart = this.calculatePeriodStart(student.cancellationLimitPeriod, student.enrollmentDate);
+
+    // Count cancellations in the current period
+    const cancellationsCount = await prisma.lesson.count({
+      where: {
+        studentId,
+        status: 'CANCELLED',
+        cancelledAt: {
+          gte: periodStart,
+        },
+      },
+    });
+
+    return {
+      canCancel: cancellationsCount < student.cancellationLimitCount,
+      used: cancellationsCount,
+      limit: student.cancellationLimitCount,
+      limitEnabled: true,
+      period: student.cancellationLimitPeriod,
+    };
+  }
+
+  /**
+   * Calculate the start date of the current period for cancellation limit
+   */
+  private calculatePeriodStart(period: string | null, enrollmentDate: Date): Date {
+    const now = new Date();
+
+    switch (period) {
+      case 'month': {
+        return new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+      case 'quarter': {
+        const quarter = Math.floor(now.getMonth() / 3);
+        return new Date(now.getFullYear(), quarter * 3, 1);
+      }
+      case 'year': {
+        return new Date(now.getFullYear(), 0, 1);
+      }
+      case 'enrollment':
+      default: {
+        return new Date(enrollmentDate);
+      }
+    }
+  }
+
+  /**
+   * Get cancellation statistics for a student
+   */
+  async getCancellationStats(studentId: string, organizationId: string): Promise<{
+    limitEnabled: boolean;
+    limit: number | null;
+    used: number;
+    remaining: number | null;
+    period: string | null;
+    periodStart: Date | null;
+    canCancel: boolean;
+    cancelledLessons: Array<{
+      id: string;
+      title: string;
+      scheduledAt: Date;
+      cancelledAt: Date;
+      cancellationReason: string | null;
+      cancellationFeeApplied: boolean;
+      cancellationFeeAmount: number | null;
+    }>;
+  }> {
+    const student = await prisma.student.findFirst({
+      where: {
+        id: studentId,
+        organizationId,
+      },
+      select: {
+        cancellationLimitEnabled: true,
+        cancellationLimitCount: true,
+        cancellationLimitPeriod: true,
+        enrollmentDate: true,
+      },
+    });
+
+    if (!student) {
+      throw new Error('Student not found');
+    }
+
+    const periodStart = student.cancellationLimitEnabled
+      ? this.calculatePeriodStart(student.cancellationLimitPeriod, student.enrollmentDate)
+      : null;
+
+    // Get cancelled lessons (in current period if limit enabled, otherwise all)
+    const cancelledLessons = await prisma.lesson.findMany({
+      where: {
+        studentId,
+        status: 'CANCELLED',
+        cancelledAt: periodStart ? { gte: periodStart } : { not: null },
+      },
+      select: {
+        id: true,
+        title: true,
+        scheduledAt: true,
+        cancelledAt: true,
+        cancellationReason: true,
+        cancellationFeeApplied: true,
+        cancellationFeeAmount: true,
+      },
+      orderBy: {
+        cancelledAt: 'desc',
+      },
+    });
+
+    const used = cancelledLessons.length;
+    const limit = student.cancellationLimitEnabled ? student.cancellationLimitCount : null;
+    const remaining = limit !== null ? Math.max(0, limit - used) : null;
+    const canCancel = !student.cancellationLimitEnabled || (limit !== null && used < limit);
+
+    return {
+      limitEnabled: student.cancellationLimitEnabled,
+      limit,
+      used,
+      remaining,
+      period: student.cancellationLimitPeriod,
+      periodStart,
+      canCancel,
+      cancelledLessons: cancelledLessons.map(l => ({
+        id: l.id,
+        title: l.title,
+        scheduledAt: l.scheduledAt,
+        cancelledAt: l.cancelledAt!,
+        cancellationReason: l.cancellationReason,
+        cancellationFeeApplied: l.cancellationFeeApplied,
+        cancellationFeeAmount: l.cancellationFeeAmount ? Number(l.cancellationFeeAmount) : null,
+      })),
+    };
   }
 
   /**
@@ -856,23 +1197,33 @@ class LessonService {
       throw new Error('Cannot delete completed lesson');
     }
 
-    // Soft delete - mark as cancelled
-    await prisma.lesson.update({
-      where: { id },
-      data: {
-        status: 'CANCELLED',
-        cancelledAt: new Date(),
-        cancellationReason: 'Deleted by user',
-      },
-    });
-
-    // Delete event from Google Calendar if teacher has connected their calendar
+    // Delete event from Google Calendar first (before deleting from DB)
     try {
       await googleCalendarService.deleteEventFromLesson(id);
     } catch (error) {
       console.error('Failed to delete lesson from Google Calendar:', error);
       // Don't fail the lesson deletion if Google Calendar sync fails
     }
+
+    // Handle related records before deleting the lesson
+    // 1. Remove lesson reference from payments (don't delete payments, just unlink)
+    await prisma.payment.updateMany({
+      where: { lessonId: id },
+      data: { lessonId: null },
+    });
+
+    // 2. Delete teacher payout lessons (if any)
+    await prisma.teacherPayoutLesson.deleteMany({
+      where: { lessonId: id },
+    });
+
+    // Note: LessonAttendance, Substitution, and LessonGoogleCalendarEvent
+    // have onDelete: Cascade, so they will be automatically deleted
+
+    // Hard delete - completely remove from database
+    await prisma.lesson.delete({
+      where: { id },
+    });
 
     return { message: 'Lesson deleted successfully' };
   }
