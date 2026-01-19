@@ -1,9 +1,22 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import alertService, { Alert } from '../services/alertService';
-import { Bell, CheckCheck, AlertTriangle, Info, XCircle, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Bell, CheckCheck, AlertTriangle, Info, XCircle, CheckCircle, ChevronLeft, ChevronRight, Calendar, User, BookOpen } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
+
+interface LessonDetail {
+  id: string;
+  title: string;
+  scheduledAt: string;
+  teacherName: string;
+  studentName: string;
+}
+
+interface StudentDetail {
+  id: string;
+  name: string;
+}
 
 const AlertsPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -89,6 +102,93 @@ const AlertsPage: React.FC = () => {
       default:
         return 'bg-gray-50 border-gray-200';
     }
+  };
+
+  const formatLessonDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pl-PL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const renderAlertDetails = (alert: Alert) => {
+    const metadata = alert.metadata;
+    if (!metadata) return null;
+
+    // Render lesson details for lesson-related alerts
+    if (metadata.lessons && Array.isArray(metadata.lessons)) {
+      const lessons = metadata.lessons as LessonDetail[];
+      const displayLessons = lessons.slice(0, 5); // Show max 5 lessons
+      const remainingCount = lessons.length - displayLessons.length;
+
+      return (
+        <div className="mt-3 space-y-2">
+          {displayLessons.map((lesson) => (
+            <div
+              key={lesson.id}
+              className="bg-white/60 rounded-lg p-3 border border-gray-200/50"
+            >
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                <BookOpen className="h-4 w-4 text-gray-500" />
+                {lesson.title}
+              </div>
+              <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-gray-600">
+                <div className="flex items-center gap-1">
+                  <User className="h-3 w-3" />
+                  <span>Lektor: {lesson.teacherName}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  <span>{formatLessonDate(lesson.scheduledAt)}</span>
+                </div>
+                <div className="flex items-center gap-1 sm:col-span-2">
+                  <User className="h-3 w-3" />
+                  <span>Uczeń: {lesson.studentName}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+          {remainingCount > 0 && (
+            <p className="text-xs text-gray-500 italic">
+              ...i {remainingCount} więcej lekcji
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // Render student details for student-related alerts
+    if (metadata.students && Array.isArray(metadata.students)) {
+      const students = metadata.students as StudentDetail[];
+      const displayStudents = students.slice(0, 8); // Show max 8 students
+      const remainingCount = students.length - displayStudents.length;
+
+      return (
+        <div className="mt-3">
+          <div className="flex flex-wrap gap-2">
+            {displayStudents.map((student) => (
+              <span
+                key={student.id}
+                className="inline-flex items-center gap-1 bg-white/60 px-2 py-1 rounded-lg border border-gray-200/50 text-sm text-gray-700"
+              >
+                <User className="h-3 w-3 text-gray-500" />
+                {student.name}
+              </span>
+            ))}
+            {remainingCount > 0 && (
+              <span className="inline-flex items-center px-2 py-1 text-xs text-gray-500 italic">
+                ...i {remainingCount} więcej
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   const handleMarkAsRead = (alertId: string) => {
@@ -186,6 +286,7 @@ const AlertsPage: React.FC = () => {
                       )}
                     </div>
                     <p className="text-sm text-gray-700">{alert.message}</p>
+                    {renderAlertDetails(alert)}
                     <p className="text-xs text-gray-500 mt-2">
                       {new Date(alert.createdAt).toLocaleDateString('pl-PL', {
                         year: 'numeric',

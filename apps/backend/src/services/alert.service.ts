@@ -143,6 +143,18 @@ class AlertService {
           lte: new Date(Date.now() + 24 * 60 * 60 * 1000),
         },
       },
+      include: {
+        teacher: {
+          include: {
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
+        student: {
+          include: {
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
     });
 
     if (upcomingUnconfirmedLessons.length > 0) {
@@ -165,6 +177,13 @@ class AlertService {
             alertType: 'UNCONFIRMED_LESSONS',
             count: upcomingUnconfirmedLessons.length,
             lessonIds: upcomingUnconfirmedLessons.map(l => l.id),
+            lessons: upcomingUnconfirmedLessons.map(l => ({
+              id: l.id,
+              title: l.title,
+              scheduledAt: l.scheduledAt.toISOString(),
+              teacherName: `${l.teacher.user.firstName} ${l.teacher.user.lastName}`,
+              studentName: `${l.student.user.firstName} ${l.student.user.lastName}`,
+            })),
           },
         });
         generatedAlerts.push(alert);
@@ -180,6 +199,18 @@ class AlertService {
         },
         status: {
           notIn: ['COMPLETED', 'CANCELLED'],
+        },
+      },
+      include: {
+        teacher: {
+          include: {
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
+        student: {
+          include: {
+            user: { select: { firstName: true, lastName: true } },
+          },
         },
       },
     });
@@ -203,6 +234,13 @@ class AlertService {
             alertType: 'OVERDUE_LESSONS',
             count: overdueLessons.length,
             lessonIds: overdueLessons.map(l => l.id),
+            lessons: overdueLessons.map(l => ({
+              id: l.id,
+              title: l.title,
+              scheduledAt: l.scheduledAt.toISOString(),
+              teacherName: `${l.teacher.user.firstName} ${l.teacher.user.lastName}`,
+              studentName: `${l.student.user.firstName} ${l.student.user.lastName}`,
+            })),
           },
         });
         generatedAlerts.push(alert);
@@ -220,7 +258,9 @@ class AlertService {
           },
         },
       },
-      select: { id: true },
+      include: {
+        user: { select: { firstName: true, lastName: true } },
+      },
     });
 
     if (studentsWithoutEnrollments.length > 0) {
@@ -242,6 +282,10 @@ class AlertService {
             alertType: 'STUDENTS_WITHOUT_ENROLLMENTS',
             count: studentsWithoutEnrollments.length,
             studentIds: studentsWithoutEnrollments.map(s => s.id),
+            students: studentsWithoutEnrollments.map(s => ({
+              id: s.id,
+              name: `${s.user.firstName} ${s.user.lastName}`,
+            })),
           },
         });
         generatedAlerts.push(alert);
