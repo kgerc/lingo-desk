@@ -181,7 +181,9 @@ model Organization {
   settings              OrganizationSettings?
   googleCalendarSyncs   GoogleCalendarSync[]
   exchangeRates         ExchangeRate[]
+  studentSettlements    StudentSettlement[]
   substitutions         Substitution[]
+  teacherPayouts        TeacherPayout[]
 
   @@map("organizations")
 }
@@ -296,6 +298,7 @@ model Student {
   payments          Payment[]
   budget            StudentBudget?
   attendances       LessonAttendance[]
+  settlements       StudentSettlement[]
 
   @@unique([organizationId, studentNumber])
   @@index([organizationId])
@@ -500,6 +503,7 @@ model Lesson {
   payments            Payment[]
   googleCalendarEvent LessonGoogleCalendarEvent?
   substitution        Substitution?
+  payoutLessons       TeacherPayoutLesson[]
 
   @@index([organizationId])
   @@index([teacherId])
@@ -639,37 +643,103 @@ model StudentBudget {
   totalHoursPurchased Decimal  @default(0) @map("total_hours_purchased") @db.Decimal(10, 2)
   totalHoursUsed      Decimal  @default(0) @map("total_hours_used") @db.Decimal(10, 2)
   balance             Decimal  @default(0) @db.Decimal(10, 2)
+  currentBalance      Decimal  @default(0) @map("current_balance") @db.Decimal(10, 2) // Financial balance (negative = debt, positive = overpayment)
+  lastSettlementDate  DateTime? @map("last_settlement_date")
   lastUpdatedAt       DateTime @updatedAt @map("last_updated_at")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
   // Relations
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student     Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  settlements StudentSettlement[]
 
   @@index([studentId])
   @@map("student_budgets")
 }
 
-model TeacherPayout {
-  id          String        @id @default(uuid())
-  organizationId String     @map("organization_id")
-  teacherId   String        @map("teacher_id")
-  periodStart DateTime      @map("period_start")
-  periodEnd   DateTime      @map("period_end")
-  totalHours  Decimal       @map("total_hours") @db.Decimal(10, 2)
-  totalAmount Decimal       @map("total_amount") @db.Decimal(10, 2)
-  status      String
-  paidAt      DateTime?     @map("paid_at")
-  notes       String?
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
+model StudentSettlement {
+  id                    String   @id @default(uuid())
+  organizationId        String   @map("organization_id")
+  studentId             String   @map("student_id")
+  budgetId              String   @map("budget_id")
+  periodStart           DateTime @map("period_start")
+  periodEnd             DateTime @map("period_end")
+  totalPaymentsDue      Decimal  @map("total_payments_due") @db.Decimal(10, 2)    // Sum of all payments (charges) in period
+  totalPaymentsReceived Decimal  @map("total_payments_received") @db.Decimal(10, 2) // Sum of all completed payments (deposits) in period
+  balanceBefore         Decimal  @map("balance_before") @db.Decimal(10, 2)        // Balance at period start
+  balanceAfter          Decimal  @map("balance_after") @db.Decimal(10, 2)         // Balance at period end
+  currency              String   @default("PLN")
+  notes                 String?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   // Relations
-  teacher Teacher @relation(fields: [teacherId], references: [id])
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  student      Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  budget       StudentBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
+  @@index([studentId])
+  @@index([periodStart, periodEnd])
+  @@map("student_settlements")
+}
+
+model TeacherPayout {
+  id                     String               @id @default(uuid())
+  organizationId         String               @map("organization_id")
+  teacherId              String               @map("teacher_id")
+  periodStart            DateTime             @map("period_start")
+  periodEnd              DateTime             @map("period_end")
+  totalHours             Decimal              @map("total_hours") @db.Decimal(10, 2)
+  totalAmount            Decimal              @map("total_amount") @db.Decimal(10, 2)
+  currency               String               @default("PLN")
+  status                 TeacherPayoutStatus  @default(PENDING)
+  paidAt                 DateTime?            @map("paid_at")
+  notes                  String?
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  teacher      Teacher              @relation(fields: [teacherId], references: [id])
+  lessons      TeacherPayoutLesson[]
+
+  @@index([organizationId])
   @@index([teacherId])
   @@index([periodStart, periodEnd])
+  @@index([status])
   @@map("teacher_payouts")
+}
+
+enum TeacherPayoutStatus {
+  PENDING
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+model TeacherPayoutLesson {
+  id                  String        @id @default(uuid())
+  payoutId            String        @map("payout_id")
+  lessonId            String        @map("lesson_id")
+  lessonDate          DateTime      @map("lesson_date")
+  durationMinutes     Int           @map("duration_minutes")
+  hourlyRate          Decimal       @map("hourly_rate") @db.Decimal(10, 2)
+  amount              Decimal       @db.Decimal(10, 2)
+  currency            String        @default("PLN")
+  qualificationReason String        @map("qualification_reason") // COMPLETED, CONFIRMED, LATE_CANCELLATION
+  studentName         String        @map("student_name")
+  lessonTitle         String        @map("lesson_title")
+  createdAt           DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  payout  TeacherPayout @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  lesson  Lesson        @relation(fields: [lessonId], references: [id])
+
+  @@unique([payoutId, lessonId])
+  @@index([payoutId])
+  @@index([lessonId])
+  @@map("teacher_payout_lessons")
 }
 
 // ============================================

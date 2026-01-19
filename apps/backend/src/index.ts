@@ -27,6 +27,8 @@ import mailingRoutes from './routes/mailing.routes';
 import googleCalendarRoutes from './routes/google-calendar.routes';
 import reportRoutes from './routes/report.routes';
 import substitutionRoutes from './routes/substitution.routes';
+import settlementRoutes from './routes/settlement.routes';
+import payoutRoutes from './routes/payout.routes';
 
 // Import scheduler and jobs
 import scheduler from './utils/scheduler';
@@ -111,6 +113,8 @@ app.use('/api/mailings', mailingRoutes);
 app.use('/api/google-calendar', googleCalendarRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/substitutions', substitutionRoutes);
+app.use('/api/settlements', settlementRoutes);
+app.use('/api/payouts', payoutRoutes);
 
 // ============================================
 // ERROR HANDLING
