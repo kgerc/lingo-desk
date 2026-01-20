@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { studentService, Student, CreateStudentData, UpdateStudentData } from '../services/studentService';
 import { X } from 'lucide-react';
+import StudentBalanceCard from './StudentBalanceCard';
 
 interface StudentModalProps {
   student: Student | null;
@@ -21,7 +22,7 @@ const LANGUAGES = [
   { value: 'pl', label: 'Polski' },
 ];
 
-type TabType = 'personal' | 'cancellation';
+type TabType = 'personal' | 'cancellation' | 'balance';
 
 const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess }) => {
   const isEdit = !!student;
@@ -194,6 +195,19 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
             >
               Ustawienia odwołań
             </button>
+            {isEdit && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('balance')}
+                className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'balance'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Saldo
+              </button>
+            )}
           </nav>
         </div>
 
@@ -609,6 +623,16 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
             </div>
           </div>
           </>
+          )}
+
+          {/* Balance Tab */}
+          {activeTab === 'balance' && student && (
+            <div>
+              <StudentBalanceCard
+                studentId={student.id}
+                studentName={`${student.user.firstName} ${student.user.lastName}`}
+              />
+            </div>
           )}
 
           {/* Actions */}

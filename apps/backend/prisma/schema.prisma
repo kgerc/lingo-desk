@@ -82,8 +82,9 @@ enum PaymentMethod {
 }
 
 enum PaymentMode {
-  PACKAGE
-  PER_LESSON
+  PACKAGE     // Hours-based: buy X hours, use them for lessons
+  PER_LESSON  // Per lesson: create payment for each completed lesson
+  BALANCE     // Balance-based: payments increase balance, lessons decrease balance
 }
 
 enum ContractType {
@@ -662,19 +663,48 @@ model StudentBudget {
   organizationId      String   @map("organization_id")
   totalHoursPurchased Decimal  @default(0) @map("total_hours_purchased") @db.Decimal(10, 2)
   totalHoursUsed      Decimal  @default(0) @map("total_hours_used") @db.Decimal(10, 2)
-  balance             Decimal  @default(0) @db.Decimal(10, 2)
-  currentBalance      Decimal  @default(0) @map("current_balance") @db.Decimal(10, 2) // Financial balance (negative = debt, positive = overpayment)
+  balance             Decimal  @default(0) @db.Decimal(10, 2) // Deprecated, use currentBalance
+  currentBalance      Decimal  @default(0) @map("current_balance") @db.Decimal(10, 2) // Financial balance (negative = debt, positive = credit)
+  currency            String   @default("PLN")
   lastSettlementDate  DateTime? @map("last_settlement_date")
   lastUpdatedAt       DateTime @updatedAt @map("last_updated_at")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
   // Relations
-  student     Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  settlements StudentSettlement[]
+  student      Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  settlements  StudentSettlement[]
+  transactions BalanceTransaction[]
 
   @@index([studentId])
   @@map("student_budgets")
+}
+
+model BalanceTransaction {
+  id              String                 @id @default(uuid())
+  budgetId        String                 @map("budget_id")
+  type            BalanceTransactionType
+  amount          Decimal                @db.Decimal(10, 2) // Always positive, type determines direction
+  balanceBefore   Decimal                @map("balance_before") @db.Decimal(10, 2)
+  balanceAfter    Decimal                @map("balance_after") @db.Decimal(10, 2)
+  currency        String                 @default("PLN")
+  description     String
+  // References to related entities
+  paymentId       String?                @map("payment_id")
+  lessonId        String?                @map("lesson_id")
+  createdBy       String?                @map("created_by") // User who initiated (for adjustments)
+  metadata        Json?                  // Additional context
+  createdAt       DateTime               @default(now()) @map("created_at")
+
+  // Relations
+  budget StudentBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@index([budgetId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([lessonId])
+  @@index([paymentId])
+  @@map("balance_transactions")
 }
 
 model StudentSettlement {
@@ -994,6 +1024,15 @@ enum AlertType {
   WARNING
   INFO
   SUCCESS
+}
+
+enum BalanceTransactionType {
+  DEPOSIT           // Payment received - increases balance
+  LESSON_CHARGE     // Lesson completed - decreases balance
+  LESSON_REFUND     // Lesson uncompleted/reverted - increases balance
+  CANCELLATION_FEE  // Late cancellation fee - decreases balance
+  ADJUSTMENT        // Manual adjustment by admin
+  REFUND            // Refund to student - decreases balance
 }
 
 // ============================================

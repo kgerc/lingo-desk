@@ -2,6 +2,7 @@ import { PaymentStatus, PaymentMethod } from '@prisma/client';
 import prisma from '../utils/prisma';
 import emailService from './email.service';
 import exchangeRateService from './exchange-rate.service';
+import balanceService from './balance.service';
 
 export interface CreatePaymentData {
   organizationId: string;
@@ -259,6 +260,22 @@ class PaymentService {
       },
     });
 
+    // If payment is created with COMPLETED status, add deposit to student balance
+    if (data.status === PaymentStatus.COMPLETED) {
+      try {
+        await balanceService.addDeposit(
+          data.studentId,
+          data.organizationId,
+          data.amount,
+          payment.id,
+          data.notes || 'Wpłata'
+        );
+      } catch (error) {
+        console.error('Failed to add deposit to student balance:', error);
+        // Don't fail payment creation if balance update fails
+      }
+    }
+
     return payment;
   }
 
@@ -307,9 +324,25 @@ class PaymentService {
       },
     });
 
-    // Send payment confirmation email if status changed to COMPLETED
+    // Handle balance updates based on status changes
     const isPaymentCompleted = data.status === 'COMPLETED' && existingPayment.status !== 'COMPLETED';
+    const isPaymentUncompleted = existingPayment.status === 'COMPLETED' && data.status && data.status !== 'COMPLETED';
+
+    // Add deposit when payment is marked as completed
     if (isPaymentCompleted) {
+      try {
+        await balanceService.addDeposit(
+          payment.studentId,
+          payment.organizationId,
+          Number(payment.amount),
+          payment.id,
+          payment.notes || 'Wpłata'
+        );
+      } catch (error) {
+        console.error('Failed to add deposit to student balance:', error);
+      }
+
+      // Send payment confirmation email
       try {
         const paymentMethodNames: Record<string, string> = {
           STRIPE: 'Stripe',
@@ -328,7 +361,19 @@ class PaymentService {
         });
       } catch (emailError) {
         console.error('Failed to send payment confirmation email:', emailError);
-        // Don't fail the update if email fails
+      }
+    }
+
+    // Revert deposit when payment is un-completed (e.g., refunded or marked as pending)
+    if (isPaymentUncompleted) {
+      try {
+        await balanceService.revertDeposit(
+          payment.studentId,
+          payment.id,
+          `Cofnięcie wpłaty (status: ${data.status})`
+        );
+      } catch (error) {
+        console.error('Failed to revert deposit from student balance:', error);
       }
     }
 

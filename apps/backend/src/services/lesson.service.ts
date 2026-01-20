@@ -1,6 +1,7 @@
 import { PrismaClient, NotificationType, LessonDeliveryMode, LessonStatus, RecurringFrequency } from '@prisma/client';
 import emailService from './email.service';
 import googleCalendarService from './google-calendar.service';
+import balanceService from './balance.service';
 
 const prisma = new PrismaClient();
 
@@ -661,11 +662,12 @@ class LessonService {
     if (isCompletingLesson && !existingLesson.completedAt) {
       updateData.completedAt = new Date();
 
-      // Deduct hours from student budget or create payment for per-lesson mode
+      // Deduct hours from student budget, create payment for per-lesson mode, or charge from balance
       await this.deductLessonFromBudget(
         existingLesson.enrollmentId,
         existingLesson.durationMinutes,
-        existingLesson.id
+        existingLesson.id,
+        existingLesson.title
       );
     }
 
@@ -674,11 +676,12 @@ class LessonService {
     if (isUncompletingLesson) {
       updateData.completedAt = null;
 
-      // Restore budget and remove payment
+      // Restore budget, remove payment, or refund balance
       await this.restoreLessonBudget(
         existingLesson.enrollmentId,
         existingLesson.durationMinutes,
-        existingLesson.id
+        existingLesson.id,
+        existingLesson.title
       );
     }
 
@@ -1252,32 +1255,38 @@ class LessonService {
   }
 
   /**
-   * Deduct lesson hours from student budget or create payment for per-lesson mode
-   */
-  /**
    * Restore budget when uncompleting a lesson (reverting from COMPLETED status)
    */
-  private async restoreLessonBudget(enrollmentId: string, durationMinutes: number, lessonId?: string) {
+  private async restoreLessonBudget(enrollmentId: string, durationMinutes: number, lessonId?: string, lessonTitle?: string) {
     const hoursToRestore = durationMinutes / 60;
 
-    return await prisma.$transaction(async (tx) => {
-      const enrollment = await tx.studentEnrollment.findUnique({
-        where: { id: enrollmentId },
-        include: {
-          student: true,
-          course: {
-            include: {
-              courseType: true,
-            },
-          },
-        },
-      });
+    // Get enrollment to check payment mode
+    const enrollment = await prisma.studentEnrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { student: true },
+    });
 
-      if (!enrollment) {
-        throw new Error('Enrollment not found');
+    if (!enrollment) {
+      throw new Error('Enrollment not found');
+    }
+
+    // Handle BALANCE mode separately (uses its own transaction)
+    if (enrollment.paymentMode === 'BALANCE' && lessonId) {
+      try {
+        await balanceService.refundLesson(
+          enrollment.studentId,
+          enrollment.student.organizationId,
+          lessonId,
+          lessonTitle || 'Lekcja'
+        );
+      } catch (error) {
+        console.error('Failed to refund lesson to student balance:', error);
       }
+      return;
+    }
 
-      // Handle based on payment mode
+    // Use transaction for PACKAGE and PER_LESSON modes
+    await prisma.$transaction(async (tx) => {
       if (enrollment.paymentMode === 'PACKAGE') {
         // PACKAGE mode: Restore hoursUsed
         await tx.studentEnrollment.update({
@@ -1309,28 +1318,62 @@ class LessonService {
     });
   }
 
-  private async deductLessonFromBudget(enrollmentId: string, durationMinutes: number, lessonId?: string) {
+  private async deductLessonFromBudget(enrollmentId: string, durationMinutes: number, lessonId?: string, lessonTitle?: string) {
     const hoursToDeduct = durationMinutes / 60;
 
-    // Use transaction to prevent race conditions and ensure atomicity
-    return await prisma.$transaction(async (tx) => {
-      // Get current enrollment with student and course info
-      const enrollment = await tx.studentEnrollment.findUnique({
-        where: { id: enrollmentId },
-        include: {
-          student: true,
-          course: {
-            include: {
-              courseType: true,
-            },
+    // Get enrollment info first to check payment mode
+    const enrollment = await prisma.studentEnrollment.findUnique({
+      where: { id: enrollmentId },
+      include: {
+        student: true,
+        course: {
+          include: {
+            courseType: true,
           },
         },
-      });
+      },
+    });
 
-      if (!enrollment) {
-        throw new Error('Enrollment not found');
+    if (!enrollment) {
+      throw new Error('Enrollment not found');
+    }
+
+    // Handle BALANCE mode separately (uses its own transaction)
+    if (enrollment.paymentMode === 'BALANCE') {
+      if (lessonId) {
+        // Get lesson price
+        const lesson = await prisma.lesson.findUnique({
+          where: { id: lessonId },
+          select: { pricePerLesson: true, teacherRate: true, title: true },
+        });
+
+        // Use pricePerLesson from lesson, fallback to teacherRate, then to courseType pricePerLesson
+        const price = lesson?.pricePerLesson
+          ? parseFloat(lesson.pricePerLesson.toString())
+          : lesson?.teacherRate
+            ? parseFloat(lesson.teacherRate.toString())
+            : parseFloat((enrollment.course?.courseType?.pricePerLesson || 0).toString());
+
+        if (price > 0) {
+          try {
+            await balanceService.chargeForLesson(
+              enrollment.studentId,
+              enrollment.student.organizationId,
+              lessonId,
+              price,
+              lessonTitle || lesson?.title || 'Lekcja'
+            );
+          } catch (error) {
+            console.error('Failed to charge lesson from student balance:', error);
+            throw error;
+          }
+        }
       }
+      return;
+    }
 
+    // Use transaction for PACKAGE and PER_LESSON modes
+    return await prisma.$transaction(async (tx) => {
       // Handle based on payment mode
       if (enrollment.paymentMode === 'PACKAGE') {
         // PACKAGE mode: Check and deduct from hoursPurchased/hoursUsed
@@ -1364,13 +1407,15 @@ class LessonService {
             // Get the lesson to retrieve teacherRate
             const lesson = await tx.lesson.findUnique({
               where: { id: lessonId },
-              select: { teacherRate: true },
+              select: { teacherRate: true, pricePerLesson: true },
             });
 
-            // Use teacherRate from lesson if available, fallback to courseType pricePerLesson
-            const pricePerLesson = lesson?.teacherRate
-              ? parseFloat(lesson.teacherRate.toString())
-              : parseFloat((enrollment.course?.courseType?.pricePerLesson || 0).toString());
+            // Use pricePerLesson from lesson, fallback to teacherRate, then to courseType pricePerLesson
+            const pricePerLesson = lesson?.pricePerLesson
+              ? parseFloat(lesson.pricePerLesson.toString())
+              : lesson?.teacherRate
+                ? parseFloat(lesson.teacherRate.toString())
+                : parseFloat((enrollment.course?.courseType?.pricePerLesson || 0).toString());
 
             // Calculate dueAt based on student's payment settings
             const now = new Date();
