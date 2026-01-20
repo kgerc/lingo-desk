@@ -43,7 +43,7 @@ const updateLessonSchema = z.object({
 class LessonController {
   async getLessons(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { search, teacherId, studentId, courseId, status, startDate, endDate } = req.query;
+      const { search, teacherId, studentId, courseId, status, startDate, endDate, page, limit } = req.query;
 
       const filters: any = {};
       if (search) filters.search = String(search);
@@ -53,8 +53,34 @@ class LessonController {
       if (status) filters.status = String(status);
       if (startDate) filters.startDate = String(startDate);
       if (endDate) filters.endDate = String(endDate);
+      if (page) filters.page = parseInt(String(page), 10);
+      if (limit) filters.limit = parseInt(String(limit), 10);
 
-      const lessons = await lessonService.getLessons(req.user!.organizationId, filters);
+      const result = await lessonService.getLessons(req.user!.organizationId, filters);
+      res.json({
+        message: 'Lessons retrieved successfully',
+        data: result.data,
+        pagination: result.pagination,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Unpaginated endpoint for calendar views that need all lessons in date range
+  async getLessonsForCalendar(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { teacherId, studentId, courseId, status, startDate, endDate } = req.query;
+
+      const filters: any = {};
+      if (teacherId) filters.teacherId = String(teacherId);
+      if (studentId) filters.studentId = String(studentId);
+      if (courseId) filters.courseId = String(courseId);
+      if (status) filters.status = String(status);
+      if (startDate) filters.startDate = String(startDate);
+      if (endDate) filters.endDate = String(endDate);
+
+      const lessons = await lessonService.getLessonsUnpaginated(req.user!.organizationId, filters);
       res.json({ message: 'Lessons retrieved successfully', data: lessons });
     } catch (error) {
       next(error);

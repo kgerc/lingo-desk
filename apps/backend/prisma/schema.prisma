@@ -523,6 +523,11 @@ model Lesson {
   @@index([status])
   @@index([teacherId, scheduledAt])
   @@index([studentId, scheduledAt])
+  // Performance indexes for common queries
+  @@index([organizationId, scheduledAt, status]) // Dashboard & calendar queries
+  @@index([organizationId, status, scheduledAt]) // Filtered list queries
+  @@index([organizationId, teacherId, status])   // Teacher-specific queries
+  @@index([organizationId, studentId, status])   // Student-specific queries
   @@map("lessons")
 }
 
@@ -623,6 +628,10 @@ model Payment {
   @@index([status])
   @@index([paidAt])
   @@index([dueAt])
+  // Performance indexes for common queries
+  @@index([organizationId, status, dueAt])     // Debtors/overdue queries
+  @@index([organizationId, studentId, status]) // Student payment history
+  @@index([studentId, status, dueAt])          // Student debtors check
   @@map("payments")
 }
 

@@ -18,7 +18,11 @@
       "Bash(npx prisma migrate resolve:*)",
       "Bash(npx prisma migrate diff:*)",
       "Bash(npx prisma migrate deploy)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(dir /s /b \"c:\\\\Users\\\\kgerc\\\\repos\\\\lingo-desk\" -maxdepth 1)",
+      "Bash(git -C \"c:\\\\Users\\\\kgerc\\\\repos\\\\lingo-desk\" log --oneline)",
+      "Bash(find:*)",
+      "Bash(powershell -Command \"\\(Get-Content ''c:\\\\Users\\\\kgerc\\\\repos\\\\lingo-desk\\\\apps\\\\frontend\\\\src\\\\components\\\\LessonModal.tsx''\\).Count\")"
     ]
   }
 }

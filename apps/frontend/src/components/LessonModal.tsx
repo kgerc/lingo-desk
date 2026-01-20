@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { lessonService, Lesson, CreateLessonData, LessonDeliveryMode } from '../services/lessonService';
@@ -78,23 +78,27 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     }
   }, [existingSubstitution]);
 
-  // Fetch teachers
+  // Fetch teachers - with longer staleTime to reduce refetches
   const { data: teachers = [] } = useQuery({
-    queryKey: ['teachers'],
+    queryKey: ['teachers', 'active'],
     queryFn: () => teacherService.getTeachers({ isActive: true }),
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  // Fetch students
+  // Fetch students - with longer staleTime
   const { data: students = [] } = useQuery({
-    queryKey: ['students'],
+    queryKey: ['students', 'active'],
     queryFn: () => studentService.getStudents({ isActive: true }),
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  // Fetch courses
+  // Fetch courses - with longer staleTime
   const { data: courses = [] } = useQuery({
-    queryKey: ['courses'],
+    queryKey: ['courses', 'active'],
     queryFn: () => courseService.getCourses({ isActive: true }),
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
+
 
   // When course is selected, auto-populate students from that course
   useEffect(() => {
@@ -273,7 +277,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     completeMutation.mutate();
   };
 
-  const handleChange = (
+  const handleChange = useCallback((
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
@@ -282,22 +286,22 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
     }
-  };
+  }, [errors]);
 
-  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePriceChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
     setFormData((prev) => ({ ...prev, pricePerLesson: value }));
     setPriceWasManuallySet(true);
-  };
+  }, []);
 
-  const toggleStudent = (studentId: string) => {
+  const toggleStudent = useCallback((studentId: string) => {
     setFormData(prev => ({
       ...prev,
       studentIds: prev.studentIds.includes(studentId)
         ? prev.studentIds.filter(id => id !== studentId)
         : [...prev.studentIds, studentId]
     }));
-  };
+  }, []);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};

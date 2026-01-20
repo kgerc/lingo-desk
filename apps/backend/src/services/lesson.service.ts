@@ -50,6 +50,20 @@ export interface LessonFilters {
   status?: string;
   startDate?: string;
   endDate?: string;
+  // Pagination
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
 }
 
 class LessonService {
@@ -224,16 +238,27 @@ class LessonService {
       },
     });
 
-    // Fire-and-forget: Sync to Google Calendar if teacher has connected their calendar
-    googleCalendarService.createEventFromLesson(lesson.id).catch(err =>
-      console.error('Failed to sync lesson to Google Calendar:', err)
+    // Note: Google Calendar sync is handled in the controller where we have user context
+    // This allows the event to be synced to the calendar of whoever is creating the lesson
+
+    // Fire-and-forget: Send lesson creation notifications to student
+    this.sendLessonCreatedNotifications(lesson).catch(err =>
+      console.error('Failed to send lesson creation notifications:', err)
     );
 
     return lesson;
   }
 
-  async getLessons(organizationId: string, filters?: LessonFilters) {
-    const { search, teacherId, studentId, courseId, status, startDate, endDate } = filters || {};
+  async getLessons(organizationId: string, filters?: LessonFilters): Promise<PaginatedResult<any>> {
+    const {
+      search, teacherId, studentId, courseId, status, startDate, endDate,
+      page = 1, limit = 50
+    } = filters || {};
+
+    // Enforce reasonable limits
+    const safeLimit = Math.min(Math.max(1, limit), 100);
+    const safePage = Math.max(1, page);
+    const skip = (safePage - 1) * safeLimit;
 
     const where: any = {
       organizationId,
@@ -292,44 +317,202 @@ class LessonService {
       }
     }
 
+    // Execute count and data queries in parallel for better performance
+    const [total, lessons] = await Promise.all([
+      prisma.lesson.count({ where }),
+      prisma.lesson.findMany({
+        where,
+        skip,
+        take: safeLimit,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          scheduledAt: true,
+          durationMinutes: true,
+          status: true,
+          deliveryMode: true,
+          meetingUrl: true,
+          teacherRate: true,
+          pricePerLesson: true,
+          currency: true,
+          cancellationReason: true,
+          //isPaidCancellation: true,
+          createdAt: true,
+          teacher: {
+            select: {
+              id: true,
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  avatarUrl: true,
+                },
+              },
+            },
+          },
+          student: {
+            select: {
+              id: true,
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  avatarUrl: true,
+                },
+              },
+            },
+          },
+          course: {
+            select: {
+              id: true,
+              name: true,
+              courseType: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          location: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          classroom: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          // Only count attendances, don't fetch all records
+          _count: {
+            select: {
+              attendances: true,
+            },
+          },
+        },
+        orderBy: {
+          scheduledAt: 'desc',
+        },
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / safeLimit);
+
+    return {
+      data: lessons,
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages,
+        hasMore: safePage < totalPages,
+      },
+    };
+  }
+
+  // Keep legacy method for backward compatibility (calendar views need all lessons)
+  async getLessonsUnpaginated(organizationId: string, filters?: Omit<LessonFilters, 'page' | 'limit'>) {
+    const { search, teacherId, studentId, courseId, status, startDate, endDate } = filters || {};
+
+    const where: any = {
+      organizationId,
+    };
+
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        {
+          teacher: {
+            user: {
+              OR: [
+                { firstName: { contains: search, mode: 'insensitive' } },
+                { lastName: { contains: search, mode: 'insensitive' } },
+              ],
+            },
+          },
+        },
+        {
+          student: {
+            user: {
+              OR: [
+                { firstName: { contains: search, mode: 'insensitive' } },
+                { lastName: { contains: search, mode: 'insensitive' } },
+              ],
+            },
+          },
+        },
+      ];
+    }
+
+    if (teacherId) where.teacherId = teacherId;
+    if (studentId) where.studentId = studentId;
+    if (courseId) where.courseId = courseId;
+    if (status) where.status = status;
+
+    if (startDate || endDate) {
+      where.scheduledAt = {};
+      if (startDate) where.scheduledAt.gte = new Date(startDate);
+      if (endDate) where.scheduledAt.lte = new Date(endDate);
+    }
+
     const lessons = await prisma.lesson.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        title: true,
+        scheduledAt: true,
+        durationMinutes: true,
+        status: true,
+        deliveryMode: true,
+        teacherRate: true,
+        pricePerLesson: true,
+        currency: true,
+        cancellationReason: true,
+        //isPaidCancellation: true,
         teacher: {
-          include: {
+          select: {
+            id: true,
             user: {
               select: {
                 id: true,
                 firstName: true,
                 lastName: true,
-                email: true,
                 avatarUrl: true,
               },
             },
           },
         },
         student: {
-          include: {
+          select: {
+            id: true,
             user: {
               select: {
                 id: true,
                 firstName: true,
                 lastName: true,
-                email: true,
                 avatarUrl: true,
               },
             },
           },
         },
         course: {
-          include: {
-            courseType: true,
+          select: {
+            id: true,
+            name: true,
+            courseType: {
+              select: {
+                id: true,
+                name: true
+              },
+            },
           },
         },
-        enrollment: true,
-        location: true,
-        classroom: true,
-        attendances: true,
       },
       orderBy: {
         scheduledAt: 'desc',
@@ -1011,6 +1194,64 @@ class LessonService {
   }
 
   /**
+   * Send lesson created notifications (IN_APP for student)
+   */
+  private async sendLessonCreatedNotifications(lesson: any) {
+    const scheduledAtFormatted = new Date(lesson.scheduledAt).toLocaleString('pl-PL', {
+      dateStyle: 'long',
+      timeStyle: 'short',
+    });
+
+    // Create IN_APP notification for student
+    await prisma.notification.create({
+      data: {
+        organizationId: lesson.organizationId,
+        userId: lesson.student.user.id,
+        type: NotificationType.IN_APP,
+        channel: 'IN_APP',
+        subject: 'Nowe zajęcia zaplanowane',
+        body: `Zaplanowano nowe zajęcia "${lesson.title}" z ${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName}. Termin: ${scheduledAtFormatted}`,
+        status: 'SENT',
+        metadata: {
+          lessonId: lesson.id,
+          scheduledAt: lesson.scheduledAt,
+          teacherId: lesson.teacherId,
+          durationMinutes: lesson.durationMinutes,
+        },
+      },
+    });
+  }
+
+  /**
+   * Send lesson confirmed notifications (IN_APP for student)
+   */
+  private async sendLessonConfirmedNotifications(lesson: any, organizationId: string) {
+    const scheduledAtFormatted = new Date(lesson.scheduledAt).toLocaleString('pl-PL', {
+      dateStyle: 'long',
+      timeStyle: 'short',
+    });
+
+    // Create IN_APP notification for student
+    await prisma.notification.create({
+      data: {
+        organizationId,
+        userId: lesson.student.user.id,
+        type: NotificationType.IN_APP,
+        channel: 'IN_APP',
+        subject: 'Zajęcia potwierdzone',
+        body: `Zajęcia "${lesson.title}" z ${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName} zostały potwierdzone. Termin: ${scheduledAtFormatted}`,
+        status: 'SENT',
+        metadata: {
+          lessonId: lesson.id,
+          scheduledAt: lesson.scheduledAt,
+          teacherId: lesson.teacherId,
+          confirmedAt: lesson.confirmedByTeacherAt,
+        },
+      },
+    });
+  }
+
+  /**
    * Deduct lesson hours from student budget or create payment for per-lesson mode
    */
   /**
@@ -1288,6 +1529,11 @@ class LessonService {
         },
       },
     });
+
+    // Fire-and-forget: Send lesson confirmation notifications to student
+    this.sendLessonConfirmedNotifications(updatedLesson, organizationId).catch(err =>
+      console.error('Failed to send lesson confirmation notifications:', err)
+    );
 
     return updatedLesson;
   }

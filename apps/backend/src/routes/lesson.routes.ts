@@ -6,8 +6,11 @@ import lessonController from '../controllers/lesson.controller';
 const router = Router();
 router.use(authenticate);
 
-// Get all lessons
+// Get all lessons (paginated)
 router.get('/', lessonController.getLessons.bind(lessonController));
+
+// Get lessons for calendar view (unpaginated, requires date range)
+router.get('/calendar', lessonController.getLessonsForCalendar.bind(lessonController));
 
 // Get lesson stats
 router.get('/stats', lessonController.getStats.bind(lessonController));
