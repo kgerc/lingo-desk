@@ -113,17 +113,36 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     }
   }, [formData.courseId, courses, isEdit]);
 
-  // Auto-calculate lesson price based on teacher hourly rate and duration (only when creating)
+  // Auto-calculate lesson price based on course price or teacher hourly rate (only when creating)
+  // Priority: courseType.pricePerLesson > teacher.hourlyRate
   useEffect(() => {
-    if (!isEdit && !priceWasManuallySet && formData.teacherId && formData.durationMinutes) {
-      const selectedTeacher = teachers.find(t => t.id === formData.teacherId);
-      if (selectedTeacher?.hourlyRate) {
-        const durationHours = Number(formData.durationMinutes) / 60;
-        const calculatedPrice = selectedTeacher.hourlyRate * durationHours;
-        setFormData(prev => ({ ...prev, pricePerLesson: calculatedPrice.toFixed(2) }));
+    if (!isEdit && !priceWasManuallySet && formData.durationMinutes) {
+      const durationMinutes = Number(formData.durationMinutes);
+      const baseDuration = 60; // base duration for price calculation
+
+      // First priority: if course is selected, use courseType price
+      if (formData.courseId) {
+        const selectedCourse = courses.find(c => c.id === formData.courseId);
+        const courseTypePrice = selectedCourse?.courseType?.pricePerLesson;
+        if (courseTypePrice !== undefined && courseTypePrice !== null) {
+          // Scale price proportionally based on duration
+          const calculatedPrice = (Number(courseTypePrice) / baseDuration) * durationMinutes;
+          setFormData(prev => ({ ...prev, pricePerLesson: calculatedPrice.toFixed(2) }));
+          return;
+        }
+      }
+
+      // Fallback: use teacher hourly rate
+      if (formData.teacherId) {
+        const selectedTeacher = teachers.find(t => t.id === formData.teacherId);
+        if (selectedTeacher?.hourlyRate) {
+          const durationHours = durationMinutes / 60;
+          const calculatedPrice = selectedTeacher.hourlyRate * durationHours;
+          setFormData(prev => ({ ...prev, pricePerLesson: calculatedPrice.toFixed(2) }));
+        }
       }
     }
-  }, [formData.teacherId, formData.durationMinutes, teachers, isEdit, priceWasManuallySet]);
+  }, [formData.teacherId, formData.durationMinutes, formData.courseId, teachers, courses, isEdit, priceWasManuallySet]);
 
   const createMutation = useMutation({
     mutationFn: async (data: { lessonData: CreateLessonData; studentIds: string[] }) => {
@@ -388,6 +407,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       if (isRecurring) {
         const scheduledDate = new Date(formData.scheduledAt);
         const endDate = new Date(scheduledDate);
+        const dayOfWeek = scheduledDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
         if (recurringType === 'weeks') {
           endDate.setDate(endDate.getDate() + (Number(recurringCount) * 7));
@@ -400,6 +420,8 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
           interval: 1,
           startDate: formData.scheduledAt,
           endDate: endDate.toISOString(),
+          daysOfWeek: recurringType === 'weeks' ? [dayOfWeek] : undefined,
+          occurrencesCount: Number(recurringCount),
         };
 
         createRecurringMutation.mutate({
@@ -613,9 +635,19 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                           placeholder="Opcjonalnie"
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         />
-                        {!isEdit && selectedTeacher?.hourlyRate && (
+                        {!isEdit && !priceWasManuallySet && (
                           <p className="mt-1 text-xs text-gray-500">
-                            Sugerowana cena na podstawie stawki lektora ({selectedTeacher.hourlyRate} {formData.currency}/h)
+                            {(() => {
+                              const selectedCourse = courses.find(c => c.id === formData.courseId);
+                              const courseTypePrice = selectedCourse?.courseType?.pricePerLesson;
+                              if (formData.courseId && courseTypePrice) {
+                                return `Cena na podstawie kursu "${selectedCourse?.courseType?.name}" (${courseTypePrice} ${formData.currency}/lekcję)`;
+                              }
+                              if (selectedTeacher?.hourlyRate) {
+                                return `Sugerowana cena na podstawie stawki lektora (${selectedTeacher.hourlyRate} ${formData.currency}/h)`;
+                              }
+                              return null;
+                            })()}
                           </p>
                         )}
                       </div>

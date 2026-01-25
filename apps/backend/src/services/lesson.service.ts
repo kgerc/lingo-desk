@@ -1761,26 +1761,20 @@ class LessonService {
       occurrencesCount?: number;
     }
   ) {
-    // Create the recurring pattern first
-    const recurringPattern = await prisma.recurringPattern.create({
-      data: {
-        organizationId,
-        frequency: pattern.frequency,
-        interval: pattern.interval || 1,
-        daysOfWeek: pattern.daysOfWeek || [],
-        startDate: pattern.startDate,
-        endDate: pattern.endDate,
-        occurrencesCount: pattern.occurrencesCount,
-      },
-    });
+    // For weekly/biweekly, if daysOfWeek is not provided, use the day of the start date
+    const effectiveDaysOfWeek =
+      pattern.daysOfWeek && pattern.daysOfWeek.length > 0
+        ? pattern.daysOfWeek
+        : [new Date(pattern.startDate).getDay()];
 
-    const createdLessons = [];
-    const errors = [];
+    // First, calculate all the dates for lessons and check conflicts
+    const lessonDates: Date[] = [];
+    const errors: Array<{ date: string; error: string }> = [];
     let currentDate = new Date(pattern.startDate);
     let count = 0;
     const maxOccurrences = pattern.occurrencesCount || 100;
 
-    // Generate lessons
+    // Collect all valid dates first
     while (
       count < maxOccurrences &&
       (!pattern.endDate || currentDate <= pattern.endDate)
@@ -1788,14 +1782,14 @@ class LessonService {
       // Check if this day should have a lesson (for weekly/biweekly)
       if (pattern.frequency === 'WEEKLY' || pattern.frequency === 'BIWEEKLY') {
         const dayOfWeek = currentDate.getDay();
-        if (!pattern.daysOfWeek || !pattern.daysOfWeek.includes(dayOfWeek)) {
-          // Move to next day
+        if (!effectiveDaysOfWeek.includes(dayOfWeek)) {
+          // Move to next week
           currentDate = this.getNextDate(currentDate, pattern.frequency, pattern.interval || 1);
           continue;
         }
       }
 
-      // Check for conflicts before creating
+      // Check for conflicts before adding to list
       const conflicts = await this.checkConflicts(
         organizationId,
         lessonData.teacherId,
@@ -1805,50 +1799,8 @@ class LessonService {
       );
 
       if (!conflicts.hasConflicts) {
-        try {
-          const lesson = await prisma.lesson.create({
-            data: {
-              organizationId,
-              ...lessonData,
-              scheduledAt: currentDate,
-              isRecurring: true,
-              recurringPatternId: recurringPattern.id,
-            },
-            include: {
-              teacher: {
-                include: {
-                  user: {
-                    select: {
-                      id: true,
-                      firstName: true,
-                      lastName: true,
-                      email: true,
-                    },
-                  },
-                },
-              },
-              student: {
-                include: {
-                  user: {
-                    select: {
-                      id: true,
-                      firstName: true,
-                      lastName: true,
-                      email: true,
-                    },
-                  },
-                },
-              },
-            },
-          });
-          createdLessons.push(lesson);
-          count++;
-        } catch (error) {
-          errors.push({
-            date: currentDate.toISOString(),
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
-        }
+        lessonDates.push(new Date(currentDate));
+        count++;
       } else {
         errors.push({
           date: currentDate.toISOString(),
@@ -1860,17 +1812,74 @@ class LessonService {
       currentDate = this.getNextDate(currentDate, pattern.frequency, pattern.interval || 1);
     }
 
-    // Update the pattern with count of created lessons
-    await prisma.recurringPattern.update({
-      where: { id: recurringPattern.id },
-      data: { createdLessonsCount: createdLessons.length },
+    // Use transaction to ensure atomicity - either all lessons are created or none
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the recurring pattern
+      const recurringPattern = await tx.recurringPattern.create({
+        data: {
+          organizationId,
+          frequency: pattern.frequency,
+          interval: pattern.interval || 1,
+          daysOfWeek: effectiveDaysOfWeek,
+          startDate: pattern.startDate,
+          endDate: pattern.endDate,
+          occurrencesCount: pattern.occurrencesCount,
+          createdLessonsCount: lessonDates.length,
+        },
+      });
+
+      // Create all lessons in the transaction
+      const createdLessons = [];
+      for (const lessonDate of lessonDates) {
+        const lesson = await tx.lesson.create({
+          data: {
+            organizationId,
+            ...lessonData,
+            scheduledAt: lessonDate,
+            isRecurring: true,
+            recurringPatternId: recurringPattern.id,
+          },
+          include: {
+            teacher: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+            student: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+        createdLessons.push(lesson);
+      }
+
+      return {
+        recurringPattern,
+        createdLessons,
+      };
     });
 
     return {
-      recurringPattern,
-      createdLessons,
+      recurringPattern: result.recurringPattern,
+      createdLessons: result.createdLessons,
       errors,
-      totalCreated: createdLessons.length,
+      totalCreated: result.createdLessons.length,
       totalErrors: errors.length,
     };
   }
