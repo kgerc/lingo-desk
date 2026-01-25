@@ -30,11 +30,32 @@ router.post(
   courseController.createCourse.bind(courseController)
 );
 
+// POST /api/courses/with-schedule - Create course with schedule (lessons)
+router.post(
+  '/with-schedule',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  courseController.createCourseWithSchedule.bind(courseController)
+);
+
 // PUT /api/courses/:id - Update course
 router.put(
   '/:id',
   authorize(UserRole.ADMIN, UserRole.MANAGER),
   courseController.updateCourse.bind(courseController)
+);
+
+// GET /api/courses/:id/lessons - Get course lessons with edit status
+router.get(
+  '/:id/lessons',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  courseController.getCourseLessonsForEdit.bind(courseController)
+);
+
+// PUT /api/courses/:id/lessons/bulk - Bulk update future lessons
+router.put(
+  '/:id/lessons/bulk',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  courseController.bulkUpdateCourseLessons.bind(courseController)
 );
 
 // POST /api/courses/:id/enroll - Enroll student in course

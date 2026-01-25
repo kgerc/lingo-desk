@@ -78,6 +78,68 @@ export interface UpdateCourseData {
   isActive?: boolean;
 }
 
+// Schedule item for creating lessons with course
+export interface ScheduleItem {
+  scheduledAt: string;
+  durationMinutes: number;
+  title?: string;
+  deliveryMode: 'IN_PERSON' | 'ONLINE';
+  meetingUrl?: string;
+}
+
+// Pattern for recurring lessons in schedule
+export interface SchedulePattern {
+  frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+  startDate: string;
+  endDate?: string;
+  occurrencesCount?: number;
+  daysOfWeek?: number[]; // 0 = Sunday, 1 = Monday, etc.
+  time: string; // HH:mm format
+  durationMinutes: number;
+  deliveryMode: 'IN_PERSON' | 'ONLINE';
+  meetingUrl?: string;
+}
+
+export interface CreateCourseWithScheduleData extends CreateCourseData {
+  schedule?: {
+    items?: ScheduleItem[];
+    pattern?: SchedulePattern;
+  };
+  studentIds?: string[];
+}
+
+export interface BulkUpdateLessonsData {
+  teacherId?: string;
+  durationMinutes?: number;
+  deliveryMode?: 'IN_PERSON' | 'ONLINE';
+  meetingUrl?: string | null;
+  locationId?: string | null;
+  classroomId?: string | null;
+}
+
+export interface CourseLessonForEdit {
+  id: string;
+  title: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  status: string;
+  deliveryMode: string;
+  canEdit: boolean;
+  editBlockReason: string | null;
+  teacher: {
+    user: {
+      firstName: string;
+      lastName: string;
+    };
+  };
+  student: {
+    user: {
+      firstName: string;
+      lastName: string;
+    };
+  };
+}
+
 export const courseService = {
   async getCourses(filters?: {
     search?: string;
@@ -137,5 +199,25 @@ export const courseService = {
   async getStats() {
     const response = await api.get('/courses/stats') as any;
     return response.data.data as { total: number; active: number; withEnrollments: number };
+  },
+
+  async createCourseWithSchedule(data: CreateCourseWithScheduleData) {
+    const response = await api.post('/courses/with-schedule', data) as any;
+    return response.data.data as {
+      course: Course;
+      lessonsCreated: number;
+      enrollmentsCreated: number;
+      errors: Array<{ date: string; studentId: string; error: string }>;
+    };
+  },
+
+  async getCourseLessonsForEdit(courseId: string) {
+    const response = await api.get(`/courses/${courseId}/lessons`) as any;
+    return response.data.data as CourseLessonForEdit[];
+  },
+
+  async bulkUpdateCourseLessons(courseId: string, updates: BulkUpdateLessonsData) {
+    const response = await api.put(`/courses/${courseId}/lessons/bulk`, updates) as any;
+    return response.data.data as { updated: number; message: string };
   },
 };

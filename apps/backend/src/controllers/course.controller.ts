@@ -41,6 +41,49 @@ const enrollStudentSchema = z.object({
   hoursPurchased: z.number().min(0).optional(),
 });
 
+// Helper to handle optional URL - empty string becomes undefined
+const optionalUrl = z.string().optional().transform((val) => {
+  if (!val || val.trim() === '') return undefined;
+  return val;
+}).pipe(z.string().url().optional());
+
+const scheduleItemSchema = z.object({
+  scheduledAt: z.string().transform((str) => new Date(str)),
+  durationMinutes: z.number().int().positive(),
+  title: z.string().optional(),
+  deliveryMode: z.enum(['IN_PERSON', 'ONLINE']),
+  meetingUrl: optionalUrl,
+});
+
+const schedulePatternSchema = z.object({
+  frequency: z.enum(['WEEKLY', 'BIWEEKLY', 'MONTHLY']),
+  startDate: z.string().transform((str) => new Date(str)),
+  endDate: z.string().optional().transform((str) => (str ? new Date(str) : undefined)),
+  occurrencesCount: z.number().int().positive().optional(),
+  daysOfWeek: z.array(z.number().int().min(0).max(6)).optional(),
+  time: z.string().regex(/^\d{2}:\d{2}$/),
+  durationMinutes: z.number().int().positive(),
+  deliveryMode: z.enum(['IN_PERSON', 'ONLINE']),
+  meetingUrl: optionalUrl,
+});
+
+const createCourseWithScheduleSchema = createCourseSchema.extend({
+  schedule: z.object({
+    items: z.array(scheduleItemSchema).optional(),
+    pattern: schedulePatternSchema.optional(),
+  }).optional(),
+  studentIds: z.array(z.string().uuid()).optional(),
+});
+
+const bulkUpdateLessonsSchema = z.object({
+  teacherId: z.string().uuid().optional(),
+  durationMinutes: z.number().int().positive().optional(),
+  deliveryMode: z.enum(['IN_PERSON', 'ONLINE']).optional(),
+  meetingUrl: z.string().url().optional().nullable(),
+  locationId: z.string().uuid().optional().nullable(),
+  classroomId: z.string().uuid().optional().nullable(),
+});
+
 class CourseController {
   async getCourses(req: AuthRequest, res: Response, next: NextFunction) {
     try {
@@ -134,6 +177,56 @@ class CourseController {
       const { enrollmentId } = req.params;
       const result = await courseService.unenrollStudent(enrollmentId as string, req.user!.organizationId);
       res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createCourseWithSchedule(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const data = createCourseWithScheduleSchema.parse(req.body);
+      const result = await courseService.createCourseWithSchedule({
+        ...data,
+        organizationId: req.user!.organizationId,
+      });
+      res.status(201).json({
+        message: `Course created with ${result.lessonsCreated} lessons`,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async bulkUpdateCourseLessons(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id: courseId } = req.params;
+      const updates = bulkUpdateLessonsSchema.parse(req.body);
+      const result = await courseService.bulkUpdateCourseLessons(
+        courseId as string,
+        req.user!.organizationId,
+        updates
+      );
+      res.json({
+        message: result.message,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getCourseLessonsForEdit(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id: courseId } = req.params;
+      const lessons = await courseService.getCourseLessonsForEdit(
+        courseId as string,
+        req.user!.organizationId
+      );
+      res.json({
+        message: 'Course lessons retrieved successfully',
+        data: lessons,
+      });
     } catch (error) {
       next(error);
     }
