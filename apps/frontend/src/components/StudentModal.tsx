@@ -27,6 +27,7 @@ type TabType = 'personal' | 'cancellation' | 'balance';
 const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess }) => {
   const isEdit = !!student;
   const [activeTab, setActiveTab] = useState<TabType>('personal');
+  const [passwordGenerated, setPasswordGenerated] = useState(false);
 
   const [formData, setFormData] = useState({
     firstName: student?.user.firstName || '',
@@ -153,6 +154,37 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
       });
     }
   };
+
+  const generateSecurePassword = (length = 8) => {
+      const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const lower = 'abcdefghijklmnopqrstuvwxyz';
+      const digits = '0123456789';
+      const special = '!@#$%^&*';
+      const all = upper + lower + digits + special;
+
+      const cryptoObj = window.crypto || (window as any).msCrypto;
+
+      const getRandomChar = (chars: string) =>
+        chars[cryptoObj.getRandomValues(new Uint32Array(1))[0] % chars.length];
+
+      // gwarantujemy spełnienie polityki
+      const passwordChars = [
+        getRandomChar(upper),
+        getRandomChar(lower),
+        getRandomChar(digits),
+        getRandomChar(special),
+      ];
+
+      while (passwordChars.length < length) {
+        passwordChars.push(getRandomChar(all));
+      }
+
+      // shuffle
+      return passwordChars
+        .sort(() => 0.5 - Math.random())
+        .join('');
+    };
+
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -292,21 +324,57 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
               </div>
 
               {!isEdit && (
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                <div className="col-span-2 space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
                     Hasło * (min. 8 znaków)
                   </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                      errors.password ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  />
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                        errors.password ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pwd = generateSecurePassword(8);
+                        setFormData((prev) => ({ ...prev, password: pwd }));
+                        setPasswordGenerated(true);
+                        toast.success('Hasło zostało wygenerowane');
+                      }}
+                      className="px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm"
+                    >
+                      Generuj
+                    </button>
+
+                    {formData.password && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(formData.password);
+                          toast.success('Hasło skopiowane do schowka');
+                        }}
+                        className="px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm"
+                      >
+                        Kopiuj
+                      </button>
+                    )}
+                  </div>
+
+                  {passwordGenerated && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                      ℹ️ To hasło będzie widoczne tylko teraz. Przekaż je uczniowi przed zapisaniem.
+                    </p>
+                  )}
+
                   {errors.password && (
-                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                    <p className="text-sm text-red-600">{errors.password}</p>
                   )}
                 </div>
               )}
