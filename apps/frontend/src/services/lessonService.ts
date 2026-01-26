@@ -94,12 +94,9 @@ export interface Lesson {
   course?: {
     id: string;
     name: string;
-    courseType: {
-      id: string;
-      name: string;
-      language: string;
-      level: string;
-    };
+    courseType: 'GROUP' | 'INDIVIDUAL';
+    language: string;
+    level: string;
   };
   enrollment: {
     id: string;

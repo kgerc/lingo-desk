@@ -147,14 +147,14 @@ const MarginsReport: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {data.map((row) => (
-                    <tr key={row.courseTypeId} className="hover:bg-gray-50">
+                    <tr key={row.courseId} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        {row.courseTypeName}
+                        {row.courseName}
                         <div className="text-xs text-gray-500">
                           {row.language} {row.level}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{row.format}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{row.courseType === 'GROUP' ? 'Grupowy' : 'Indywidualny'}</td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right">
                         {row.totalRevenue.toFixed(2)} PLN
                       </td>

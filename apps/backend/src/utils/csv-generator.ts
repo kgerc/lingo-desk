@@ -113,10 +113,10 @@ class CsvGenerator {
    */
   static generateMarginsCsv(data: any[]): string {
     const headers = [
-      'Typ kursu',
+      'Kurs',
+      'Typ',
       'Język',
       'Poziom',
-      'Format',
       'Liczba płatności',
       'Przychód (PLN)',
       'Liczba lekcji',
@@ -126,10 +126,10 @@ class CsvGenerator {
     ];
 
     const rows = data.map((row) => [
-      row.courseTypeName,
+      row.courseName,
+      row.courseType === 'GROUP' ? 'Grupowy' : 'Indywidualny',
       row.language,
       row.level,
-      row.format,
       String(row.paymentsCount),
       this.formatNumber(row.totalRevenue),
       String(row.lessonsCount),

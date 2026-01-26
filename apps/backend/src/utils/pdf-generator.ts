@@ -300,11 +300,11 @@ class PdfGenerator {
           generatedAt: new Date(),
         });
 
-        const headers = ['Typ kursu', 'Format', 'Przychód', 'Koszty', 'Zysk', 'Marża %'];
+        const headers = ['Kurs', 'Typ', 'Przychód', 'Koszty', 'Zysk', 'Marża %'];
         const columnWidths = [150, 80, 90, 90, 90, 70];
         const rows = data.map((row) => [
-          `${row.courseTypeName} (${row.language} ${row.level})`,
-          row.format,
+          `${row.courseName} (${row.language} ${row.level})`,
+          row.courseType === 'GROUP' ? 'Grupowy' : 'Indywidualny',
           this.formatCurrency(row.totalRevenue),
           this.formatCurrency(row.totalTeacherCost),
           this.formatCurrency(row.grossProfit),

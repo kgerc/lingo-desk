@@ -4,7 +4,8 @@ interface ReportFilters {
   startDate?: Date;
   endDate?: Date;
   teacherId?: string;
-  courseTypeId?: string;
+  courseId?: string;
+  courseType?: 'GROUP' | 'INDIVIDUAL';
   organizationId: string;
 }
 
@@ -35,11 +36,11 @@ interface NewStudentData {
 }
 
 interface MarginData {
-  courseTypeId: string;
-  courseTypeName: string;
+  courseId: string;
+  courseName: string;
+  courseType: string;
   language: string;
   level: string;
-  format: string;
   paymentsCount: number;
   totalRevenue: number;
   lessonsCount: number;
@@ -229,30 +230,51 @@ class ReportService {
   }
 
   /**
-   * Generate margins report
+   * Generate margins report - now grouped by Course instead of CourseType
    */
   async generateMarginsReport(filters: ReportFilters): Promise<MarginData[]> {
-    const { organizationId, startDate, endDate, courseTypeId } = filters;
+    const { organizationId, startDate, endDate, courseId, courseType } = filters;
 
     const whereClause: any = {
       organizationId,
     };
 
-    if (courseTypeId) {
-      whereClause.id = courseTypeId;
+    if (courseId) {
+      whereClause.id = courseId;
     }
 
-    const courseTypes = await prisma.courseType.findMany({
+    if (courseType) {
+      whereClause.courseType = courseType;
+    }
+
+    const courses = await prisma.course.findMany({
       where: whereClause,
       include: {
-        courses: {
+        lessons: {
+          where: {
+            status: 'COMPLETED',
+            ...(startDate && endDate
+              ? {
+                  scheduledAt: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                }
+              : {}),
+          },
+          select: {
+            id: true,
+            teacherRate: true,
+          },
+        },
+        enrollments: {
           include: {
-            lessons: {
+            payments: {
               where: {
                 status: 'COMPLETED',
                 ...(startDate && endDate
                   ? {
-                      scheduledAt: {
+                      createdAt: {
                         gte: startDate,
                         lte: endDate,
                       },
@@ -260,28 +282,7 @@ class ReportService {
                   : {}),
               },
               select: {
-                id: true,
-                teacherRate: true,
-              },
-            },
-            enrollments: {
-              include: {
-                payments: {
-                  where: {
-                    status: 'COMPLETED',
-                    ...(startDate && endDate
-                      ? {
-                          createdAt: {
-                            gte: startDate,
-                            lte: endDate,
-                          },
-                        }
-                      : {}),
-                  },
-                  select: {
-                    amount: true,
-                  },
-                },
+                amount: true,
               },
             },
           },
@@ -289,29 +290,21 @@ class ReportService {
       },
     });
 
-    const result: MarginData[] = courseTypes.map((courseType) => {
-      const lessonsCount = courseType.courses.reduce((sum, course) => sum + course.lessons.length, 0);
-      const totalTeacherCost = courseType.courses.reduce(
-        (sum, course) =>
-          sum +
-          course.lessons.reduce((lessonSum, lesson) => lessonSum + Number(lesson.teacherRate || 0), 0),
+    const result: MarginData[] = courses.map((course) => {
+      const lessonsCount = course.lessons.length;
+      const totalTeacherCost = course.lessons.reduce(
+        (sum, lesson) => sum + Number(lesson.teacherRate || 0),
         0
       );
 
-      const paymentsCount = courseType.courses.reduce(
-        (sum, course) =>
-          sum + course.enrollments.reduce((enrollSum, enroll) => enrollSum + enroll.payments.length, 0),
+      const paymentsCount = course.enrollments.reduce(
+        (sum, enroll) => sum + enroll.payments.length,
         0
       );
 
-      const totalRevenue = courseType.courses.reduce(
-        (sum, course) =>
-          sum +
-          course.enrollments.reduce(
-            (enrollSum, enroll) =>
-              enrollSum + enroll.payments.reduce((paySum, pay) => paySum + Number(pay.amount), 0),
-            0
-          ),
+      const totalRevenue = course.enrollments.reduce(
+        (sum, enroll) =>
+          sum + enroll.payments.reduce((paySum, pay) => paySum + Number(pay.amount), 0),
         0
       );
 
@@ -319,11 +312,11 @@ class ReportService {
       const marginPercent = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
       return {
-        courseTypeId: courseType.id,
-        courseTypeName: courseType.name,
-        language: courseType.language,
-        level: courseType.level,
-        format: courseType.format,
+        courseId: course.id,
+        courseName: course.name,
+        courseType: course.courseType,
+        language: course.language,
+        level: course.level,
         paymentsCount,
         totalRevenue: Math.round(totalRevenue * 100) / 100,
         lessonsCount,

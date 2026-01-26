@@ -167,17 +167,6 @@ function App() {
         />
 
         <Route
-          path="/course-types"
-          element={
-            isAuthenticated ? (
-              <Navigate to="/courses" replace />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-
-        <Route
           path="/mailing"
           element={
             isAuthenticated ? (

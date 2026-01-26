@@ -4,7 +4,7 @@ interface ReportFilters {
   startDate?: string;
   endDate?: string;
   teacherId?: string;
-  courseTypeId?: string;
+  courseId?: string;
   month?: number;
   year?: number;
   periodDays?: number;
@@ -39,11 +39,11 @@ interface NewStudentData {
 }
 
 interface MarginData {
-  courseTypeId: string;
-  courseTypeName: string;
+  courseId: string;
+  courseName: string;
   language: string;
   level: string;
-  format: string;
+  courseType: string;
   paymentsCount: number;
   totalRevenue: number;
   lessonsCount: number;

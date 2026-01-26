@@ -3,9 +3,18 @@ import api from '../lib/api';
 export interface Course {
   id: string;
   organizationId: string;
-  courseTypeId: string;
   teacherId: string;
   name: string;
+  // Pola przeniesione z CourseType:
+  courseType: 'GROUP' | 'INDIVIDUAL';
+  language: string;
+  level: string;
+  deliveryMode: 'IN_PERSON' | 'ONLINE' | 'BOTH';
+  defaultDurationMinutes: number;
+  pricePerLesson: number;
+  currency: string;
+  description?: string;
+  // Pozostałe pola:
   startDate: string;
   endDate?: string;
   isActive: boolean;
@@ -15,15 +24,6 @@ export interface Course {
   currentStudentsCount: number;
   createdAt: string;
   updatedAt: string;
-  courseType: {
-    id: string;
-    name: string;
-    language: string;
-    level: string;
-    format: string;
-    deliveryMode: string;
-    pricePerLesson: number;
-  };
   teacher: {
     id: string;
     userId: string;
@@ -56,9 +56,18 @@ export interface Course {
 }
 
 export interface CreateCourseData {
-  courseTypeId: string;
   teacherId: string;
   name: string;
+  // Pola przeniesione z CourseType:
+  courseType: 'GROUP' | 'INDIVIDUAL';
+  language: string;
+  level: string;
+  deliveryMode: 'IN_PERSON' | 'ONLINE' | 'BOTH';
+  defaultDurationMinutes: number;
+  pricePerLesson: number;
+  currency: string;
+  description?: string;
+  // Pozostałe pola:
   startDate: string;
   endDate?: string;
   maxStudents?: number;
@@ -70,6 +79,16 @@ export interface CreateCourseData {
 export interface UpdateCourseData {
   teacherId?: string;
   name?: string;
+  // Pola przeniesione z CourseType:
+  courseType?: 'GROUP' | 'INDIVIDUAL';
+  language?: string;
+  level?: string;
+  deliveryMode?: 'IN_PERSON' | 'ONLINE' | 'BOTH';
+  defaultDurationMinutes?: number;
+  pricePerLesson?: number;
+  currency?: string;
+  description?: string;
+  // Pozostałe pola:
   startDate?: string;
   endDate?: string;
   maxStudents?: number;
@@ -144,13 +163,13 @@ export const courseService = {
   async getCourses(filters?: {
     search?: string;
     teacherId?: string;
-    courseTypeId?: string;
+    courseType?: 'GROUP' | 'INDIVIDUAL';
     isActive?: boolean;
   }) {
     const params = new URLSearchParams();
     if (filters?.search) params.append('search', filters.search);
     if (filters?.teacherId) params.append('teacherId', filters.teacherId);
-    if (filters?.courseTypeId) params.append('courseTypeId', filters.courseTypeId);
+    if (filters?.courseType) params.append('courseType', filters.courseType);
     if (filters?.isActive !== undefined) params.append('isActive', String(filters.isActive));
 
     const response = await api.get(`/courses?${params.toString()}`) as any;

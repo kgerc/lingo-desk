@@ -328,6 +328,13 @@ class PaymentService {
     const isPaymentCompleted = data.status === 'COMPLETED' && existingPayment.status !== 'COMPLETED';
     const isPaymentUncompleted = existingPayment.status === 'COMPLETED' && data.status && data.status !== 'COMPLETED';
 
+    // Check if amount changed on already completed payment
+    const isAmountChangedOnCompletedPayment =
+      existingPayment.status === 'COMPLETED' &&
+      (!data.status || data.status === 'COMPLETED') && // Status remains COMPLETED
+      data.amount !== undefined &&
+      Number(data.amount) !== Number(existingPayment.amount);
+
     // Add deposit when payment is marked as completed
     if (isPaymentCompleted) {
       try {
@@ -374,6 +381,27 @@ class PaymentService {
         );
       } catch (error) {
         console.error('Failed to revert deposit from student balance:', error);
+      }
+    }
+
+    // Adjust balance when amount changes on already completed payment
+    if (isAmountChangedOnCompletedPayment) {
+      const oldAmount = Number(existingPayment.amount);
+      const newAmount = Number(data.amount);
+      const difference = newAmount - oldAmount;
+
+      try {
+        // Use adjustBalance for both increase and decrease
+        // It handles positive (add) and negative (subtract) amounts
+        await balanceService.adjustBalance(
+          payment.studentId,
+          payment.organizationId,
+          difference,
+          `Korekta wpłaty (${difference > 0 ? '+' : ''}${difference} ${payment.currency})`,
+          'system' // Created by system during payment update
+        );
+      } catch (error) {
+        console.error('Failed to adjust balance for amount change:', error);
       }
     }
 

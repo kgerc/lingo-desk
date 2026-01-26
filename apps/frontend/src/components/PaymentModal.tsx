@@ -41,10 +41,11 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
 
   const createMutation = useMutation({
     mutationFn: (data: CreatePaymentData) => paymentService.createPayment(data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success('Płatność została pomyślnie utworzona');
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payment-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['studentBalance', data.studentId] });
       onClose();
     },
     onError: (error: any) => {
@@ -55,10 +56,11 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
   const updateMutation = useMutation({
     mutationFn: (data: UpdatePaymentData) =>
       paymentService.updatePayment(payment!.id, data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success('Płatność została pomyślnie zaktualizowana');
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payment-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['studentBalance', data.studentId] });
       onClose();
     },
     onError: (error: any) => {

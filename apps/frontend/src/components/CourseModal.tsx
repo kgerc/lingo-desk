@@ -4,8 +4,7 @@ import toast from 'react-hot-toast';
 import { courseService, Course, CreateCourseWithScheduleData, ScheduleItem, SchedulePattern } from '../services/courseService';
 import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
-import { courseTypeService } from '../services/courseTypeService';
-import { X, Info, Calendar, Users, Plus, Trash2, Clock, AlertCircle } from 'lucide-react';
+import { X, Info, Calendar, Users, Plus, Trash2, Clock, AlertCircle, Settings } from 'lucide-react';
 
 interface CourseModalProps {
   course: Course | null;
@@ -13,7 +12,7 @@ interface CourseModalProps {
   onSuccess: () => void;
 }
 
-type TabType = 'basic' | 'schedule' | 'students';
+type TabType = 'basic' | 'details' | 'schedule' | 'students';
 type ScheduleMode = 'none' | 'manual' | 'recurring';
 
 const DAYS_OF_WEEK = [
@@ -26,14 +25,52 @@ const DAYS_OF_WEEK = [
   { value: 0, label: 'Niedziela' },
 ];
 
+const LANGUAGES = [
+  { value: 'en', label: 'Angielski' },
+  { value: 'de', label: 'Niemiecki' },
+  { value: 'es', label: 'Hiszpański' },
+  { value: 'fr', label: 'Francuski' },
+  { value: 'it', label: 'Włoski' },
+  { value: 'pl', label: 'Polski' },
+];
+
+const LEVELS = [
+  { value: 'A1', label: 'A1' },
+  { value: 'A2', label: 'A2' },
+  { value: 'B1', label: 'B1' },
+  { value: 'B2', label: 'B2' },
+  { value: 'C1', label: 'C1' },
+  { value: 'C2', label: 'C2' },
+  { value: 'BEGINNER', label: 'Początkujący' },
+  { value: 'INTERMEDIATE', label: 'Średniozaawansowany' },
+  { value: 'ADVANCED', label: 'Zaawansowany' },
+  { value: 'ALL_LEVELS', label: 'Wszystkie poziomy' },
+];
+
+const CURRENCIES = [
+  { value: 'PLN', label: 'PLN' },
+  { value: 'EUR', label: 'EUR' },
+  { value: 'USD', label: 'USD' },
+  { value: 'GBP', label: 'GBP' },
+];
+
 const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess }) => {
   const isEdit = !!course;
 
   const [activeTab, setActiveTab] = useState<TabType>('basic');
   const [formData, setFormData] = useState({
-    courseTypeId: course?.courseTypeId || '',
     teacherId: course?.teacherId || '',
     name: course?.name || '',
+    // Pola przeniesione z CourseType:
+    courseType: course?.courseType || 'INDIVIDUAL' as 'GROUP' | 'INDIVIDUAL',
+    language: course?.language || 'en',
+    level: course?.level || 'A1',
+    deliveryMode: course?.deliveryMode || 'ONLINE' as 'IN_PERSON' | 'ONLINE' | 'BOTH',
+    defaultDurationMinutes: course?.defaultDurationMinutes?.toString() || '60',
+    pricePerLesson: course?.pricePerLesson?.toString() || '',
+    currency: course?.currency || 'PLN',
+    description: course?.description || '',
+    // Pozostałe pola:
     maxStudents: course?.maxStudents?.toString() || '',
     startDate: course?.startDate ? course.startDate.split('T')[0] : '',
     endDate: course?.endDate ? course.endDate.split('T')[0] : '',
@@ -72,17 +109,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
     queryFn: () => studentService.getStudents({ isActive: true }),
   });
 
-  // Fetch course types for dropdown
-  const { data: courseTypes = [] } = useQuery({
-    queryKey: ['courseTypes'],
-    queryFn: () => courseTypeService.getCourseTypes(),
-  });
-
-  // Get selected course type for default duration
-  const selectedCourseType = useMemo(() => {
-    return courseTypes.find(ct => ct.id === formData.courseTypeId);
-  }, [courseTypes, formData.courseTypeId]);
-
   // Generate preview of lessons from recurring pattern
   const previewLessons = useMemo(() => {
     if (scheduleMode !== 'recurring' || !recurringPattern.startDate || !recurringPattern.time) {
@@ -100,7 +126,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
       : [startDate.getDay()];
     const endDate = recurringPattern.endDate ? new Date(recurringPattern.endDate) : null;
 
-    // For MONTHLY frequency, use simpler logic
     if (recurringPattern.frequency === 'MONTHLY') {
       let currentDate = new Date(startDate);
       while (lessons.length < maxOccurrences && (!endDate || currentDate <= endDate)) {
@@ -110,41 +135,32 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
       return lessons.slice(0, 20);
     }
 
-    // For WEEKLY/BIWEEKLY with multiple days, iterate week by week
     const weekInterval = recurringPattern.frequency === 'BIWEEKLY' ? 2 : 1;
     const maxWeeks = Math.ceil(maxOccurrences / Math.max(effectiveDaysOfWeek.length, 1)) + 1;
 
-    // Find the start of the week containing startDate (Sunday = 0)
     const weekStart = new Date(startDate);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     weekStart.setHours(hours, minutes, 0, 0);
 
     let weekCount = 0;
     while (weekCount < maxWeeks && lessons.length < maxOccurrences) {
-      // Check each selected day of this week
       for (const dayOfWeek of [...effectiveDaysOfWeek].sort((a, b) => a - b)) {
         const lessonDate = new Date(weekStart);
         lessonDate.setDate(lessonDate.getDate() + dayOfWeek);
         lessonDate.setHours(hours, minutes, 0, 0);
 
-        // Skip if before start date
         if (lessonDate < startDate) continue;
-
-        // Stop if after end date
         if (endDate && lessonDate > endDate) break;
-
-        // Stop if we have enough occurrences
         if (lessons.length >= maxOccurrences) break;
 
         lessons.push(new Date(lessonDate));
       }
 
-      // Move to next week (or skip a week for BIWEEKLY)
       weekStart.setDate(weekStart.getDate() + 7 * weekInterval);
       weekCount++;
     }
 
-    return lessons.slice(0, 20); // Show max 20 in preview
+    return lessons.slice(0, 20);
   }, [scheduleMode, recurringPattern]);
 
   const createMutation = useMutation({
@@ -193,7 +209,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
 
-    // Clear error for this field
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
     }
@@ -215,7 +230,7 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
   };
 
   const addManualItem = () => {
-    const defaultDuration = selectedCourseType?.defaultDurationMinutes || 60;
+    const defaultDuration = parseInt(formData.defaultDurationMinutes) || 60;
     setManualItems(prev => [...prev, {
       scheduledAt: '',
       durationMinutes: defaultDuration,
@@ -248,16 +263,16 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
       newErrors.name = 'Nazwa kursu jest wymagana';
     }
 
-    if (!formData.courseTypeId) {
-      newErrors.courseTypeId = 'Typ kursu jest wymagany';
-    }
-
     if (!formData.teacherId) {
       newErrors.teacherId = 'Lektor jest wymagany';
     }
 
     if (!formData.startDate) {
       newErrors.startDate = 'Data rozpoczęcia jest wymagana';
+    }
+
+    if (!formData.pricePerLesson || parseFloat(formData.pricePerLesson) < 0) {
+      newErrors.pricePerLesson = 'Podaj cenę za lekcję';
     }
 
     if (formData.maxStudents && parseInt(formData.maxStudents) <= 0) {
@@ -268,7 +283,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
       newErrors.endDate = 'Data zakończenia nie może być wcześniejsza niż data rozpoczęcia';
     }
 
-    // Validate schedule if adding lessons
     if (!isEdit && scheduleMode !== 'none' && selectedStudentIds.length === 0) {
       newErrors.students = 'Wybierz co najmniej jednego ucznia, aby utworzyć harmonogram lekcji';
     }
@@ -291,9 +305,16 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
     if (!validate()) return;
 
     const data: any = {
-      courseTypeId: formData.courseTypeId,
       teacherId: formData.teacherId,
       name: formData.name,
+      courseType: formData.courseType,
+      language: formData.language,
+      level: formData.level,
+      deliveryMode: formData.deliveryMode,
+      defaultDurationMinutes: parseInt(formData.defaultDurationMinutes) || 60,
+      pricePerLesson: parseFloat(formData.pricePerLesson) || 0,
+      currency: formData.currency,
+      description: formData.description || undefined,
       startDate: formData.startDate,
       endDate: formData.endDate || undefined,
       maxStudents: formData.maxStudents ? parseInt(formData.maxStudents) : undefined,
@@ -303,7 +324,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
     if (isEdit && course) {
       await updateMutation.mutateAsync({ id: course.id, updates: data });
     } else {
-      // Add schedule data for new courses
       const scheduleData: CreateCourseWithScheduleData = {
         ...data,
         studentIds: selectedStudentIds.length > 0 ? selectedStudentIds : undefined,
@@ -321,6 +341,7 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
 
   const tabs = [
     { id: 'basic' as TabType, name: 'Podstawowe', icon: Info },
+    { id: 'details' as TabType, name: 'Szczegóły', icon: Settings },
     ...(!isEdit ? [
       { id: 'students' as TabType, name: 'Uczniowie', icon: Users },
       { id: 'schedule' as TabType, name: 'Harmonogram', icon: Calendar },
@@ -390,9 +411,26 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
           {/* Basic Tab */}
           {activeTab === 'basic' && (
             <div className="space-y-6">
-              {/* Basic Information */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900">Podstawowe informacje</h3>
+
+                {/* Course Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nazwa kursu *
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                      errors.name ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="np. Angielski B1 - środa 18:00"
+                  />
+                  {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+                </div>
 
                 {/* Course Type */}
                 <div>
@@ -400,23 +438,14 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                     Typ kursu *
                   </label>
                   <select
-                    name="courseTypeId"
-                    value={formData.courseTypeId}
+                    name="courseType"
+                    value={formData.courseType}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                      errors.courseTypeId ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="">Wybierz typ kursu</option>
-                    {courseTypes.map((type) => (
-                      <option key={type.id} value={type.id}>
-                        {type.name} ({type.level}, {type.language})
-                      </option>
-                    ))}
+                    <option value="INDIVIDUAL">Indywidualny</option>
+                    <option value="GROUP">Grupowy</option>
                   </select>
-                  {errors.courseTypeId && (
-                    <p className="mt-1 text-sm text-red-600">{errors.courseTypeId}</p>
-                  )}
                 </div>
 
                 {/* Teacher */}
@@ -444,31 +473,139 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                   )}
                 </div>
 
-                {/* Course Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nazwa kursu *
-                  </label>
+                {/* Language & Level */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Język *
+                    </label>
+                    <select
+                      name="language"
+                      value={formData.language}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      {LANGUAGES.map((lang) => (
+                        <option key={lang.value} value={lang.value}>
+                          {lang.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Poziom *
+                    </label>
+                    <select
+                      name="level"
+                      value={formData.level}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      {LEVELS.map((level) => (
+                        <option key={level.value} value={level.value}>
+                          {level.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Dates */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Data rozpoczęcia *
+                    </label>
+                    <input
+                      type="date"
+                      name="startDate"
+                      value={formData.startDate}
+                      onChange={handleChange}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                        errors.startDate ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    {errors.startDate && (
+                      <p className="mt-1 text-sm text-red-600">{errors.startDate}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Data zakończenia (opcjonalnie)
+                    </label>
+                    <input
+                      type="date"
+                      name="endDate"
+                      value={formData.endDate}
+                      onChange={handleChange}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                        errors.endDate ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    {errors.endDate && (
+                      <p className="mt-1 text-sm text-red-600">{errors.endDate}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div className="flex items-center">
                   <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
+                    type="checkbox"
+                    name="isActive"
+                    checked={formData.isActive}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                      errors.name ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="np. Angielski B1 - środa 18:00"
+                    className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
                   />
-                  {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+                  <label className="ml-2 block text-sm text-gray-700">Kurs aktywny</label>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Course Details */}
+          {/* Details Tab */}
+          {activeTab === 'details' && (
+            <div className="space-y-6">
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900">Szczegóły kursu</h3>
 
+                {/* Delivery Mode */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tryb prowadzenia *
+                  </label>
+                  <select
+                    name="deliveryMode"
+                    value={formData.deliveryMode}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="ONLINE">Online</option>
+                    <option value="IN_PERSON">Stacjonarnie</option>
+                    <option value="BOTH">Oba tryby</option>
+                  </select>
+                </div>
+
+                {/* Duration & Max Students */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Max Students */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Domyślny czas lekcji (minuty) *
+                    </label>
+                    <input
+                      type="number"
+                      name="defaultDurationMinutes"
+                      value={formData.defaultDurationMinutes}
+                      onChange={handleChange}
+                      min="15"
+                      step="15"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Maksymalna liczba uczestników
@@ -488,57 +625,64 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                       <p className="mt-1 text-sm text-red-600">{errors.maxStudents}</p>
                     )}
                   </div>
+                </div>
 
-                  {/* Start Date */}
+                {/* Price & Currency */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Data rozpoczęcia *
+                      Cena za lekcję *
                     </label>
                     <input
-                      type="date"
-                      name="startDate"
-                      value={formData.startDate}
+                      type="number"
+                      name="pricePerLesson"
+                      value={formData.pricePerLesson}
                       onChange={handleChange}
+                      min="0"
+                      step="0.01"
                       className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                        errors.startDate ? 'border-red-500' : 'border-gray-300'
+                        errors.pricePerLesson ? 'border-red-500' : 'border-gray-300'
                       }`}
+                      placeholder="np. 100"
                     />
-                    {errors.startDate && (
-                      <p className="mt-1 text-sm text-red-600">{errors.startDate}</p>
+                    {errors.pricePerLesson && (
+                      <p className="mt-1 text-sm text-red-600">{errors.pricePerLesson}</p>
                     )}
                   </div>
 
-                  {/* End Date */}
-                  <div className="md:col-span-2">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Data zakończenia (opcjonalnie)
+                      Waluta *
                     </label>
-                    <input
-                      type="date"
-                      name="endDate"
-                      value={formData.endDate}
+                    <select
+                      name="currency"
+                      value={formData.currency}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                        errors.endDate ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    />
-                    {errors.endDate && (
-                      <p className="mt-1 text-sm text-red-600">{errors.endDate}</p>
-                    )}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      {CURRENCIES.map((curr) => (
+                        <option key={curr.value} value={curr.value}>
+                          {curr.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-              </div>
 
-              {/* Status */}
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="isActive"
-                  checked={formData.isActive}
-                  onChange={handleChange}
-                  className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
-                />
-                <label className="ml-2 block text-sm text-gray-700">Kurs aktywny</label>
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Opis kursu
+                  </label>
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Opcjonalny opis kursu..."
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -708,7 +852,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                   <h4 className="font-medium">Lekcje cykliczne</h4>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Frequency */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Częstotliwość
@@ -724,7 +867,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                       </select>
                     </div>
 
-                    {/* Duration */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Czas trwania (minuty)
@@ -739,7 +881,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                       />
                     </div>
 
-                    {/* Start Date */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Data rozpoczęcia *
@@ -752,7 +893,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                       />
                     </div>
 
-                    {/* Time */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Godzina
@@ -765,7 +905,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                       />
                     </div>
 
-                    {/* End Date or Count */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Data zakończenia (opcjonalnie)
@@ -793,7 +932,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                       />
                     </div>
 
-                    {/* Delivery Mode */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Tryb zajęć
@@ -809,7 +947,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                     </div>
                   </div>
 
-                  {/* Days of Week (for WEEKLY/BIWEEKLY) */}
                   {(recurringPattern.frequency === 'WEEKLY' || recurringPattern.frequency === 'BIWEEKLY') && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -834,7 +971,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                     </div>
                   )}
 
-                  {/* Preview */}
                   {previewLessons.length > 0 && (
                     <div className="mt-6">
                       <h4 className="font-medium mb-2">
@@ -854,7 +990,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                 </div>
               )}
 
-              {/* Summary */}
               {scheduleMode !== 'none' && selectedStudentIds.length > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-start gap-3">

@@ -6,7 +6,7 @@ import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
 import { courseService } from '../services/courseService';
 import substitutionService from '../services/substitutionService';
-import { X, Users as UsersIcon, Clock, ClipboardList, Info, XCircle } from 'lucide-react';
+import { X, Users as UsersIcon, Clock, ClipboardList, Info, XCircle, Loader2 } from 'lucide-react';
 import AttendanceSection from './AttendanceSection';
 import CancelLessonDialog from './CancelLessonDialog';
 
@@ -49,7 +49,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
   });
 
   const [isRecurring, setIsRecurring] = useState(false);
-  const [recurringType, setRecurringType] = useState<'weeks' | 'months'>('weeks');
+  const [recurringType, setRecurringType] = useState<'weeks' | 'months' | 'years'>('weeks');
   const [recurringCount, setRecurringCount] = useState<string>('4');
 
   const [isSubstitution, setIsSubstitution] = useState(false);
@@ -114,19 +114,19 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
   }, [formData.courseId, courses, isEdit]);
 
   // Auto-calculate lesson price based on course price or teacher hourly rate (only when creating)
-  // Priority: courseType.pricePerLesson > teacher.hourlyRate
+  // Priority: course.pricePerLesson > teacher.hourlyRate
   useEffect(() => {
     if (!isEdit && !priceWasManuallySet && formData.durationMinutes) {
       const durationMinutes = Number(formData.durationMinutes);
       const baseDuration = 60; // base duration for price calculation
 
-      // First priority: if course is selected, use courseType price
+      // First priority: if course is selected, use course price
       if (formData.courseId) {
         const selectedCourse = courses.find(c => c.id === formData.courseId);
-        const courseTypePrice = selectedCourse?.courseType?.pricePerLesson;
-        if (courseTypePrice !== undefined && courseTypePrice !== null) {
+        const coursePrice = selectedCourse?.pricePerLesson;
+        if (coursePrice !== undefined && coursePrice !== null) {
           // Scale price proportionally based on duration
-          const calculatedPrice = (Number(courseTypePrice) / baseDuration) * durationMinutes;
+          const calculatedPrice = (Number(coursePrice) / baseDuration) * durationMinutes;
           setFormData(prev => ({ ...prev, pricePerLesson: calculatedPrice.toFixed(2) }));
           return;
         }
@@ -409,19 +409,25 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
         const endDate = new Date(scheduledDate);
         const dayOfWeek = scheduledDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
+        // Calculate end date based on recurring type
+        // All modes now use WEEKLY frequency - the difference is only in how far the end date extends
         if (recurringType === 'weeks') {
+          // X weeks: end date is X weeks from start
           endDate.setDate(endDate.getDate() + (Number(recurringCount) * 7));
-        } else {
+        } else if (recurringType === 'months') {
+          // X months: end date is X months from start (weekly lessons for X months)
           endDate.setMonth(endDate.getMonth() + Number(recurringCount));
+        } else {
+          // X years: end date is X years from start (weekly lessons for X years)
+          endDate.setFullYear(endDate.getFullYear() + Number(recurringCount));
         }
 
         const pattern = {
-          frequency: recurringType === 'weeks' ? 'WEEKLY' as const : 'MONTHLY' as const,
+          frequency: 'WEEKLY' as const, // Always use WEEKLY - creates lesson every week on selected day
           interval: 1,
           startDate: formData.scheduledAt,
           endDate: endDate.toISOString(),
-          daysOfWeek: recurringType === 'weeks' ? [dayOfWeek] : undefined,
-          occurrencesCount: Number(recurringCount),
+          daysOfWeek: [dayOfWeek], // Always include daysOfWeek for proper date generation
         };
 
         createRecurringMutation.mutate({
@@ -462,6 +468,16 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
         <div className="fixed inset-0 bg-black/50" onClick={onClose} />
 
         <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          {/* Loading overlay for recurring lessons creation */}
+          {createRecurringMutation.isPending && (
+            <div className="absolute inset-0 bg-white/90 z-50 flex flex-col items-center justify-center">
+              <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
+              <p className="text-lg font-medium text-gray-900 mb-2">Tworzenie lekcji cyklicznych...</p>
+              <p className="text-sm text-gray-500">Ta operacja może potrwać kilka minut.</p>
+              <p className="text-sm text-gray-500">Proszę nie zamykać okna.</p>
+            </div>
+          )}
+
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <h2 className="text-2xl font-bold text-gray-900">
@@ -639,9 +655,9 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                           <p className="mt-1 text-xs text-gray-500">
                             {(() => {
                               const selectedCourse = courses.find(c => c.id === formData.courseId);
-                              const courseTypePrice = selectedCourse?.courseType?.pricePerLesson;
-                              if (formData.courseId && courseTypePrice) {
-                                return `Cena na podstawie kursu "${selectedCourse?.courseType?.name}" (${courseTypePrice} ${formData.currency}/lekcję)`;
+                              const coursePrice = selectedCourse?.pricePerLesson;
+                              if (formData.courseId && coursePrice) {
+                                return `Cena na podstawie kursu "${selectedCourse?.name}" (${coursePrice} ${formData.currency}/lekcję)`;
                               }
                               if (selectedTeacher?.hourlyRate) {
                                 return `Sugerowana cena na podstawie stawki lektora (${selectedTeacher.hourlyRate} ${formData.currency}/h)`;
@@ -744,7 +760,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                               <input
                                 type="number"
                                 min="1"
-                                max="52"
+                                max={recurringType === 'weeks' ? 52 : recurringType === 'months' ? 60 : 10}
                                 value={recurringCount}
                                 onChange={(e) => setRecurringCount(e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
@@ -758,11 +774,12 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                               </label>
                               <select
                                 value={recurringType}
-                                onChange={(e) => setRecurringType(e.target.value as 'weeks' | 'months')}
+                                onChange={(e) => setRecurringType(e.target.value as 'weeks' | 'months' | 'years')}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                               >
                                 <option value="weeks">Tygodni</option>
                                 <option value="months">Miesięcy</option>
+                                <option value="years">Lat</option>
                               </select>
                             </div>
                           </div>
@@ -770,11 +787,42 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                           <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded p-3">
                             <p className="font-medium text-blue-800">Informacja:</p>
                             <p className="mt-1">
-                              System utworzy {recurringCount || '0'} {recurringType === 'weeks' ? 'tygodni' : 'miesięcy'} lekcji
-                              w tym samym dniu tygodnia i o tej samej godzinie.
+                              System utworzy cotygodniowe lekcje przez {recurringCount || '0'}{' '}
+                              {recurringType === 'weeks' ? 'tygodni' : recurringType === 'months' ? 'miesięcy' : 'lat'}
+                              {' '}w tym samym dniu tygodnia i o tej samej godzinie.
                               Lekcje z konfliktami harmonogramu zostaną automatycznie pominięte.
                             </p>
+                            {(() => {
+                              // Calculate approximate number of lessons
+                              const count = Number(recurringCount) || 0;
+                              let approxLessons = 0;
+                              if (recurringType === 'weeks') {
+                                approxLessons = count;
+                              } else if (recurringType === 'months') {
+                                approxLessons = Math.round(count * 4.33); // ~4.33 weeks per month
+                              } else {
+                                approxLessons = Math.round(count * 52); // 52 weeks per year
+                              }
+                              return approxLessons > 0 && (
+                                <p className="mt-1 text-blue-600">
+                                  Szacowana liczba lekcji: ~{approxLessons}
+                                </p>
+                              );
+                            })()}
                           </div>
+
+                          {/* Warning for very long series (> 2 years) */}
+                          {((recurringType === 'years' && Number(recurringCount) > 2) ||
+                            (recurringType === 'months' && Number(recurringCount) > 24)) && (
+                            <div className="text-sm bg-amber-50 border border-amber-200 rounded p-3">
+                              <p className="font-medium text-amber-800">Uwaga:</p>
+                              <p className="mt-1 text-amber-700">
+                                Tworzysz serię lekcji na ponad 2 lata. To może wygenerować bardzo dużą liczbę lekcji
+                                ({recurringType === 'years' ? Math.round(Number(recurringCount) * 52) : Math.round(Number(recurringCount) * 4.33)}+).
+                                Upewnij się, że to zamierzone działanie.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

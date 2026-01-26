@@ -97,7 +97,7 @@ const MaterialsPage: React.FC = () => {
             <option value="">Wybierz kurs</option>
             {courses.map((course) => (
               <option key={course.id} value={course.id}>
-                {course.name} - {course.courseType.name}
+                {course.name} - {course.language}
               </option>
             ))}
           </select>

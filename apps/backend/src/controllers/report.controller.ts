@@ -70,13 +70,16 @@ class ReportController {
   async getMarginsReport(req: AuthRequest, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
-      const { startDate, endDate, courseTypeId } = req.query;
+      const { startDate, endDate, courseId, courseType } = req.query;
 
       const filters = {
         organizationId,
         startDate: startDate ? new Date(String(startDate)) : undefined,
         endDate: endDate ? new Date(String(endDate)) : undefined,
-        courseTypeId: courseTypeId ? String(courseTypeId) : undefined,
+        courseId: courseId ? String(courseId) : undefined,
+        courseType: courseType && (courseType === 'GROUP' || courseType === 'INDIVIDUAL')
+          ? courseType as 'GROUP' | 'INDIVIDUAL'
+          : undefined,
       };
 
       const data = await reportService.generateMarginsReport(filters);
@@ -220,7 +223,10 @@ class ReportController {
             organizationId,
             startDate: filters.startDate ? new Date(String(filters.startDate)) : undefined,
             endDate: filters.endDate ? new Date(String(filters.endDate)) : undefined,
-            courseTypeId: filters.courseTypeId ? String(filters.courseTypeId) : undefined,
+            courseId: filters.courseId ? String(filters.courseId) : undefined,
+            courseType: filters.courseType && (filters.courseType === 'GROUP' || filters.courseType === 'INDIVIDUAL')
+              ? filters.courseType as 'GROUP' | 'INDIVIDUAL'
+              : undefined,
           });
 
           if (format === 'csv') {

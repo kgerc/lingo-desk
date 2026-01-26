@@ -3,22 +3,16 @@ import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { courseService, Course } from '../services/courseService';
-import { Plus, Search, Users, BookOpen, Calendar, MapPin, Wifi, Home, MoreVertical, Layers } from 'lucide-react';
+import { Plus, Search, Users, BookOpen, Calendar, MapPin, Wifi, Home, MoreVertical } from 'lucide-react';
 import CourseModal from '../components/CourseModal';
 import EnrollStudentModal from '../components/EnrollStudentModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Dropdown from '../components/Dropdown';
-import CourseTypesPage from './CourseTypesPage';
-import { useAuthStore } from '../stores/authStore';
-
-type TabType = 'courses' | 'types';
 
 const CoursesPage: React.FC = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const user = useAuthStore((state) => state.user);
-  const [activeTab, setActiveTab] = useState<TabType>('courses');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -27,8 +21,6 @@ const CoursesPage: React.FC = () => {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; courseId: string | null }>({ isOpen: false, courseId: null });
   const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-
-  const canManageCourseTypes = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
   // Fetch courses
   const { data: courses = [], isLoading } = useQuery({
@@ -138,63 +130,23 @@ const CoursesPage: React.FC = () => {
     });
   };
 
-  // If showing course types tab
-  if (activeTab === 'types' && canManageCourseTypes) {
+  const getCourseTypeBadge = (type: string) => {
+    if (type === 'GROUP') {
+      return (
+        <span className="px-2 py-1 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+          Grupowy
+        </span>
+      );
+    }
     return (
-      <div>
-        {/* Tabs Header */}
-        <div className="mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex gap-6">
-              <button
-                onClick={() => setActiveTab('courses')}
-                className="flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              >
-                <BookOpen className="h-5 w-5" />
-                Kursy
-              </button>
-              <button
-                onClick={() => setActiveTab('types')}
-                className="flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors border-primary text-primary"
-              >
-                <Layers className="h-5 w-5" />
-                Typy kursów
-              </button>
-            </nav>
-          </div>
-        </div>
-
-        <CourseTypesPage />
-      </div>
+      <span className="px-2 py-1 rounded text-xs font-medium bg-teal-100 text-teal-800">
+        Indywidualny
+      </span>
     );
-  }
+  };
 
   return (
     <div>
-      {/* Tabs Header - only show for admin/manager */}
-      {canManageCourseTypes && (
-        <div className="mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex gap-6">
-              <button
-                onClick={() => setActiveTab('courses')}
-                className="flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors border-primary text-primary"
-              >
-                <BookOpen className="h-5 w-5" />
-                Kursy
-              </button>
-              <button
-                onClick={() => setActiveTab('types')}
-                className="flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              >
-                <Layers className="h-5 w-5" />
-                Typy kursów
-              </button>
-            </nav>
-          </div>
-        </div>
-      )}
-
       <div className="mb-8 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Kursy</h1>
@@ -237,11 +189,15 @@ const CoursesPage: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
-                <tr><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Kurs
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Lektor
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Typ
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Poziom
@@ -265,7 +221,8 @@ const CoursesPage: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {courses.map((course) => (
-                  <tr key={course.id} className="hover:bg-gray-50 transition-colors"><td className="px-6 py-4">
+                  <tr key={course.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4">
                       <div className="flex items-center">
                         <div className="h-10 w-10 flex-shrink-0">
                           <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -274,7 +231,7 @@ const CoursesPage: React.FC = () => {
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">{course.name}</div>
-                          <div className="text-xs text-gray-500">{course.courseType.name}</div>
+                          <div className="text-xs text-gray-500">{course.language}</div>
                         </div>
                       </div>
                     </td>
@@ -290,16 +247,20 @@ const CoursesPage: React.FC = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getLanguageLevelBadge(course.courseType.level)}
+                      {getCourseTypeBadge(course.courseType)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getLanguageLevelBadge(course.level)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        {getDeliveryModeIcon(course.courseType.deliveryMode)}
+                        {getDeliveryModeIcon(course.deliveryMode)}
                         <span className="text-sm text-gray-900">
-                          {getDeliveryModeLabel(course.courseType.deliveryMode)}
+                          {getDeliveryModeLabel(course.deliveryMode)}
                         </span>
                       </div>
-                    </td>                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex items-center gap-1">
                         <Users className="h-4 w-4 text-gray-400" />
                         <span className="text-gray-900">

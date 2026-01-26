@@ -26,7 +26,7 @@ const GroupsPage: React.FC = () => {
     queryFn: async () => {
       const allCourses = await courseService.getCourses({ search: searchTerm });
       // Filter only GROUP format courses
-      return allCourses.filter((course) => course.courseType.format === 'GROUP');
+      return allCourses.filter((course) => course.courseType === 'GROUP');
     },
   });
 
@@ -177,7 +177,7 @@ const GroupsPage: React.FC = () => {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">{group.name}</h3>
-                  <p className="text-sm text-gray-600">{group.courseType.name}</p>
+                  <p className="text-sm text-gray-600">{group.language}</p>
                 </div>
 
                 {/* Dropdown */}
@@ -236,8 +236,8 @@ const GroupsPage: React.FC = () => {
                 {/* Language & Level */}
                 <div className="flex items-center gap-2">
                   <BookOpen className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">{group.courseType.language}</span>
-                  {getLanguageLevelBadge(group.courseType.level)}
+                  <span className="text-sm text-gray-600">{group.language}</span>
+                  {getLanguageLevelBadge(group.level)}
                 </div>
 
                 {/* Teacher */}
@@ -267,11 +267,11 @@ const GroupsPage: React.FC = () => {
 
                 {/* Delivery Mode */}
                 <div className="flex items-center gap-2">
-                  {getDeliveryModeIcon(group.courseType.deliveryMode)}
+                  {getDeliveryModeIcon(group.deliveryMode)}
                   <span className="text-sm text-gray-600">
-                    {group.courseType.deliveryMode === 'ONLINE'
+                    {group.deliveryMode === 'ONLINE'
                       ? 'Online'
-                      : group.courseType.deliveryMode === 'IN_PERSON'
+                      : group.deliveryMode === 'IN_PERSON'
                       ? 'Stacjonarnie'
                       : 'Hybrydowo'}
                   </span>

@@ -1,4 +1,4 @@
-import { PrismaClient, LessonStatus, LessonDeliveryMode } from '@prisma/client';
+import { PrismaClient, LessonStatus, LessonDeliveryMode, CourseFormat, LanguageLevel, CourseDeliveryMode } from '@prisma/client';
 import emailService from './email.service';
 
 const prisma = new PrismaClient();
@@ -72,9 +72,18 @@ function generateDatesFromPattern(pattern: {
 
 export interface CreateCourseData {
   organizationId: string;
-  courseTypeId: string;
   teacherId: string;
   name: string;
+  // Pola przeniesione z CourseType:
+  courseType: CourseFormat;
+  language: string;
+  level: LanguageLevel;
+  deliveryMode: CourseDeliveryMode;
+  defaultDurationMinutes: number;
+  pricePerLesson: number;
+  currency: string;
+  description?: string;
+  // Istniejące pola:
   startDate: Date;
   endDate?: Date;
   maxStudents?: number;
@@ -86,6 +95,16 @@ export interface CreateCourseData {
 export interface UpdateCourseData {
   teacherId?: string;
   name?: string;
+  // Pola przeniesione z CourseType:
+  courseType?: CourseFormat;
+  language?: string;
+  level?: LanguageLevel;
+  deliveryMode?: CourseDeliveryMode;
+  defaultDurationMinutes?: number;
+  pricePerLesson?: number;
+  currency?: string;
+  description?: string;
+  // Istniejące pola:
   startDate?: Date;
   endDate?: Date;
   maxStudents?: number;
@@ -136,25 +155,13 @@ export interface BulkUpdateLessonsData {
 export interface CourseFilters {
   search?: string;
   teacherId?: string;
-  courseTypeId?: string;
+  courseType?: CourseFormat;
   isActive?: boolean;
 }
 
 class CourseService {
   async createCourse(data: CreateCourseData) {
-    const { organizationId, courseTypeId, teacherId, ...courseData } = data;
-
-    // Verify course type exists and belongs to organization
-    const courseType = await prisma.courseType.findFirst({
-      where: {
-        id: courseTypeId,
-        organizationId,
-      },
-    });
-
-    if (!courseType) {
-      throw new Error('Course type not found');
-    }
+    const { organizationId, teacherId, ...courseData } = data;
 
     // Verify teacher exists and belongs to organization
     const teacher = await prisma.teacher.findFirst({
@@ -172,12 +179,10 @@ class CourseService {
     const course = await prisma.course.create({
       data: {
         organizationId,
-        courseTypeId,
         teacherId,
         ...courseData,
       },
       include: {
-        courseType: true,
         teacher: {
           include: {
             user: {
@@ -206,19 +211,7 @@ class CourseService {
    * Create course with schedule (lessons) in a single transaction
    */
   async createCourseWithSchedule(data: CreateCourseWithScheduleData) {
-    const { organizationId, courseTypeId, teacherId, schedule, studentIds, ...courseData } = data;
-
-    // Verify course type exists and belongs to organization
-    const courseType = await prisma.courseType.findFirst({
-      where: {
-        id: courseTypeId,
-        organizationId,
-      },
-    });
-
-    if (!courseType) {
-      throw new Error('Course type not found');
-    }
+    const { organizationId, teacherId, schedule, studentIds, ...courseData } = data;
 
     // Verify teacher exists and belongs to organization
     const teacher = await prisma.teacher.findFirst({
@@ -278,7 +271,6 @@ class CourseService {
       const course = await tx.course.create({
         data: {
           organizationId,
-          courseTypeId,
           teacherId,
           ...courseData,
         },
@@ -307,8 +299,8 @@ class CourseService {
       const lessons: any[] = [];
       const errors: { date: string; studentId: string; error: string }[] = [];
 
-      // Calculate price per lesson from course type
-      const pricePerLesson = courseType.pricePerLesson ? Number(courseType.pricePerLesson) : undefined;
+      // Use price per lesson from course
+      const pricePerLesson = courseData.pricePerLesson ? Number(courseData.pricePerLesson) : undefined;
 
       for (const lessonDate of lessonDates) {
         for (const enrollment of enrollments) {
@@ -327,7 +319,7 @@ class CourseService {
                 meetingUrl: lessonDate.meetingUrl,
                 status: 'SCHEDULED' as LessonStatus,
                 pricePerLesson,
-                currency: courseType.currency || 'PLN',
+                currency: courseData.currency || 'PLN',
               },
             });
             lessons.push(lesson);
@@ -353,7 +345,6 @@ class CourseService {
     const fullCourse = await prisma.course.findUnique({
       where: { id: result.course.id },
       include: {
-        courseType: true,
         teacher: {
           include: {
             user: {
@@ -528,7 +519,7 @@ class CourseService {
   }
 
   async getCourses(organizationId: string, filters?: CourseFilters) {
-    const { search, teacherId, courseTypeId, isActive } = filters || {};
+    const { search, teacherId, courseType, isActive } = filters || {};
 
     const where: any = {
       organizationId,
@@ -554,8 +545,8 @@ class CourseService {
       where.teacherId = teacherId;
     }
 
-    if (courseTypeId) {
-      where.courseTypeId = courseTypeId;
+    if (courseType) {
+      where.courseType = courseType;
     }
 
     if (isActive !== undefined) {
@@ -565,7 +556,6 @@ class CourseService {
     const courses = await prisma.course.findMany({
       where,
       include: {
-        courseType: true,
         teacher: {
           include: {
             user: {
@@ -611,7 +601,6 @@ class CourseService {
         organizationId,
       },
       include: {
-        courseType: true,
         teacher: {
           include: {
             user: {
@@ -709,7 +698,6 @@ class CourseService {
         ...updateData,
       },
       include: {
-        courseType: true,
         teacher: {
           include: {
             user: {
@@ -894,11 +882,7 @@ class CourseService {
             },
           },
         },
-        course: {
-          include: {
-            courseType: true,
-          },
-        },
+        course: true,
       },
     });
 
@@ -908,7 +892,7 @@ class CourseService {
         studentEmail: enrollment.student.user.email,
         studentName: `${enrollment.student.user.firstName} ${enrollment.student.user.lastName}`,
         courseName: enrollment.course!.name,
-        courseType: `${enrollment.course!.courseType.name} - ${enrollment.course!.courseType.language} ${enrollment.course!.courseType.level}`,
+        courseType: `${enrollment.course!.courseType === 'GROUP' ? 'Grupowy' : 'Indywidualny'} - ${enrollment.course!.language} ${enrollment.course!.level}`,
         startDate: enrollment.course!.startDate,
       });
     } catch (emailError) {

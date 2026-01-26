@@ -108,11 +108,7 @@ class LessonService {
         course: { organizationId },
       },
       include: {
-        course: {
-          include: {
-            courseType: true,
-          },
-        },
+        course: true,
         student: true,
       },
     });
@@ -141,11 +137,7 @@ class LessonService {
               },
             },
           },
-          course: {
-            include: {
-              courseType: true,
-            },
-          },
+          course: true,
         },
       });
       contractEnrollmentId = enrollment.id;
@@ -176,8 +168,8 @@ class LessonService {
     }
 
     // Calculate teacher rate if not explicitly provided
-    const courseTypePricePerLesson = enrollment?.course?.courseType?.pricePerLesson
-      ? Number(enrollment.course.courseType.pricePerLesson)
+    const courseTypePricePerLesson = enrollment?.course?.pricePerLesson
+      ? Number(enrollment.course.pricePerLesson)
       : undefined;
     const teacherHourlyRate = Number(teacher.hourlyRate);
 
@@ -227,11 +219,7 @@ class LessonService {
             },
           },
         },
-        course: {
-          include: {
-            courseType: true,
-          },
-        },
+        course: true,
         enrollment: true,
         location: true,
         classroom: true,
@@ -370,12 +358,6 @@ class LessonService {
             select: {
               id: true,
               name: true,
-              courseType: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
             },
           },
           location: {
@@ -506,12 +488,6 @@ class LessonService {
           select: {
             id: true,
             name: true,
-            courseType: {
-              select: {
-                id: true,
-                name: true
-              },
-            },
           },
         },
       },
@@ -558,18 +534,10 @@ class LessonService {
             },
           },
         },
-        course: {
-          include: {
-            courseType: true,
-          },
-        },
+        course: true,
         enrollment: {
           include: {
-            course: {
-              include: {
-                courseType: true,
-              },
-            },
+            course: true,
           },
         },
         location: true,
@@ -663,12 +631,15 @@ class LessonService {
       updateData.completedAt = new Date();
 
       // Deduct hours from student budget, create payment for per-lesson mode, or charge from balance
-      await this.deductLessonFromBudget(
-        existingLesson.enrollmentId,
-        existingLesson.durationMinutes,
-        existingLesson.id,
-        existingLesson.title
-      );
+      // Only if enrollment exists
+      if (existingLesson.enrollmentId) {
+        await this.deductLessonFromBudget(
+          existingLesson.enrollmentId,
+          existingLesson.durationMinutes,
+          existingLesson.id,
+          existingLesson.title
+        );
+      }
     }
 
     // If uncompleting (reverting from COMPLETED to another status), restore budget and remove payment
@@ -677,12 +648,15 @@ class LessonService {
       updateData.completedAt = null;
 
       // Restore budget, remove payment, or refund balance
-      await this.restoreLessonBudget(
-        existingLesson.enrollmentId,
-        existingLesson.durationMinutes,
-        existingLesson.id,
-        existingLesson.title
-      );
+      // Only if enrollment exists
+      if (existingLesson.enrollmentId) {
+        await this.restoreLessonBudget(
+          existingLesson.enrollmentId,
+          existingLesson.durationMinutes,
+          existingLesson.id,
+          existingLesson.title
+        );
+      }
     }
 
     const lesson = await prisma.lesson.update({
@@ -715,11 +689,7 @@ class LessonService {
             },
           },
         },
-        course: {
-          include: {
-            courseType: true,
-          },
-        },
+        course: true,
         enrollment: true,
         location: true,
         classroom: true,
@@ -1326,11 +1296,7 @@ class LessonService {
       where: { id: enrollmentId },
       include: {
         student: true,
-        course: {
-          include: {
-            courseType: true,
-          },
-        },
+        course: true,
       },
     });
 
@@ -1347,12 +1313,12 @@ class LessonService {
           select: { pricePerLesson: true, teacherRate: true, title: true },
         });
 
-        // Use pricePerLesson from lesson, fallback to teacherRate, then to courseType pricePerLesson
+        // Use pricePerLesson from lesson, fallback to teacherRate, then to course pricePerLesson
         const price = lesson?.pricePerLesson
           ? parseFloat(lesson.pricePerLesson.toString())
           : lesson?.teacherRate
             ? parseFloat(lesson.teacherRate.toString())
-            : parseFloat((enrollment.course?.courseType?.pricePerLesson || 0).toString());
+            : parseFloat((enrollment.course?.pricePerLesson || 0).toString());
 
         if (price > 0) {
           try {
@@ -1410,12 +1376,12 @@ class LessonService {
               select: { teacherRate: true, pricePerLesson: true },
             });
 
-            // Use pricePerLesson from lesson, fallback to teacherRate, then to courseType pricePerLesson
+            // Use pricePerLesson from lesson, fallback to teacherRate, then to course pricePerLesson
             const pricePerLesson = lesson?.pricePerLesson
               ? parseFloat(lesson.pricePerLesson.toString())
               : lesson?.teacherRate
                 ? parseFloat(lesson.teacherRate.toString())
-                : parseFloat((enrollment.course?.courseType?.pricePerLesson || 0).toString());
+                : parseFloat((enrollment.course?.pricePerLesson || 0).toString());
 
             // Calculate dueAt based on student's payment settings
             const now = new Date();
@@ -1567,11 +1533,7 @@ class LessonService {
             },
           },
         },
-        course: {
-          include: {
-            courseType: true,
-          },
-        },
+        course: true,
       },
     });
 
@@ -1743,7 +1705,7 @@ class LessonService {
       description?: string;
       teacherId: string;
       studentId: string;
-      enrollmentId: string;
+      enrollmentId?: string; // Optional - empty string should be treated as undefined
       courseId?: string;
       durationMinutes: number;
       locationId?: string;
@@ -1772,7 +1734,9 @@ class LessonService {
     const errors: Array<{ date: string; error: string }> = [];
     let currentDate = new Date(pattern.startDate);
     let count = 0;
-    const maxOccurrences = pattern.occurrencesCount || 100;
+    // Max occurrences: use provided value, or if endDate is set use higher limit (104 = 2 years weekly)
+    // If neither is provided, default to 100 for safety
+    const maxOccurrences = pattern.occurrencesCount || (pattern.endDate ? 104 : 100);
 
     // Collect all valid dates first
     while (
@@ -1830,11 +1794,22 @@ class LessonService {
 
       // Create all lessons in the transaction
       const createdLessons = [];
+
+      // Sanitize lessonData - remove empty string values for optional foreign keys
+      const sanitizedLessonData = {
+        ...lessonData,
+        enrollmentId: lessonData.enrollmentId && lessonData.enrollmentId.trim() !== '' ? lessonData.enrollmentId : undefined,
+        courseId: lessonData.courseId && lessonData.courseId.trim() !== '' ? lessonData.courseId : undefined,
+        locationId: lessonData.locationId && lessonData.locationId.trim() !== '' ? lessonData.locationId : undefined,
+        classroomId: lessonData.classroomId && lessonData.classroomId.trim() !== '' ? lessonData.classroomId : undefined,
+        meetingUrl: lessonData.meetingUrl && lessonData.meetingUrl.trim() !== '' ? lessonData.meetingUrl : undefined,
+      };
+
       for (const lessonDate of lessonDates) {
         const lesson = await tx.lesson.create({
           data: {
             organizationId,
-            ...lessonData,
+            ...sanitizedLessonData,
             scheduledAt: lessonDate,
             isRecurring: true,
             recurringPatternId: recurringPattern.id,

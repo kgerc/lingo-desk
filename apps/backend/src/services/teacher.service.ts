@@ -193,7 +193,6 @@ export class TeacherService {
         },
         courses: {
           include: {
-            courseType: true,
             _count: {
               select: {
                 enrollments: true,
