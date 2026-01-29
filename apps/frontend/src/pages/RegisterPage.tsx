@@ -89,6 +89,7 @@ const RegisterPage: React.FC = () => {
                   name="firstName"
                   type="text"
                   required
+                  autoComplete="given-name"
                   value={formData.firstName}
                   onChange={handleChange}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
@@ -104,6 +105,7 @@ const RegisterPage: React.FC = () => {
                   name="lastName"
                   type="text"
                   required
+                  autoComplete="family-name"
                   value={formData.lastName}
                   onChange={handleChange}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
@@ -119,6 +121,7 @@ const RegisterPage: React.FC = () => {
                 id="organizationName"
                 name="organizationName"
                 type="text"
+                autoComplete="organization"
                 value={formData.organizationName}
                 onChange={handleChange}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
@@ -134,6 +137,7 @@ const RegisterPage: React.FC = () => {
                 name="email"
                 type="email"
                 required
+                autoComplete="email"
                 value={formData.email}
                 onChange={handleChange}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
@@ -150,6 +154,7 @@ const RegisterPage: React.FC = () => {
                 type="password"
                 required
                 minLength={8}
+                autoComplete="new-password"
                 value={formData.password}
                 onChange={handleChange}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"

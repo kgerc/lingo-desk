@@ -264,6 +264,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                 <input
                   type="text"
                   name="firstName"
+                  autoComplete="off"
                   value={formData.firstName}
                   onChange={handleChange}
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
@@ -282,6 +283,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                 <input
                   type="text"
                   name="lastName"
+                  autoComplete="off"
                   value={formData.lastName}
                   onChange={handleChange}
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
@@ -300,6 +302,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                 <input
                   type="email"
                   name="email"
+                  autoComplete="off"
                   value={formData.email}
                   onChange={handleChange}
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
@@ -318,6 +321,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                 <input
                   type="tel"
                   name="phone"
+                  autoComplete="off"
                   value={formData.phone}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
@@ -334,6 +338,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                     <input
                       type="text"
                       name="password"
+                      autoComplete="off"
                       value={formData.password}
                       onChange={handleChange}
                       className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${

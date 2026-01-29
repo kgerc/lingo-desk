@@ -314,6 +314,18 @@ function App() {
             )
           }
         />
+
+        {/* Catch-all route - redirect unknown paths */}
+        <Route
+          path="*"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
       </Routes>
     </BrowserRouter>
   )
