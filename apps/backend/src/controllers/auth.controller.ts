@@ -2,18 +2,24 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import authService from '../services/auth.service';
 import { AuthRequest } from '../middleware/auth';
+import {
+  requiredEmail,
+  requiredString,
+  optionalString,
+  messages,
+} from '../utils/validation-messages';
 
 const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  firstName: z.string().min(2),
-  lastName: z.string().min(2),
-  organizationName: z.string().optional(),
+  email: requiredEmail('Email'),
+  password: requiredString('Hasło', { min: 8 }),
+  firstName: requiredString('Imię', { min: 2 }),
+  lastName: requiredString('Nazwisko', { min: 2 }),
+  organizationName: optionalString('Nazwa organizacji'),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
+  email: requiredEmail('Email'),
+  password: requiredString('Hasło'),
 });
 
 export class AuthController {
@@ -23,7 +29,7 @@ export class AuthController {
       const result = await authService.register(data);
 
       res.status(201).json({
-        message: 'User registered successfully',
+        message: 'Rejestracja zakończona pomyślnie',
         data: result,
       });
     } catch (error) {
@@ -37,7 +43,7 @@ export class AuthController {
       const result = await authService.login(data);
 
       res.json({
-        message: 'Login successful',
+        message: 'Zalogowano pomyślnie',
         data: result,
       });
     } catch (error) {
@@ -51,7 +57,7 @@ export class AuthController {
         return res.status(401).json({
           error: {
             code: 'UNAUTHORIZED',
-            message: 'Not authenticated',
+            message: messages.system.unauthorized,
           },
         });
       }

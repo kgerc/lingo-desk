@@ -27,9 +27,12 @@ const ALLOWED_MIME_TYPES = [
 ];
 
 const sendBulkEmailSchema = z.object({
-  subject: z.string().min(1, 'Subject is required'),
-  message: z.string().min(1, 'Message is required'),
-  recipients: z.enum(['all', 'selected', 'debtors']),
+  subject: z.string().min(1, 'Pole "Temat" jest wymagane'),
+  message: z.string().min(1, 'Pole "Wiadomość" jest wymagane'),
+  recipients: z.enum(['all', 'selected', 'debtors'], {
+    required_error: 'Pole "Odbiorcy" jest wymagane',
+    invalid_type_error: 'Pole "Odbiorcy" musi być jedną z wartości: wszyscy, wybrani, dłużnicy',
+  }),
   selectedStudentIds: z.array(z.string()).optional(),
 });
 
@@ -65,14 +68,14 @@ export const sendBulkEmail = async (req: MulterRequest, res: Response) => {
         // Validate file type
         if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
           return res.status(400).json({
-            message: `File type not allowed: ${file.originalname}. Allowed types: PDF, Word, Excel, PowerPoint, images, text files, CSV, ZIP.`
+            message: `Niedozwolony typ pliku: ${file.originalname}. Dozwolone typy: PDF, Word, Excel, PowerPoint, obrazy, pliki tekstowe, CSV, ZIP.`
           });
         }
 
         // Validate individual file size
         if (file.size > MAX_FILE_SIZE) {
           return res.status(400).json({
-            message: `File "${file.originalname}" exceeds max size of 10MB`
+            message: `Plik "${file.originalname}" przekracza maksymalny rozmiar 10MB`
           });
         }
 
@@ -88,7 +91,7 @@ export const sendBulkEmail = async (req: MulterRequest, res: Response) => {
       // Validate total size
       if (totalSize > MAX_TOTAL_SIZE) {
         return res.status(400).json({
-          message: 'Total attachments size exceeds max of 25MB'
+          message: 'Łączny rozmiar załączników przekracza maksimum 25MB'
         });
       }
     }
@@ -105,10 +108,10 @@ export const sendBulkEmail = async (req: MulterRequest, res: Response) => {
     return res.status(200).json(result);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Validation error', errors: error.errors });
+      return res.status(400).json({ message: 'Błąd walidacji', errors: error.errors });
     }
     console.error('Error sending bulk email:', error);
-    return res.status(500).json({ message: 'Failed to send bulk email' });
+    return res.status(500).json({ message: 'Nie udało się wysłać wiadomości email' });
   }
 };
 
@@ -135,6 +138,6 @@ export const getDebtorsCount = async (req: AuthRequest, res: Response) => {
     return res.status(200).json({ count: pendingPayments.length });
   } catch (error) {
     console.error('Error getting debtors count:', error);
-    return res.status(500).json({ message: 'Failed to get debtors count' });
+    return res.status(500).json({ message: 'Nie udało się pobrać liczby dłużników' });
   }
 };

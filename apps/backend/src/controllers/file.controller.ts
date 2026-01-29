@@ -96,7 +96,7 @@ class FileController {
 
       res.json({
         success: true,
-        message: 'File deleted successfully',
+        message: 'Plik usunięty pomyślnie',
         data: result,
       });
     } catch (error) {

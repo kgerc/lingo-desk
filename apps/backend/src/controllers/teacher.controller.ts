@@ -3,32 +3,49 @@ import { z } from 'zod';
 import teacherService from '../services/teacher.service';
 import { AuthRequest } from '../middleware/auth';
 import { ContractType } from '@prisma/client';
+import {
+  requiredEmail,
+  optionalEmail,
+  requiredString,
+  optionalString,
+  optionalPhone,
+  //requiredEnum,
+  //optionalEnum,
+  optionalBoolean,
+  messages,
+} from '../utils/validation-messages';
+
 
 const createTeacherSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  firstName: z.string().min(2),
-  lastName: z.string().min(2),
-  phone: z.string().optional(),
-  hourlyRate: z.number().positive(),
+  email: requiredEmail('Email'),
+  password: requiredString('Hasło', { min: 8 }),
+  firstName: requiredString('Imię', { min: 2 }),
+  lastName: requiredString('Nazwisko', { min: 2 }),
+  phone: optionalPhone('Telefon'),
+  hourlyRate: z.number({
+    required_error: 'Pole "Stawka godzinowa" jest wymagane',
+    invalid_type_error: 'Pole "Stawka godzinowa" musi być liczbą',
+  }).positive({ message: 'Pole "Stawka godzinowa" musi być liczbą dodatnią' }),
   contractType: z.nativeEnum(ContractType).optional(),
   specializations: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
-  bio: z.string().optional(),
+  bio: optionalString('Biografia'),
 });
 
 const updateTeacherSchema = z.object({
-  firstName: z.string().min(2).optional(),
-  lastName: z.string().min(2).optional(),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
-  hourlyRate: z.number().positive().optional(),
+  firstName: optionalString('Imię', { min: 2 }),
+  lastName: optionalString('Nazwisko', { min: 2 }),
+  phone: optionalPhone('Telefon'),
+  email: optionalEmail('Email'),
+  hourlyRate: z.number({
+    invalid_type_error: 'Pole "Stawka godzinowa" musi być liczbą',
+  }).positive({ message: 'Pole "Stawka godzinowa" musi być liczbą dodatnią' }).optional(),
   contractType: z.nativeEnum(ContractType).optional(),
   specializations: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
-  bio: z.string().optional(),
-  isAvailableForBooking: z.boolean().optional(),
-  isActive: z.boolean().optional(),
+  bio: optionalString('Biografia'),
+  isAvailableForBooking: optionalBoolean('Dostępny do rezerwacji'),
+  isActive: optionalBoolean('Aktywny'),
 });
 
 export class TeacherController {
@@ -38,7 +55,7 @@ export class TeacherController {
         return res.status(401).json({
           error: {
             code: 'UNAUTHORIZED',
-            message: 'Organization ID not found',
+            message: messages.system.unauthorized,
           },
         });
       }
@@ -47,10 +64,11 @@ export class TeacherController {
       const teacher = await teacherService.createTeacher({
         ...data,
         organizationId: req.user.organizationId,
+        contractType: data.contractType as ContractType | undefined,
       });
 
       return res.status(201).json({
-        message: 'Teacher created successfully',
+        message: 'Lektor został utworzony pomyślnie',
         data: teacher,
       });
     } catch (error) {
@@ -141,7 +159,7 @@ export class TeacherController {
       );
 
       return res.json({
-        message: 'Teacher updated successfully',
+        message: 'Lektor zaktualizowany pomyślnie',
         data: teacher,
       });
     } catch (error) {
@@ -200,7 +218,7 @@ export class TeacherController {
       // Get teacher by userId with full details
       const teacher = await teacherService.getTeacherByUserId(req.user.id);
       if (!teacher) {
-        res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Teacher not found' } });
+        res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Nie znaleziono lektora' } });
         return;
       }
 
@@ -225,7 +243,7 @@ export class TeacherController {
 
       const teacher = await teacherService.getTeacherByUserId(req.user.id);
       if (!teacher) {
-        res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Teacher not found' } });
+        res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Nie znaleziono lektora' } });
         return;
       }
 

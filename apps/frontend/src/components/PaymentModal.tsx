@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import paymentService, { Payment, CreatePaymentData, UpdatePaymentData } from '../services/paymentService';
 import { studentService } from '../services/studentService';
 import { X } from 'lucide-react';
+import { getErrorMessage } from '../lib/errorUtils';
 
 interface PaymentModalProps {
   payment: Payment | null;
@@ -49,7 +50,7 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
       onClose();
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Błąd tworzenia płatności');
+      toast.error(getErrorMessage(error, 'Błąd tworzenia płatności'));
     },
   });
 
@@ -64,7 +65,7 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
       onClose();
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Błąd aktualizacji płatności');
+      toast.error(getErrorMessage(error, 'Błąd aktualizacji płatności'));
     },
   });
 

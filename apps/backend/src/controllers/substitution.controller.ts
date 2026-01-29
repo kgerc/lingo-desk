@@ -1,20 +1,21 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import substitutionService from '../services/substitution.service';
+import { requiredUuid, optionalUuid, optionalString } from '../utils/validation-messages';
 
 // Validation schemas
 const createSubstitutionSchema = z.object({
-  lessonId: z.string().uuid(),
-  originalTeacherId: z.string().uuid(),
-  substituteTeacherId: z.string().uuid(),
-  reason: z.string().optional(),
-  notes: z.string().optional(),
+  lessonId: requiredUuid('Lekcja'),
+  originalTeacherId: requiredUuid('Lektor pierwotny'),
+  substituteTeacherId: requiredUuid('Lektor zastępujący'),
+  reason: optionalString('Powód'),
+  notes: optionalString('Notatki'),
 });
 
 const updateSubstitutionSchema = z.object({
-  substituteTeacherId: z.string().uuid().optional(),
-  reason: z.string().optional(),
-  notes: z.string().optional(),
+  substituteTeacherId: optionalUuid('Lektor zastępujący'),
+  reason: optionalString('Powód'),
+  notes: optionalString('Notatki'),
 });
 
 interface AuthRequest extends Request {
@@ -88,7 +89,7 @@ class SubstitutionController {
       if (!substitution) {
         return res.status(404).json({
           success: false,
-          message: 'Substitution not found for this lesson',
+          message: 'Nie znaleziono zastępstwa dla tej lekcji',
         });
       }
 
@@ -117,7 +118,7 @@ class SubstitutionController {
 
       res.status(201).json({
         success: true,
-        message: 'Substitution created successfully',
+        message: 'Zastępstwo zostało utworzone pomyślnie',
         data: substitution,
       });
     } catch (error) {
@@ -139,7 +140,7 @@ class SubstitutionController {
 
       res.json({
         success: true,
-        message: 'Substitution updated successfully',
+        message: 'Zastępstwo zostało zaktualizowane pomyślnie',
         data: substitution,
       });
     } catch (error) {
@@ -160,7 +161,7 @@ class SubstitutionController {
 
       res.json({
         success: true,
-        message: 'Substitution deleted successfully',
+        message: 'Zastępstwo zostało usunięte pomyślnie',
       });
     } catch (error) {
       next(error);

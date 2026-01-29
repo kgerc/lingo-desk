@@ -9,7 +9,7 @@ export class DashboardController {
         res.status(401).json({
           error: {
             code: 'UNAUTHORIZED',
-            message: 'Organization ID not found',
+            message: 'Nie znaleziono ID organizacji',
           },
         });
         return;
@@ -31,7 +31,7 @@ export class DashboardController {
         res.status(401).json({
           error: {
             code: 'UNAUTHORIZED',
-            message: 'Organization ID not found',
+            message: 'Nie znaleziono ID organizacji',
           },
         });
         return;
@@ -74,7 +74,7 @@ export class DashboardController {
         res.status(401).json({
           error: {
             code: 'UNAUTHORIZED',
-            message: 'Organization ID not found',
+            message: 'Nie znaleziono ID organizacji',
           },
         });
         return;

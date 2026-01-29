@@ -67,7 +67,7 @@ class MaterialController {
 
       res.json({
         success: true,
-        message: 'Material deleted successfully',
+        message: 'Materiał usunięty pomyślnie',
       });
     } catch (error) {
       next(error);
@@ -83,7 +83,7 @@ class MaterialController {
 
       res.json({
         success: true,
-        message: 'Materials reordered successfully',
+        message: 'Materiały zostały uporządkowane pomyślnie',
       });
     } catch (error) {
       next(error);

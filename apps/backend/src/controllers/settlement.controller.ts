@@ -2,19 +2,25 @@ import { Response } from 'express';
 import { z } from 'zod';
 import settlementService from '../services/settlement.service';
 import { AuthRequest } from '../middleware/auth';
+import {
+  requiredUuid,
+  requiredDateString,
+  optionalString,
+  messages,
+} from '../utils/validation-messages';
 
 // Validation schemas
 const previewSettlementSchema = z.object({
-  studentId: z.string().uuid(),
-  periodStart: z.string().transform((val) => new Date(val)),
-  periodEnd: z.string().transform((val) => new Date(val)),
+  studentId: requiredUuid('Uczeń'),
+  periodStart: requiredDateString('Data początku okresu'),
+  periodEnd: requiredDateString('Data końca okresu'),
 });
 
 const createSettlementSchema = z.object({
-  studentId: z.string().uuid(),
-  periodStart: z.string().transform((val) => new Date(val)),
-  periodEnd: z.string().transform((val) => new Date(val)),
-  notes: z.string().optional(),
+  studentId: requiredUuid('Uczeń'),
+  periodStart: requiredDateString('Data początku okresu'),
+  periodEnd: requiredDateString('Data końca okresu'),
+  notes: optionalString('Notatki'),
 });
 
 /**
@@ -24,14 +30,14 @@ export const getStudentsWithBalance = async (req: AuthRequest, res: Response) =>
   try {
     const organizationId = req.user?.organizationId;
     if (!organizationId) {
-      return res.status(401).json({ message: 'Unauthorized' });
+      return res.status(401).json({ message: messages.system.unauthorized });
     }
 
     const students = await settlementService.getStudentsWithBalance(organizationId);
     return res.status(200).json(students);
   } catch (error) {
     console.error('Error getting students with balance:', error);
-    return res.status(500).json({ message: 'Failed to get students' });
+    return res.status(500).json({ message: 'Nie udało się pobrać listy uczniów' });
   }
 };
 
@@ -42,7 +48,7 @@ export const getLastSettlementDate = async (req: AuthRequest, res: Response) => 
   try {
     const organizationId = req.user?.organizationId;
     if (!organizationId) {
-      return res.status(401).json({ message: 'Unauthorized' });
+      return res.status(401).json({ message: messages.system.unauthorized });
     }
 
     const { studentId } = req.params;
@@ -56,7 +62,7 @@ export const getLastSettlementDate = async (req: AuthRequest, res: Response) => 
     });
   } catch (error) {
     console.error('Error getting last settlement date:', error);
-    return res.status(500).json({ message: 'Failed to get settlement info' });
+    return res.status(500).json({ message: 'Nie udało się pobrać informacji o rozliczeniu' });
   }
 };
 
@@ -67,7 +73,7 @@ export const previewSettlement = async (req: AuthRequest, res: Response) => {
   try {
     const organizationId = req.user?.organizationId;
     if (!organizationId) {
-      return res.status(401).json({ message: 'Unauthorized' });
+      return res.status(401).json({ message: messages.system.unauthorized });
     }
 
     const validatedData = previewSettlementSchema.parse(req.body);
@@ -82,10 +88,10 @@ export const previewSettlement = async (req: AuthRequest, res: Response) => {
     return res.status(200).json(preview);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Validation error', errors: error.errors });
+      return res.status(400).json({ message: messages.system.validationFailed, errors: error.errors });
     }
     console.error('Error previewing settlement:', error);
-    return res.status(500).json({ message: 'Failed to preview settlement' });
+    return res.status(500).json({ message: 'Nie udało się wygenerować podglądu rozliczenia' });
   }
 };
 
@@ -96,7 +102,7 @@ export const createSettlement = async (req: AuthRequest, res: Response) => {
   try {
     const organizationId = req.user?.organizationId;
     if (!organizationId) {
-      return res.status(401).json({ message: 'Unauthorized' });
+      return res.status(401).json({ message: messages.system.unauthorized });
     }
 
     const validatedData = createSettlementSchema.parse(req.body);
@@ -112,10 +118,10 @@ export const createSettlement = async (req: AuthRequest, res: Response) => {
     return res.status(201).json(result);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Validation error', errors: error.errors });
+      return res.status(400).json({ message: messages.system.validationFailed, errors: error.errors });
     }
     console.error('Error creating settlement:', error);
-    return res.status(500).json({ message: 'Failed to create settlement' });
+    return res.status(500).json({ message: 'Nie udało się utworzyć rozliczenia' });
   }
 };
 
@@ -126,7 +132,7 @@ export const getStudentSettlements = async (req: AuthRequest, res: Response) => 
   try {
     const organizationId = req.user?.organizationId;
     if (!organizationId) {
-      return res.status(401).json({ message: 'Unauthorized' });
+      return res.status(401).json({ message: messages.system.unauthorized });
     }
 
     const { studentId } = req.params;
@@ -135,7 +141,7 @@ export const getStudentSettlements = async (req: AuthRequest, res: Response) => 
     return res.status(200).json(settlements);
   } catch (error) {
     console.error('Error getting student settlements:', error);
-    return res.status(500).json({ message: 'Failed to get settlements' });
+    return res.status(500).json({ message: 'Nie udało się pobrać rozliczeń' });
   }
 };
 
@@ -146,7 +152,7 @@ export const getSettlementById = async (req: AuthRequest, res: Response) => {
   try {
     const organizationId = req.user?.organizationId;
     if (!organizationId) {
-      return res.status(401).json({ message: 'Unauthorized' });
+      return res.status(401).json({ message: messages.system.unauthorized });
     }
 
     const { id } = req.params;
@@ -155,10 +161,10 @@ export const getSettlementById = async (req: AuthRequest, res: Response) => {
     return res.status(200).json(settlement);
   } catch (error: any) {
     if (error.message === 'Settlement not found') {
-      return res.status(404).json({ message: 'Settlement not found' });
+      return res.status(404).json({ message: 'Nie znaleziono rozliczenia' });
     }
     console.error('Error getting settlement:', error);
-    return res.status(500).json({ message: 'Failed to get settlement' });
+    return res.status(500).json({ message: 'Nie udało się pobrać rozliczenia' });
   }
 };
 
@@ -169,21 +175,21 @@ export const deleteSettlement = async (req: AuthRequest, res: Response) => {
   try {
     const organizationId = req.user?.organizationId;
     if (!organizationId) {
-      return res.status(401).json({ message: 'Unauthorized' });
+      return res.status(401).json({ message: messages.system.unauthorized });
     }
 
     const { id } = req.params;
 
     await settlementService.deleteSettlement(id, organizationId);
-    return res.status(200).json({ message: 'Settlement deleted successfully' });
+    return res.status(200).json({ message: 'Rozliczenie zostało usunięte pomyślnie' });
   } catch (error: any) {
     if (error.message === 'Settlement not found') {
-      return res.status(404).json({ message: 'Settlement not found' });
+      return res.status(404).json({ message: 'Nie znaleziono rozliczenia' });
     }
     if (error.message === 'Only the most recent settlement can be deleted') {
-      return res.status(400).json({ message: error.message });
+      return res.status(400).json({ message: 'Można usunąć tylko ostatnie rozliczenie' });
     }
     console.error('Error deleting settlement:', error);
-    return res.status(500).json({ message: 'Failed to delete settlement' });
+    return res.status(500).json({ message: 'Nie udało się usunąć rozliczenia' });
   }
 };

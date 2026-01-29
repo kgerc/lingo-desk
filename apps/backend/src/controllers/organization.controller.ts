@@ -72,7 +72,7 @@ class OrganizationController {
       if (!organizationId) {
         res.status(400).json({
           success: false,
-          error: { message: 'organizationId is required' },
+          error: { message: 'Pole "Organizacja" jest wymagane' },
         });
         return;
       }
@@ -97,7 +97,7 @@ class OrganizationController {
       if (!userId || !role) {
         res.status(400).json({
           success: false,
-          error: { message: 'userId and role are required' },
+          error: { message: 'Pola "Użytkownik" i "Rola" są wymagane' },
         });
         return;
       }

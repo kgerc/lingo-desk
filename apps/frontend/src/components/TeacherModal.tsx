@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { teacherService, Teacher, CreateTeacherData, UpdateTeacherData } from '../services/teacherService';
 import { X } from 'lucide-react';
+import { handleApiError } from '../lib/errorUtils';
 
 interface TeacherModalProps {
   teacher: Teacher | null;
@@ -41,9 +42,9 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
       onSuccess();
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.error?.message || 'Błąd tworzenia lektora';
-      toast.error(errorMessage);
-      setErrors({ form: errorMessage });
+      const { fieldErrors, message } = handleApiError(error, 'Błąd tworzenia lektora');
+      toast.error(message);
+      setErrors(fieldErrors);
     },
   });
 
@@ -55,9 +56,9 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
       onSuccess();
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.error?.message || 'Błąd aktualizacji lektora';
-      toast.error(errorMessage);
-      setErrors({ form: errorMessage });
+      const { fieldErrors, message } = handleApiError(error, 'Błąd aktualizacji lektora');
+      toast.error(message);
+      setErrors(fieldErrors);
     },
   });
 

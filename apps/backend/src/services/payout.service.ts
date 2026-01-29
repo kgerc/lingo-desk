@@ -622,6 +622,62 @@ class PayoutService {
       };
     });
   }
+
+  async getLessonsForRange(
+  teacherId: string,
+  organizationId: string,
+  fromDate: Date,
+  toDate: Date
+  ) {
+    const teacher = await prisma.teacher.findFirst({
+      where: { id: teacherId, organizationId },
+    });
+
+    if (!teacher) throw new Error('Teacher not found');
+
+    const hourlyRate = Number(teacher.hourlyRate);
+
+    const lessons = await prisma.lesson.findMany({
+      where: {
+        teacherId,
+        organizationId,
+        scheduledAt: { gte: fromDate, lte: toDate },
+      },
+      include: {
+        student: { include: { user: { select: { firstName: true, lastName: true } } } },
+        payoutLessons: { include: { payout: { select: { id: true, status: true, paidAt: true } } } },
+      },
+      orderBy: { scheduledAt: 'asc' },
+    });
+
+    return lessons.map((lesson) => {
+      const { qualified, reason } = this.isLessonQualified(lesson);
+      const payoutLesson = lesson.payoutLessons[0];
+      const amount = this.calculateLessonAmount(lesson.durationMinutes, hourlyRate);
+
+      return {
+        id: lesson.id,
+        title: lesson.title,
+        scheduledAt: lesson.scheduledAt,
+        durationMinutes: lesson.durationMinutes,
+        status: lesson.status,
+        cancelledAt: lesson.cancelledAt,
+        studentName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
+        hourlyRate,
+        amount,
+        currency: lesson.currency,
+        qualifiesForPayout: qualified,
+        qualificationReason: reason,
+        payout: payoutLesson
+          ? {
+              id: payoutLesson.payout.id,
+              status: payoutLesson.payout.status,
+              paidAt: payoutLesson.payout.paidAt,
+            }
+          : null,
+      };
+    });
+  }
 }
 
 export default new PayoutService();

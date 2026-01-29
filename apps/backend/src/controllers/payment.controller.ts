@@ -1,7 +1,60 @@
 import { Response } from 'express';
+import { z } from 'zod';
 import { AuthRequest } from '../middleware/auth';
 import paymentService from '../services/payment.service';
 import { PaymentStatus, PaymentMethod } from '@prisma/client';
+import {
+  requiredUuid,
+  optionalUuid,
+  requiredNonNegative,
+  optionalNonNegative,
+  optionalString,
+  requiredEnum,
+  optionalEnum,
+  optionalDateString,
+  messages,
+} from '../utils/validation-messages';
+
+// Polish labels for enums
+const paymentStatusLabels = {
+  PENDING: 'Oczekująca',
+  COMPLETED: 'Zrealizowana',
+  FAILED: 'Nieudana',
+  REFUNDED: 'Zwrócona',
+  CANCELLED: 'Anulowana',
+};
+const paymentMethodLabels = {
+  CASH: 'Gotówka',
+  BANK_TRANSFER: 'Przelew',
+  CARD: 'Karta',
+  ONLINE: 'Online',
+  OTHER: 'Inne',
+};
+
+const paymentStatusValues = Object.values(PaymentStatus) as [string, ...string[]];
+const paymentMethodValues = Object.values(PaymentMethod) as [string, ...string[]];
+
+const createPaymentSchema = z.object({
+  studentId: requiredUuid('Uczeń'),
+  enrollmentId: optionalUuid('Zapisanie'),
+  amount: requiredNonNegative('Kwota'),
+  currency: optionalString('Waluta'),
+  status: requiredEnum('Status', paymentStatusValues, paymentStatusLabels),
+  paymentMethod: requiredEnum('Metoda płatności', paymentMethodValues, paymentMethodLabels),
+  notes: optionalString('Notatki'),
+  paidAt: optionalDateString('Data płatności'),
+  exchangeRateOverride: optionalNonNegative('Kurs wymiany'),
+});
+
+const updatePaymentSchema = z.object({
+  amount: optionalNonNegative('Kwota'),
+  currency: optionalString('Waluta'),
+  status: optionalEnum('Status', paymentStatusValues, paymentStatusLabels),
+  paymentMethod: optionalEnum('Metoda płatności', paymentMethodValues, paymentMethodLabels),
+  notes: optionalString('Notatki'),
+  paidAt: optionalDateString('Data płatności'),
+  exchangeRateOverride: optionalNonNegative('Kurs wymiany').nullable(),
+});
 
 class PaymentController {
   /**
@@ -34,7 +87,7 @@ class PaymentController {
       console.error('Error fetching payments:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch payments',
+        message: 'Nie udało się pobrać płatności',
       });
     }
   }
@@ -58,7 +111,7 @@ class PaymentController {
       console.error('Error fetching payment:', error);
       res.status(404).json({
         success: false,
-        message: error instanceof Error ? error.message : 'Failed to fetch payment',
+        message: error instanceof Error ? error.message : 'Nie udało się pobrać płatności',
       });
     }
   }
@@ -70,40 +123,31 @@ class PaymentController {
   async createPayment(req: AuthRequest, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
-      const { studentId, enrollmentId, amount, currency, status, paymentMethod, notes, paidAt, exchangeRateOverride } =
-        req.body;
-
-      // Validation
-      if (!studentId || !amount || !status || !paymentMethod) {
-        return res.status(400).json({
-          success: false,
-          message: 'Missing required fields: studentId, amount, status, paymentMethod',
-        });
-      }
+      const data = createPaymentSchema.parse(req.body);
 
       const payment = await paymentService.createPayment({
         organizationId,
-        studentId,
-        enrollmentId,
-        amount: parseFloat(amount),
-        currency,
-        status,
-        paymentMethod,
-        notes,
-        paidAt: paidAt ? new Date(paidAt) : undefined,
-        exchangeRateOverride: exchangeRateOverride !== undefined ? parseFloat(exchangeRateOverride) : undefined,
+        studentId: data.studentId,
+        enrollmentId: data.enrollmentId,
+        amount: data.amount,
+        currency: data.currency,
+        status: data.status as PaymentStatus,
+        paymentMethod: data.paymentMethod as PaymentMethod,
+        notes: data.notes,
+        paidAt: data.paidAt ? new Date(data.paidAt) : undefined,
+        exchangeRateOverride: data.exchangeRateOverride,
       });
 
       return res.status(201).json({
         success: true,
         data: payment,
-        message: 'Payment created successfully',
+        message: 'Płatność została utworzona pomyślnie',
       });
     } catch (error) {
       console.error('Error creating payment:', error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to create payment',
+        message: messages.system.internalError,
       });
     }
   }
@@ -116,28 +160,28 @@ class PaymentController {
     try {
       const organizationId = req.user!.organizationId;
       const { id } = req.params;
-      const { amount, currency, status, paymentMethod, notes, paidAt, exchangeRateOverride } = req.body;
+      const data = updatePaymentSchema.parse(req.body);
 
       const payment = await paymentService.updatePayment(id as string, organizationId, {
-        amount: amount !== undefined ? parseFloat(amount) : undefined,
-        currency,
-        status,
-        paymentMethod,
-        notes,
-        paidAt: paidAt !== undefined ? (paidAt ? new Date(paidAt) : null) : undefined,
-        exchangeRateOverride: exchangeRateOverride !== undefined ? (exchangeRateOverride ? parseFloat(exchangeRateOverride) : null) : undefined,
+        amount: data.amount,
+        currency: data.currency,
+        status: data.status as PaymentStatus | undefined,
+        paymentMethod: data.paymentMethod as PaymentMethod | undefined,
+        notes: data.notes,
+        paidAt: data.paidAt !== undefined ? (data.paidAt ? new Date(data.paidAt) : null) : undefined,
+        exchangeRateOverride: data.exchangeRateOverride,
       });
 
       res.json({
         success: true,
         data: payment,
-        message: 'Payment updated successfully',
+        message: 'Płatność została zaktualizowana pomyślnie',
       });
     } catch (error) {
       console.error('Error updating payment:', error);
       res.status(404).json({
         success: false,
-        message: error instanceof Error ? error.message : 'Failed to update payment',
+        message: error instanceof Error ? error.message : 'Nie udało się zaktualizować płatności',
       });
     }
   }
@@ -155,13 +199,13 @@ class PaymentController {
 
       res.json({
         success: true,
-        message: 'Payment deleted successfully',
+        message: 'Płatność została usunięta pomyślnie',
       });
     } catch (error) {
       console.error('Error deleting payment:', error);
       res.status(404).json({
         success: false,
-        message: error instanceof Error ? error.message : 'Failed to delete payment',
+        message: error instanceof Error ? error.message : 'Nie udało się usunąć płatności',
       });
     }
   }
@@ -183,7 +227,7 @@ class PaymentController {
       console.error('Error fetching payment stats:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch payment statistics',
+        message: 'Nie udało się pobrać statystyk płatności',
       });
     }
   }
@@ -207,7 +251,7 @@ class PaymentController {
       console.error('Error fetching student payment history:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch payment history',
+        message: 'Nie udało się pobrać historii płatności',
       });
     }
   }
@@ -229,7 +273,7 @@ class PaymentController {
       console.error('Error fetching debtors:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch debtors',
+        message: 'Nie udało się pobrać listy dłużników',
       });
     }
   }
@@ -246,7 +290,7 @@ class PaymentController {
       if (!csvData) {
         return res.status(400).json({
           success: false,
-          message: 'CSV data is required',
+          message: 'Dane CSV są wymagane',
         });
       }
 
@@ -261,7 +305,7 @@ class PaymentController {
       console.error('Error importing payments:', error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to import payments',
+        message: 'Nie udało się zaimportować płatności',
       });
     }
   }

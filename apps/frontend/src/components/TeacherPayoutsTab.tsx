@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import payoutService, {
@@ -42,8 +42,15 @@ export default function TeacherPayoutsTab() {
     isOpen: false,
     payoutId: null,
   });
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [rangeDraft, setRangeDraft] = useState<string | null>(null);
+  type CalendarFilter =
+    | { type: 'ALL' }
+    | { type: 'DAY'; date: string }
+    | { type: 'RANGE'; from: string; to: string };
+
+  const [calendarFilter, setCalendarFilter] =
+    useState<CalendarFilter>({ type: 'ALL' });
 
   // Fetch teachers summary
   const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery({
@@ -59,15 +66,15 @@ export default function TeacherPayoutsTab() {
     enabled: !!selectedTeacher && viewMode === 'history',
   });
 
-  // Fetch lessons for selected day
-  const { data: lessonsForDay = [], isLoading: isLoadingLessons } = useQuery({
-    queryKey: ['teacher-lessons-for-day', selectedTeacher?.id, selectedDate.toISOString().split('T')[0]],
+  const lessonsRangeQuery = useQuery({
+    queryKey: ['teacher-lessons-range', selectedTeacher?.id, periodStart, periodEnd],
     queryFn: () =>
-      payoutService.getLessonsForDay(
+      payoutService.getLessonsForRange(
         selectedTeacher!.id,
-        selectedDate.toISOString().split('T')[0]
+        periodStart,
+        periodEnd
       ),
-    enabled: !!selectedTeacher && viewMode === 'payout',
+    enabled: false, // manual
   });
 
   // Set default period dates when entering payout view
@@ -77,10 +84,14 @@ export default function TeacherPayoutsTab() {
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      setPeriodStart(firstDay.toISOString().split('T')[0]);
-      setPeriodEnd(lastDay.toISOString().split('T')[0]);
+      setPeriodStart(formatDate(firstDay));
+      setPeriodEnd(formatDate(lastDay));
     }
   }, [viewMode]);
+
+  useEffect(() => {
+    setCalendarFilter({ type: 'ALL' });
+  }, [periodStart, periodEnd]);
 
   // Preview mutation
   const previewMutation = useMutation({
@@ -146,7 +157,10 @@ export default function TeacherPayoutsTab() {
     setViewMode('payout');
     setPreview(null);
     setNotes('');
-    setSelectedDate(new Date());
+    setCalendarFilter({
+      type: 'DAY',
+      date: new Date().toISOString().slice(0, 10),
+    })
     setCurrentMonth(new Date());
   };
 
@@ -169,6 +183,7 @@ export default function TeacherPayoutsTab() {
       return;
     }
     previewMutation.mutate();
+    lessonsRangeQuery.refetch();
   };
 
   const handleSavePayout = () => {
@@ -201,6 +216,27 @@ export default function TeacherPayoutsTab() {
         .includes(searchTerm.toLowerCase()) ||
       teacher.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const filteredLessons = useMemo(() => {
+    const lessons = lessonsRangeQuery.data ?? [];
+
+    if (calendarFilter.type === 'ALL') return lessons;
+
+    if (calendarFilter.type === 'DAY') {
+      return lessons.filter(
+        l => l.scheduledAt.slice(0, 10) === calendarFilter.date
+      );
+    }
+
+    if (calendarFilter.type === 'RANGE') {
+      return lessons.filter(l => {
+        const date = l.scheduledAt.slice(0, 10);
+        return date >= calendarFilter.from && date <= calendarFilter.to;
+      });
+    }
+
+    return lessons;
+  }, [lessonsRangeQuery.data, calendarFilter]);
 
   const formatCurrency = (amount: number, currency = 'PLN') => {
     return `${amount.toFixed(2)} ${currency}`;
@@ -304,15 +340,40 @@ export default function TeacherPayoutsTab() {
   };
 
   const isSelected = (date: Date) => {
-    return (
-      date.getDate() === selectedDate.getDate() &&
-      date.getMonth() === selectedDate.getMonth() &&
-      date.getFullYear() === selectedDate.getFullYear()
-    );
+    if (calendarFilter.type !== 'DAY') return false;
+    return formatDate(date) === calendarFilter.date;
+  };
+
+  const isInRange = (date: Date) => {
+  if (calendarFilter.type !== 'RANGE') return false;
+  const d = formatDate(date);
+  return d >= calendarFilter.from && d <= calendarFilter.to;
+  };
+
+  const isRangeStart = (date: Date) => {
+    if (calendarFilter.type !== 'RANGE') return false;
+    return formatDate(date) === calendarFilter.from;
+  };
+
+  const isRangeEnd = (date: Date) => {
+    if (calendarFilter.type !== 'RANGE') return false;
+    return formatDate(date) === calendarFilter.to;
+  };
+
+  const isDraftStart = (date: Date) => {
+    if (!rangeDraft) return false;
+    return formatDate(date) === rangeDraft;
   };
 
   const isCurrentMonth = (date: Date) => {
     return date.getMonth() === currentMonth.getMonth();
+  };
+
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const prevMonth = () => {
@@ -628,16 +689,35 @@ export default function TeacherPayoutsTab() {
               {getDaysInMonth(currentMonth).map((date, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setSelectedDate(date)}
-                  className={`py-1.5 rounded text-sm transition-colors ${
-                    !isCurrentMonth(date)
-                      ? 'text-gray-300'
-                      : isSelected(date)
+                  onClick={() => {
+                    const d = formatDate(date);
+
+                    if (!rangeDraft) {
+                      setRangeDraft(d);
+                      setCalendarFilter({ type: 'ALL' });
+                    } else {
+                      setCalendarFilter({
+                        type: 'RANGE',
+                        from: rangeDraft < d ? rangeDraft : d,
+                        to: rangeDraft < d ? d : rangeDraft,
+                      });
+                      setRangeDraft(null);
+                    }
+                  }}
+                  className={`py-1.5 rounded text-sm transition-colors relative
+                    ${!isCurrentMonth(date) ? 'text-gray-300' : ''}
+                    ${isDraftStart(date) ? 'bg-primary/30 text-primary font-semibold' : ''}
+                    ${isRangeStart(date) ? 'bg-primary text-white rounded-l-full' : ''}
+                    ${isRangeEnd(date) ? 'bg-primary text-white rounded-r-full' : ''}
+                    ${isInRange(date) && !isRangeStart(date) && !isRangeEnd(date)
+                      ? 'bg-primary/20 text-primary'
+                      : ''}
+                    ${calendarFilter.type === 'DAY' && isSelected(date)
                       ? 'bg-primary text-white'
-                      : isToday(date)
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'hover:bg-gray-100 text-gray-900'
-                  }`}
+                      : ''}
+                    ${isToday(date) ? 'ring-1 ring-blue-400' : ''}
+                    hover:bg-gray-100
+                  `}
                 >
                   {date.getDate()}
                 </button>
@@ -703,25 +783,55 @@ export default function TeacherPayoutsTab() {
 
         {/* Right column - Lessons for day and preview */}
         <div className="lg:col-span-2 space-y-6">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            {rangeDraft && (
+              <span className="px-3 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                Wybierz drugi dzień zakresu
+              </span>
+            )}
+
+            {calendarFilter.type === 'DAY' && (
+              <span className="px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-800 flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                {calendarFilter.date}
+              </span>
+            )}
+
+            {calendarFilter.type === 'RANGE' && (
+              <span className="px-3 py-1 text-xs rounded-full bg-primary/10 text-primary flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                {calendarFilter.from} – {calendarFilter.to}
+              </span>
+            )}
+
+            {(calendarFilter.type !== 'ALL' || rangeDraft) && (
+              <button
+                onClick={() => {
+                  setCalendarFilter({ type: 'ALL' });
+                  setRangeDraft(null);
+                }}
+                className="text-xs text-gray-500 underline"
+              >
+                Wyczyść
+              </button>
+            )}
+          </div>
+
           {/* Lessons for selected day */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Lekcje: {selectedDate.toLocaleDateString('pl-PL', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })}
+              Lekcje:
             </h3>
-            {isLoadingLessons ? (
+            {lessonsRangeQuery.isFetching ? (
               <LoadingSpinner message="Ładowanie lekcji..." />
-            ) : lessonsForDay.length === 0 ? (
+            ) : filteredLessons.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
-                Brak lekcji w tym dniu
+                Brak lekcji w wybranym zakresie dat
               </div>
             ) : (
               <div className="divide-y divide-gray-200">
-                {lessonsForDay.map((lesson) => (
+                {filteredLessons.map((lesson) => (
                   <div key={lesson.id} className="py-3 flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">

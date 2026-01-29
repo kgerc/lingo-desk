@@ -3,41 +3,64 @@ import { z } from 'zod';
 import lessonService from '../services/lesson.service';
 import { AuthRequest } from '../middleware/auth';
 import googleCalendarService from '../services/google-calendar.service';
+import {
+  requiredUuid,
+  optionalUuid,
+  requiredString,
+  optionalString,
+  requiredEnum,
+  optionalEnum,
+  requiredPositiveInt,
+  optionalPositiveInt,
+  optionalNonNegative,
+  requiredBoolean,
+  requiredDateString,
+  optionalDateString,
+  optionalUrl,
+} from '../utils/validation-messages';
+
+// Polish labels for enums
+const lessonDeliveryModeLabels = { IN_PERSON: 'Stacjonarnie', ONLINE: 'Online' };
+const lessonStatusLabels = {
+  SCHEDULED: 'Zaplanowana',
+  CONFIRMED: 'Potwierdzona',
+  COMPLETED: 'Zakończona',
+  CANCELLED: 'Anulowana',
+  PENDING_CONFIRMATION: 'Oczekuje na potwierdzenie',
+  NO_SHOW: 'Nieobecność',
+};
 
 const createLessonSchema = z.object({
-  courseId: z.string().uuid().optional(),
-  enrollmentId: z.string().optional(),
-  teacherId: z.string().uuid(),
-  studentId: z.string().uuid(),
-  title: z.string().min(2),
-  description: z.string().optional(),
-  scheduledAt: z.string().transform((str) => new Date(str)),
-  durationMinutes: z.number().int().positive().default(60),
-  locationId: z.string().uuid().optional(),
-  classroomId: z.string().uuid().optional(),
-  deliveryMode: z.enum(['IN_PERSON', 'ONLINE']),
-  meetingUrl: z.string().url().optional(),
-  status: z.enum(['SCHEDULED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'PENDING_CONFIRMATION', 'NO_SHOW']).default('SCHEDULED'),
-  isRecurring: z.boolean().default(false),
-  recurringPatternId: z.string().uuid().optional(),
-  teacherRate: z.number().optional()
+  courseId: optionalUuid('Kurs'),
+  enrollmentId: optionalString('Zapisanie'),
+  teacherId: requiredUuid('Lektor'),
+  studentId: requiredUuid('Uczeń'),
+  title: requiredString('Tytuł', { min: 2 }),
+  description: optionalString('Opis'),
+  scheduledAt: requiredDateString('Data i godzina'),
+  durationMinutes: requiredPositiveInt('Czas trwania').default(60),
+  locationId: optionalUuid('Lokalizacja'),
+  classroomId: optionalUuid('Sala'),
+  deliveryMode: requiredEnum('Tryb lekcji', ['IN_PERSON', 'ONLINE'] as const, lessonDeliveryModeLabels),
+  meetingUrl: optionalUrl('Link do spotkania'),
+  status: requiredEnum('Status', ['SCHEDULED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'PENDING_CONFIRMATION', 'NO_SHOW'] as const, lessonStatusLabels).default('SCHEDULED'),
+  isRecurring: requiredBoolean('Cykliczna').default(false),
+  recurringPatternId: optionalUuid('Wzorzec cykliczny'),
+  teacherRate: optionalNonNegative('Stawka lektora'),
 });
 
 const updateLessonSchema = z.object({
-  title: z.string().min(2).optional(),
-  description: z.string().optional(),
-  scheduledAt: z
-    .string()
-    .optional()
-    .transform((str) => (str ? new Date(str) : undefined)),
-  durationMinutes: z.number().int().positive().optional(),
-  locationId: z.string().uuid().optional(),
-  classroomId: z.string().uuid().optional(),
-  deliveryMode: z.enum(['IN_PERSON', 'ONLINE']).optional(),
-  meetingUrl: z.string().url().optional(),
-  status: z.enum(['SCHEDULED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'PENDING_CONFIRMATION', 'NO_SHOW']).optional(),
-  cancellationReason: z.string().optional(),
-  teacherRate: z.number().optional()
+  title: optionalString('Tytuł', { min: 2 }),
+  description: optionalString('Opis'),
+  scheduledAt: optionalDateString('Data i godzina'),
+  durationMinutes: optionalPositiveInt('Czas trwania'),
+  locationId: optionalUuid('Lokalizacja'),
+  classroomId: optionalUuid('Sala'),
+  deliveryMode: optionalEnum('Tryb lekcji', ['IN_PERSON', 'ONLINE'] as const, lessonDeliveryModeLabels),
+  meetingUrl: optionalUrl('Link do spotkania'),
+  status: optionalEnum('Status', ['SCHEDULED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'PENDING_CONFIRMATION', 'NO_SHOW'] as const, lessonStatusLabels),
+  cancellationReason: optionalString('Powód anulowania'),
+  teacherRate: optionalNonNegative('Stawka lektora'),
 });
 
 class LessonController {
@@ -58,7 +81,7 @@ class LessonController {
 
       const result = await lessonService.getLessons(req.user!.organizationId, filters);
       res.json({
-        message: 'Lessons retrieved successfully',
+        message: 'Lekcje pobrane pomyślnie',
         data: result.data,
         pagination: result.pagination,
       });
@@ -81,7 +104,7 @@ class LessonController {
       if (endDate) filters.endDate = String(endDate);
 
       const lessons = await lessonService.getLessonsUnpaginated(req.user!.organizationId, filters);
-      res.json({ message: 'Lessons retrieved successfully', data: lessons });
+      res.json({ message: 'Lekcje pobrane pomyślnie', data: lessons });
     } catch (error) {
       next(error);
     }
@@ -91,7 +114,7 @@ class LessonController {
     try {
       const { id } = req.params;
       const lesson = await lessonService.getLessonById(id as string, req.user!.organizationId);
-      res.json({ message: 'Lesson retrieved successfully', data: lesson });
+      res.json({ message: 'Lekcja pobrana pomyślnie', data: lesson });
     } catch (error) {
       next(error);
     }
@@ -112,7 +135,7 @@ class LessonController {
         });
       }
 
-      res.status(201).json({ message: 'Lesson created successfully', data: lesson });
+      res.status(201).json({ message: 'Lekcja utworzona pomyślnie', data: lesson });
     } catch (error) {
       next(error);
     }
@@ -131,7 +154,7 @@ class LessonController {
         });
       }
 
-      res.json({ message: 'Lesson updated successfully', data: lesson });
+      res.json({ message: 'Lekcja zaktualizowana pomyślnie', data: lesson });
     } catch (error) {
       next(error);
     }
@@ -159,7 +182,7 @@ class LessonController {
     try {
       const { id } = req.params;
       const lesson = await lessonService.confirmLesson(id as string, req.user!.organizationId);
-      res.json({ message: 'Lesson confirmed successfully', data: lesson });
+      res.json({ message: 'Lekcja potwierdzona pomyślnie', data: lesson });
     } catch (error) {
       next(error);
     }
@@ -168,7 +191,7 @@ class LessonController {
   async getStats(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const stats = await lessonService.getLessonStats(req.user!.organizationId);
-      res.json({ message: 'Lesson stats retrieved successfully', data: stats });
+      res.json({ message: 'Statystyki lekcji pobrane pomyślnie', data: stats });
     } catch (error) {
       next(error);
     }
@@ -182,7 +205,7 @@ class LessonController {
         return res.status(400).json({
           error: {
             code: 'VALIDATION_ERROR',
-            message: 'Missing required parameters: teacherId, studentId, scheduledAt, durationMinutes',
+            message: 'Brak wymaganych parametrów: lektor, uczeń, data i godzina, czas trwania',
           },
         });
       }

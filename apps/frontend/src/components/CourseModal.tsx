@@ -5,6 +5,7 @@ import { courseService, Course, CreateCourseWithScheduleData, ScheduleItem, Sche
 import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
 import { X, Info, Calendar, Users, Plus, Trash2, Clock, AlertCircle, Settings } from 'lucide-react';
+import { handleApiError } from '../lib/errorUtils';
 
 interface CourseModalProps {
   course: Course | null;
@@ -177,9 +178,9 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
       onSuccess();
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.error?.message || 'Wystąpił błąd podczas tworzenia kursu';
-      toast.error(errorMessage);
-      setErrors({ form: errorMessage });
+      const { fieldErrors, message } = handleApiError(error, 'Wystąpił błąd podczas tworzenia kursu');
+      toast.error(message);
+      setErrors(fieldErrors);
     },
   });
 
@@ -191,9 +192,9 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
       onSuccess();
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.error?.message || 'Wystąpił błąd podczas aktualizacji kursu';
-      toast.error(errorMessage);
-      setErrors({ form: errorMessage });
+      const { fieldErrors, message } = handleApiError(error, 'Wystąpił błąd podczas aktualizacji kursu');
+      toast.error(message);
+      setErrors(fieldErrors);
     },
   });
 

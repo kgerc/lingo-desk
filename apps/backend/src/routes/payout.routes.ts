@@ -10,6 +10,7 @@ import {
   deletePayout,
   getTeachersSummary,
   getLessonsForDay,
+  getLessonsForRange
 } from '../controllers/payout.controller';
 
 const router = Router();
@@ -39,5 +40,6 @@ router.delete('/:id', deletePayout);
 router.get('/teacher/:teacherId', getTeacherPayouts);
 router.get('/teacher/:teacherId/preview', previewPayout);
 router.get('/teacher/:teacherId/lessons', getLessonsForDay);
+router.get('/teacher/:teacherId/lessons-range', getLessonsForRange);
 
 export default router;

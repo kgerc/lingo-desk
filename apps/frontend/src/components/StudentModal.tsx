@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { studentService, Student, CreateStudentData, UpdateStudentData } from '../services/studentService';
 import { X } from 'lucide-react';
 import StudentBalanceCard from './StudentBalanceCard';
+import { handleApiError } from '../lib/errorUtils';
 
 interface StudentModalProps {
   student: Student | null;
@@ -62,9 +63,9 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
       onSuccess();
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.error?.message || 'Błąd tworzenia ucznia';
-      toast.error(errorMessage);
-      setErrors({ form: errorMessage });
+      const { fieldErrors, message } = handleApiError(error, 'Błąd tworzenia ucznia');
+      toast.error(message);
+      setErrors(fieldErrors);
     },
   });
 
@@ -76,9 +77,9 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
       onSuccess();
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.error?.message || 'Błąd aktualizacji ucznia';
-      toast.error(errorMessage);
-      setErrors({ form: errorMessage });
+      const { fieldErrors, message } = handleApiError(error, 'Błąd aktualizacji ucznia');
+      toast.error(message);
+      setErrors(fieldErrors);
     },
   });
 

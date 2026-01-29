@@ -27,7 +27,7 @@ export const previewPayout = async (req: AuthRequest, res: Response) => {
     return res.json(preview);
   } catch (error) {
     console.error('Preview payout error:', error);
-    return res.status(500).json({ error: 'Failed to preview payout' });
+    return res.status(500).json({ error: 'Nie udało się wygenerować podglądu wypłaty' });
   }
 };
 
@@ -55,7 +55,7 @@ export const createPayout = async (req: AuthRequest, res: Response) => {
     return res.status(201).json(result);
   } catch (error: any) {
     console.error('Create payout error:', error);
-    return res.status(500).json({ error: error.message || 'Failed to create payout' });
+    return res.status(500).json({ error: error.message || 'Nie udało się utworzyć wypłaty' });
   }
 };
 
@@ -90,7 +90,7 @@ export const getPayouts = async (req: AuthRequest, res: Response) => {
     return res.json(payouts);
   } catch (error) {
     console.error('Get payouts error:', error);
-    return res.status(500).json({ error: 'Failed to get payouts' });
+    return res.status(500).json({ error: 'Nie udało się pobrać wypłat' });
   }
 };
 
@@ -107,8 +107,8 @@ export const getPayoutById = async (req: AuthRequest, res: Response) => {
     return res.json(payout);
   } catch (error: any) {
     console.error('Get payout error:', error);
-    if (error.message === 'Payout not found') {
-      return res.status(404).json({ error: 'Payout not found' });
+    if (error.message === 'Nie znaleziono wypłaty') {
+      return res.status(404).json({ error: 'Nie znaleziono wypłaty' });
     }
     return res.status(500).json({ error: 'Failed to get payout' });
   }
@@ -149,8 +149,8 @@ export const updatePayoutStatus = async (req: AuthRequest, res: Response) => {
     return res.json(payout);
   } catch (error: any) {
     console.error('Update payout status error:', error);
-    if (error.message === 'Payout not found') {
-      return res.status(404).json({ error: 'Payout not found' });
+    if (error.message === 'Nie znaleziono wypłaty') {
+      return res.status(404).json({ error: 'Nie znaleziono wypłaty' });
     }
     return res.status(500).json({ error: 'Failed to update payout status' });
   }
@@ -169,8 +169,8 @@ export const deletePayout = async (req: AuthRequest, res: Response) => {
     return res.status(204).send();
   } catch (error: any) {
     console.error('Delete payout error:', error);
-    if (error.message === 'Payout not found') {
-      return res.status(404).json({ error: 'Payout not found' });
+    if (error.message === 'Nie znaleziono wypłaty') {
+      return res.status(404).json({ error: 'Nie znaleziono wypłaty' });
     }
     if (error.message === 'Only pending payouts can be deleted') {
       return res.status(400).json({ error: error.message });
@@ -217,9 +217,41 @@ export const getLessonsForDay = async (req: AuthRequest, res: Response) => {
     return res.json(lessons);
   } catch (error: any) {
     console.error('Get lessons for day error:', error);
+    if (error.message === 'Nie znaleziono lektora') {
+      return res.status(404).json({ error: 'Nie znaleziono lektora' });
+    }
+    return res.status(500).json({ error: 'Failed to get lessons' });
+  }
+};
+
+// GET /payouts/teacher/:teacherId/lessons-range?fromDate&toDate
+export const getLessonsForRange = async (req: AuthRequest, res: Response) => {
+  try {
+    const organizationId = req.user?.organizationId;
+    if (!organizationId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { teacherId } = req.params;
+    const { fromDate, toDate } = req.query;
+
+    if (!fromDate || !toDate) {
+      return res.status(400).json({ error: 'fromDate and toDate are required' });
+    }
+
+    const lessons = await payoutService.getLessonsForRange(
+      teacherId,
+      organizationId,
+      new Date(fromDate as string),
+      new Date(toDate as string)
+    );
+
+    return res.json(lessons);
+  } catch (error: any) {
+    console.error('Get lessons for range error:', error);
     if (error.message === 'Teacher not found') {
       return res.status(404).json({ error: 'Teacher not found' });
     }
-    return res.status(500).json({ error: 'Failed to get lessons' });
+    return res.status(500).json({ error: 'Failed to get lessons for range' });
   }
 };

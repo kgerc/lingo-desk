@@ -8,6 +8,7 @@ import { courseService } from '../services/courseService';
 import substitutionService from '../services/substitutionService';
 import { X, Users as UsersIcon, Clock, ClipboardList, Info, XCircle, Loader2 } from 'lucide-react';
 import AttendanceSection from './AttendanceSection';
+import { handleApiError } from '../lib/errorUtils';
 import CancelLessonDialog from './CancelLessonDialog';
 
 interface LessonModalProps {
@@ -170,9 +171,9 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       onSuccess();
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.error?.message || 'Wystąpił błąd podczas tworzenia lekcji';
-      toast.error(errorMessage);
-      setErrors({ form: errorMessage });
+      const { fieldErrors, message } = handleApiError(error, 'Wystąpił błąd podczas tworzenia lekcji');
+      toast.error(message);
+      setErrors(fieldErrors);
     },
   });
 
@@ -213,9 +214,9 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       onSuccess();
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.error?.message || 'Wystąpił błąd podczas tworzenia cyklicznych lekcji';
-      toast.error(errorMessage);
-      setErrors({ form: errorMessage });
+      const { fieldErrors, message } = handleApiError(error, 'Wystąpił błąd podczas tworzenia cyklicznych lekcji');
+      toast.error(message);
+      setErrors(fieldErrors);
     },
   });
 
@@ -273,9 +274,9 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       onSuccess();
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.error?.message || 'Wystąpił błąd podczas aktualizacji lekcji';
-      toast.error(errorMessage);
-      setErrors({ form: errorMessage });
+      const { fieldErrors, message } = handleApiError(error, 'Wystąpił błąd podczas aktualizacji lekcji');
+      toast.error(message);
+      setErrors(fieldErrors);
     },
   });
 
@@ -287,8 +288,8 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       onClose();
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.error?.message || 'Błąd przy oznaczaniu lekcji';
-      toast.error(errorMessage);
+      const { message } = handleApiError(error, 'Błąd przy oznaczaniu lekcji');
+      toast.error(message);
     },
   });
 

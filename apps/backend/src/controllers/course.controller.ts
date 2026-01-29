@@ -3,93 +3,99 @@ import { z } from 'zod';
 import { CourseFormat, LanguageLevel, CourseDeliveryMode } from '@prisma/client';
 import courseService, { CreateCourseData, UpdateCourseData, CreateCourseWithScheduleData } from '../services/course.service';
 import { AuthRequest } from '../middleware/auth';
+import {
+  requiredUuid,
+  optionalUuid,
+  requiredString,
+  optionalString,
+  requiredEnum,
+  optionalEnum,
+  requiredPositiveInt,
+  optionalPositiveInt,
+  requiredNonNegative,
+  optionalNonNegative,
+  requiredBoolean,
+  optionalBoolean,
+  requiredDateString,
+  optionalDateString,
+  optionalUrl,
+} from '../utils/validation-messages';
 
 // Enum values for Zod validation
 const languageLevelValues = Object.values(LanguageLevel) as [string, ...string[]];
 const courseFormatValues = Object.values(CourseFormat) as [string, ...string[]];
 const courseDeliveryModeValues = Object.values(CourseDeliveryMode) as [string, ...string[]];
 
+// Polish labels for enums
+const courseTypeLabels = { GROUP: 'Grupowy', INDIVIDUAL: 'Indywidualny' };
+const levelLabels = { A1: 'A1', A2: 'A2', B1: 'B1', B2: 'B2', C1: 'C1', C2: 'C2' };
+const deliveryModeLabels = { IN_PERSON: 'Stacjonarnie', ONLINE: 'Online', BOTH: 'Hybrydowo' };
+const lessonDeliveryModeLabels = { IN_PERSON: 'Stacjonarnie', ONLINE: 'Online' };
+const frequencyLabels = { WEEKLY: 'Co tydzień', BIWEEKLY: 'Co dwa tygodnie', MONTHLY: 'Co miesiąc' };
+const paymentModeLabels = { PACKAGE: 'Pakiet', PER_LESSON: 'Za lekcję' };
+
 const createCourseSchema = z.object({
-  teacherId: z.string().uuid(),
-  name: z.string().min(2),
-  // Pola przeniesione z CourseType:
-  courseType: z.enum(courseFormatValues),
-  language: z.string().min(2),
-  level: z.enum(languageLevelValues),
-  deliveryMode: z.enum(courseDeliveryModeValues),
-  defaultDurationMinutes: z.number().int().positive().default(60),
-  pricePerLesson: z.number().nonnegative(),
-  currency: z.string().default('PLN'),
-  description: z.string().optional(),
-  // Istniejące pola:
-  startDate: z.string().transform((str) => new Date(str)),
-  endDate: z
-    .string()
-    .optional()
-    .transform((str) => (str ? new Date(str) : undefined)),
-  maxStudents: z.number().int().positive().optional(),
-  locationId: z.string().uuid().optional(),
-  classroomId: z.string().uuid().optional(),
-  isActive: z.boolean().default(true),
+  teacherId: requiredUuid('Lektor'),
+  name: requiredString('Nazwa kursu', { min: 2 }),
+  courseType: requiredEnum('Typ kursu', courseFormatValues, courseTypeLabels),
+  language: requiredString('Język', { min: 2 }),
+  level: requiredEnum('Poziom', languageLevelValues, levelLabels),
+  deliveryMode: requiredEnum('Tryb prowadzenia', courseDeliveryModeValues, deliveryModeLabels),
+  defaultDurationMinutes: requiredPositiveInt('Domyślny czas trwania').default(60),
+  pricePerLesson: requiredNonNegative('Cena za lekcję'),
+  currency: requiredString('Waluta').default('PLN'),
+  description: optionalString('Opis'),
+  startDate: requiredDateString('Data rozpoczęcia'),
+  endDate: optionalDateString('Data zakończenia'),
+  maxStudents: optionalPositiveInt('Maksymalna liczba uczniów'),
+  locationId: optionalUuid('Lokalizacja'),
+  classroomId: optionalUuid('Sala'),
+  isActive: requiredBoolean('Aktywny').default(true),
 });
 
 const updateCourseSchema = z.object({
-  teacherId: z.string().uuid().optional(),
-  name: z.string().min(2).optional(),
-  // Pola przeniesione z CourseType:
-  courseType: z.enum(courseFormatValues).optional(),
-  language: z.string().min(2).optional(),
-  level: z.enum(languageLevelValues).optional(),
-  deliveryMode: z.enum(courseDeliveryModeValues).optional(),
-  defaultDurationMinutes: z.number().int().positive().optional(),
-  pricePerLesson: z.number().nonnegative().optional(),
-  currency: z.string().optional(),
-  description: z.string().optional(),
-  // Istniejące pola:
-  startDate: z
-    .string()
-    .optional()
-    .transform((str) => (str ? new Date(str) : undefined)),
-  endDate: z
-    .string()
-    .optional()
-    .transform((str) => (str ? new Date(str) : undefined)),
-  maxStudents: z.number().int().positive().optional(),
-  locationId: z.string().uuid().optional(),
-  classroomId: z.string().uuid().optional(),
-  isActive: z.boolean().optional(),
+  teacherId: optionalUuid('Lektor'),
+  name: optionalString('Nazwa kursu', { min: 2 }),
+  courseType: optionalEnum('Typ kursu', courseFormatValues, courseTypeLabels),
+  language: optionalString('Język', { min: 2 }),
+  level: optionalEnum('Poziom', languageLevelValues, levelLabels),
+  deliveryMode: optionalEnum('Tryb prowadzenia', courseDeliveryModeValues, deliveryModeLabels),
+  defaultDurationMinutes: optionalPositiveInt('Domyślny czas trwania'),
+  pricePerLesson: optionalNonNegative('Cena za lekcję'),
+  currency: optionalString('Waluta'),
+  description: optionalString('Opis'),
+  startDate: optionalDateString('Data rozpoczęcia'),
+  endDate: optionalDateString('Data zakończenia'),
+  maxStudents: optionalPositiveInt('Maksymalna liczba uczniów'),
+  locationId: optionalUuid('Lokalizacja'),
+  classroomId: optionalUuid('Sala'),
+  isActive: optionalBoolean('Aktywny'),
 });
 
 const enrollStudentSchema = z.object({
-  studentId: z.string().uuid(),
-  paymentMode: z.enum(['PACKAGE', 'PER_LESSON']).optional(),
-  hoursPurchased: z.number().min(0).optional(),
+  studentId: requiredUuid('Uczeń'),
+  paymentMode: optionalEnum('Tryb płatności', ['PACKAGE', 'PER_LESSON'] as const, paymentModeLabels),
+  hoursPurchased: optionalNonNegative('Liczba zakupionych godzin'),
 });
 
-// Helper to handle optional URL - empty string becomes undefined
-const optionalUrl = z.string().optional().transform((val) => {
-  if (!val || val.trim() === '') return undefined;
-  return val;
-}).pipe(z.string().url().optional());
-
 const scheduleItemSchema = z.object({
-  scheduledAt: z.string().transform((str) => new Date(str)),
-  durationMinutes: z.number().int().positive(),
-  title: z.string().optional(),
-  deliveryMode: z.enum(['IN_PERSON', 'ONLINE']),
-  meetingUrl: optionalUrl,
+  scheduledAt: requiredDateString('Data i godzina'),
+  durationMinutes: requiredPositiveInt('Czas trwania'),
+  title: optionalString('Tytuł'),
+  deliveryMode: requiredEnum('Tryb lekcji', ['IN_PERSON', 'ONLINE'] as const, lessonDeliveryModeLabels),
+  meetingUrl: optionalUrl('Link do spotkania'),
 });
 
 const schedulePatternSchema = z.object({
-  frequency: z.enum(['WEEKLY', 'BIWEEKLY', 'MONTHLY']),
-  startDate: z.string().transform((str) => new Date(str)),
-  endDate: z.string().optional().transform((str) => (str ? new Date(str) : undefined)),
-  occurrencesCount: z.number().int().positive().optional(),
-  daysOfWeek: z.array(z.number().int().min(0).max(6)).optional(),
-  time: z.string().regex(/^\d{2}:\d{2}$/),
-  durationMinutes: z.number().int().positive(),
-  deliveryMode: z.enum(['IN_PERSON', 'ONLINE']),
-  meetingUrl: optionalUrl,
+  frequency: requiredEnum('Częstotliwość', ['WEEKLY', 'BIWEEKLY', 'MONTHLY'] as const, frequencyLabels),
+  startDate: requiredDateString('Data rozpoczęcia'),
+  endDate: optionalDateString('Data zakończenia'),
+  occurrencesCount: optionalPositiveInt('Liczba powtórzeń'),
+  daysOfWeek: z.array(z.number().int().min(0, { message: 'Dzień tygodnia musi być od 0 do 6' }).max(6, { message: 'Dzień tygodnia musi być od 0 do 6' })).optional(),
+  time: z.string().regex(/^\d{2}:\d{2}$/, { message: 'Godzina musi być w formacie HH:MM' }),
+  durationMinutes: requiredPositiveInt('Czas trwania'),
+  deliveryMode: requiredEnum('Tryb lekcji', ['IN_PERSON', 'ONLINE'] as const, lessonDeliveryModeLabels),
+  meetingUrl: optionalUrl('Link do spotkania'),
 });
 
 const createCourseWithScheduleSchema = createCourseSchema.extend({
@@ -97,16 +103,16 @@ const createCourseWithScheduleSchema = createCourseSchema.extend({
     items: z.array(scheduleItemSchema).optional(),
     pattern: schedulePatternSchema.optional(),
   }).optional(),
-  studentIds: z.array(z.string().uuid()).optional(),
+  studentIds: z.array(requiredUuid('ID ucznia')).optional(),
 });
 
 const bulkUpdateLessonsSchema = z.object({
-  teacherId: z.string().uuid().optional(),
-  durationMinutes: z.number().int().positive().optional(),
-  deliveryMode: z.enum(['IN_PERSON', 'ONLINE']).optional(),
-  meetingUrl: z.string().url().optional().nullable(),
-  locationId: z.string().uuid().optional().nullable(),
-  classroomId: z.string().uuid().optional().nullable(),
+  teacherId: optionalUuid('Lektor'),
+  durationMinutes: optionalPositiveInt('Czas trwania'),
+  deliveryMode: optionalEnum('Tryb lekcji', ['IN_PERSON', 'ONLINE'] as const, lessonDeliveryModeLabels),
+  meetingUrl: optionalUrl('Link do spotkania').nullable(),
+  locationId: optionalUuid('Lokalizacja').nullable(),
+  classroomId: optionalUuid('Sala').nullable(),
 });
 
 class CourseController {
@@ -123,7 +129,7 @@ class CourseController {
       if (isActive !== undefined) filters.isActive = isActive === 'true';
 
       const courses = await courseService.getCourses(req.user!.organizationId, filters);
-      res.json({ message: 'Courses retrieved successfully', data: courses });
+      res.json({ message: 'Kursy pobrane pomyślnie', data: courses });
     } catch (error) {
       next(error);
     }
@@ -133,7 +139,7 @@ class CourseController {
     try {
       const { id } = req.params;
       const course = await courseService.getCourseById(id as string, req.user!.organizationId);
-      res.json({ message: 'Course retrieved successfully', data: course });
+      res.json({ message: 'Kurs pobrany pomyślnie', data: course });
     } catch (error) {
       next(error);
     }
@@ -150,7 +156,7 @@ class CourseController {
         deliveryMode: data.deliveryMode as CourseDeliveryMode,
       };
       const course = await courseService.createCourse(courseData);
-      res.status(201).json({ message: 'Course created successfully', data: course });
+      res.status(201).json({ message: 'Kurs utworzony pomyślnie', data: course });
     } catch (error) {
       next(error);
     }
@@ -167,7 +173,7 @@ class CourseController {
         deliveryMode: data.deliveryMode as CourseDeliveryMode | undefined,
       };
       const course = await courseService.updateCourse(id as string, req.user!.organizationId, updateData);
-      res.json({ message: 'Course updated successfully', data: course });
+      res.json({ message: 'Kurs zaktualizowany pomyślnie', data: course });
     } catch (error) {
       next(error);
     }
@@ -186,7 +192,7 @@ class CourseController {
   async getStats(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const stats = await courseService.getCourseStats(req.user!.organizationId);
-      res.json({ message: 'Course stats retrieved successfully', data: stats });
+      res.json({ message: 'Statystyki kursu pobrane pomyślnie', data: stats });
     } catch (error) {
       next(error);
     }
@@ -203,7 +209,7 @@ class CourseController {
         paymentMode,
         hoursPurchased
       );
-      res.status(201).json({ message: 'Student enrolled successfully', data: enrollment });
+      res.status(201).json({ message: 'Uczeń zapisany pomyślnie', data: enrollment });
     } catch (error) {
       next(error);
     }
@@ -265,7 +271,7 @@ class CourseController {
         req.user!.organizationId
       );
       res.json({
-        message: 'Course lessons retrieved successfully',
+        message: 'Lekcje kursu pobrane pomyślnie',
         data: lessons,
       });
     } catch (error) {

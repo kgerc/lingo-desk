@@ -18,7 +18,7 @@ class BalanceController {
       res.json(balance);
     } catch (error: any) {
       console.error('Error getting student balance:', error);
-      res.status(500).json({ error: error.message || 'Failed to get student balance' });
+      res.status(500).json({ error: error.message || 'Nie udało się pobrać salda ucznia' });
     }
   }
 
@@ -43,7 +43,7 @@ class BalanceController {
       res.json(history);
     } catch (error: any) {
       console.error('Error getting transaction history:', error);
-      res.status(500).json({ error: error.message || 'Failed to get transaction history' });
+      res.status(500).json({ error: error.message || 'Nie udało się pobrać historii transakcji' });
     }
   }
 
@@ -79,7 +79,7 @@ class BalanceController {
       });
     } catch (error: any) {
       console.error('Error adjusting balance:', error);
-      res.status(500).json({ error: error.message || 'Failed to adjust balance' });
+      res.status(500).json({ error: error.message || 'Nie udało się skorygować salda' });
     }
   }
 
@@ -101,7 +101,7 @@ class BalanceController {
       });
 
       if (!student) {
-        res.status(404).json({ error: 'Student profile not found' });
+        res.status(404).json({ error: 'Nie znaleziono profilu ucznia' });
         return;
       }
 
@@ -110,7 +110,7 @@ class BalanceController {
       res.json(balance);
     } catch (error: any) {
       console.error('Error getting my balance:', error);
-      res.status(500).json({ error: error.message || 'Failed to get balance' });
+      res.status(500).json({ error: error.message || 'Nie udało się pobrać salda' });
     }
   }
 
@@ -133,7 +133,7 @@ class BalanceController {
       });
 
       if (!student) {
-        res.status(404).json({ error: 'Student profile not found' });
+        res.status(404).json({ error: 'Nie znaleziono profilu ucznia' });
         return;
       }
 
@@ -148,7 +148,7 @@ class BalanceController {
       res.json(history);
     } catch (error: any) {
       console.error('Error getting my transaction history:', error);
-      res.status(500).json({ error: error.message || 'Failed to get transaction history' });
+      res.status(500).json({ error: error.message || 'Nie udało się pobrać historii transakcji' });
     }
   }
 }

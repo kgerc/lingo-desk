@@ -34,7 +34,7 @@ class NotificationController {
       console.error('Error fetching notifications:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch notifications',
+        message: 'Nie udało się pobrać powiadomień',
       });
     }
   }
@@ -56,7 +56,7 @@ class NotificationController {
       console.error('Error fetching unread count:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch unread count',
+        message: 'Nie udało się pobrać liczby nieprzeczytanych',
       });
     }
   }
@@ -80,7 +80,7 @@ class NotificationController {
       console.error('Error marking notification as read:', error);
       res.status(404).json({
         success: false,
-        message: error instanceof Error ? error.message : 'Failed to mark notification as read',
+        message: error instanceof Error ? error.message : 'Nie udało się oznaczyć powiadomienia jako przeczytane',
       });
     }
   }
@@ -102,7 +102,7 @@ class NotificationController {
       console.error('Error marking all notifications as read:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to mark all notifications as read',
+        message: 'Nie udało się oznaczyć wszystkich powiadomień jako przeczytane',
       });
     }
   }

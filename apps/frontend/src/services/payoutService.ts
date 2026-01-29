@@ -186,6 +186,16 @@ const payoutService = {
     const response = await api.get(`/payouts/teacher/${teacherId}/lessons?${params.toString()}`);
     return response.data;
   },
+
+  getLessonsForRange: async (
+  teacherId: string,
+  fromDate: string,
+  toDate: string
+  ): Promise<LessonForDay[]> => {
+    const params = new URLSearchParams({ fromDate, toDate });
+    const response = await api.get(`/payouts/teacher/${teacherId}/lessons-range?${params.toString()}`);
+    return response.data;
+  },
 };
 
 export default payoutService;

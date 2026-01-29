@@ -3,45 +3,73 @@ import { z } from 'zod';
 import studentService from '../services/student.service';
 import { AuthRequest } from '../middleware/auth';
 import { LanguageLevel } from '@prisma/client';
+import {
+  requiredEmail,
+  optionalEmail,
+  requiredString,
+  optionalString,
+  optionalPhone,
+  requiredEnum,
+  optionalEnum,
+  optionalBoolean,
+  optionalPositiveInt,
+  messages,
+} from '../utils/validation-messages';
+
+// Polish labels for enums
+const languageLevelLabels = { A1: 'A1', A2: 'A2', B1: 'B1', B2: 'B2', C1: 'C1', C2: 'C2' };
+const languageLevelValues = Object.values(LanguageLevel) as [string, ...string[]];
+const cancellationPeriodLabels = {
+  month: 'Miesiąc',
+  quarter: 'Kwartał',
+  year: 'Rok',
+  enrollment: 'Czas zapisania',
+};
 
 const createStudentSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  firstName: z.string().min(2),
-  lastName: z.string().min(2),
-  phone: z.string().optional(),
-  dateOfBirth: z.string().optional(),
-  address: z.string().optional(),
-  languageLevel: z.nativeEnum(LanguageLevel),
-  language: z.string().optional(), // Language being learned (ISO 639-1 code)
-  goals: z.string().optional(),
-  isMinor: z.boolean().optional(),
-  paymentDueDays: z.number().nullable().optional(),
-  paymentDueDayOfMonth: z.number().nullable().optional()
+  email: requiredEmail('Email'),
+  password: requiredString('Hasło', { min: 8 }),
+  firstName: requiredString('Imię', { min: 2 }),
+  lastName: requiredString('Nazwisko', { min: 2 }),
+  phone: optionalPhone('Telefon'),
+  dateOfBirth: optionalString('Data urodzenia'),
+  address: optionalString('Adres'),
+  languageLevel: requiredEnum('Poziom języka', languageLevelValues, languageLevelLabels),
+  language: optionalString('Język'), // Language being learned (ISO 639-1 code)
+  goals: optionalString('Cele nauki'),
+  isMinor: optionalBoolean('Niepełnoletni'),
+  paymentDueDays: optionalPositiveInt('Termin płatności (dni)').nullable(),
+  paymentDueDayOfMonth: z.number({
+    invalid_type_error: 'Pole "Dzień miesiąca płatności" musi być liczbą',
+  }).min(1, { message: 'Dzień miesiąca musi być od 1 do 28' }).max(28, { message: 'Dzień miesiąca musi być od 1 do 28' }).nullable().optional(),
 });
 
 const updateStudentSchema = z.object({
-  firstName: z.string().min(2).optional(),
-  lastName: z.string().min(2).optional(),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
-  dateOfBirth: z.string().optional(),
-  address: z.string().optional(),
-  languageLevel: z.nativeEnum(LanguageLevel).optional(),
-  language: z.string().optional(), // Language being learned
-  goals: z.string().optional(),
-  isMinor: z.boolean().optional(),
-  isActive: z.boolean().optional(),
-  paymentDueDays: z.number().nullable().optional(),
-  paymentDueDayOfMonth: z.number().nullable().optional(),
+  firstName: optionalString('Imię', { min: 2 }),
+  lastName: optionalString('Nazwisko', { min: 2 }),
+  phone: optionalPhone('Telefon'),
+  email: optionalEmail('Email'),
+  dateOfBirth: optionalString('Data urodzenia'),
+  address: optionalString('Adres'),
+  languageLevel: optionalEnum('Poziom języka', languageLevelValues, languageLevelLabels),
+  language: optionalString('Język'), // Language being learned
+  goals: optionalString('Cele nauki'),
+  isMinor: optionalBoolean('Niepełnoletni'),
+  isActive: optionalBoolean('Aktywny'),
+  paymentDueDays: optionalPositiveInt('Termin płatności (dni)').nullable(),
+  paymentDueDayOfMonth: z.number({
+    invalid_type_error: 'Pole "Dzień miesiąca płatności" musi być liczbą',
+  }).min(1, { message: 'Dzień miesiąca musi być od 1 do 28' }).max(28, { message: 'Dzień miesiąca musi być od 1 do 28' }).nullable().optional(),
   // Cancellation fee settings
-  cancellationFeeEnabled: z.boolean().optional(),
-  cancellationHoursThreshold: z.number().nullable().optional(),
-  cancellationFeePercent: z.number().min(0).max(100).nullable().optional(),
+  cancellationFeeEnabled: optionalBoolean('Opłata za anulowanie'),
+  cancellationHoursThreshold: optionalPositiveInt('Próg godzin anulowania').nullable(),
+  cancellationFeePercent: z.number({
+    invalid_type_error: 'Pole "Procent opłaty za anulowanie" musi być liczbą',
+  }).min(0, { message: 'Procent musi być od 0 do 100' }).max(100, { message: 'Procent musi być od 0 do 100' }).nullable().optional(),
   // Cancellation limit settings
-  cancellationLimitEnabled: z.boolean().optional(),
-  cancellationLimitCount: z.number().min(1).nullable().optional(),
-  cancellationLimitPeriod: z.enum(['month', 'quarter', 'year', 'enrollment']).nullable().optional(),
+  cancellationLimitEnabled: optionalBoolean('Limit anulowań'),
+  cancellationLimitCount: optionalPositiveInt('Limit liczby anulowań').nullable(),
+  cancellationLimitPeriod: optionalEnum('Okres limitu anulowań', ['month', 'quarter', 'year', 'enrollment'] as const, cancellationPeriodLabels).nullable(),
 });
 
 export class StudentController {
@@ -51,7 +79,7 @@ export class StudentController {
         return res.status(401).json({
           error: {
             code: 'UNAUTHORIZED',
-            message: 'Organization ID not found',
+            message: messages.system.unauthorized,
           },
         });
       }
@@ -59,11 +87,12 @@ export class StudentController {
       const data = createStudentSchema.parse(req.body);
       const student = await studentService.createStudent({
         ...data,
-        organizationId: req.user.organizationId
+        organizationId: req.user.organizationId,
+        languageLevel: data.languageLevel as LanguageLevel,
       });
 
       return res.status(201).json({
-        message: 'Student created successfully',
+        message: 'Uczeń został utworzony pomyślnie',
         data: student,
       });
     } catch (error) {
@@ -153,11 +182,14 @@ export class StudentController {
       const student = await studentService.updateStudent(
         id as string,
         req.user.organizationId,
-        data
+        {
+          ...data,
+          languageLevel: data.languageLevel as LanguageLevel | undefined,
+        }
       );
 
       return res.json({
-        message: 'Student updated successfully',
+        message: 'Dane ucznia zostały zaktualizowane',
         data: student,
       });
     } catch (error) {

@@ -22,7 +22,7 @@ class GoogleCalendarController {
       return res.json({ authUrl });
     } catch (error) {
       console.error('Error initiating Google Calendar auth:', error);
-      return res.status(500).json({ message: 'Failed to initiate authorization' });
+      return res.status(500).json({ message: 'Nie udało się zainicjować autoryzacji' });
     }
   }
 
@@ -49,7 +49,7 @@ class GoogleCalendarController {
       });
 
       if (!user) {
-        return res.status(404).json({ message: 'User not found' });
+        return res.status(404).json({ message: 'Nie znaleziono użytkownika' });
       }
 
       // Handle the callback and save tokens
@@ -101,7 +101,7 @@ class GoogleCalendarController {
       });
     } catch (error) {
       console.error('Error getting sync status:', error);
-      return res.status(500).json({ message: 'Failed to get sync status' });
+      return res.status(500).json({ message: 'Nie udało się pobrać statusu synchronizacji' });
     }
   }
 
@@ -119,10 +119,10 @@ class GoogleCalendarController {
 
       await googleCalendarService.disconnect(userId);
 
-      return res.json({ message: 'Google Calendar disconnected successfully' });
+      return res.json({ message: 'Kalendarz Google został odłączony pomyślnie' });
     } catch (error) {
       console.error('Error disconnecting Google Calendar:', error);
-      return res.status(500).json({ message: 'Failed to disconnect Google Calendar' });
+      return res.status(500).json({ message: 'Nie udało się odłączyć Kalendarza Google' });
     }
   }
 
@@ -171,10 +171,10 @@ class GoogleCalendarController {
 
       const result = await googleCalendarService.setupWatch(userId);
 
-      return res.json({ message: 'Watch setup successfully', data: result });
+      return res.json({ message: 'Nasłuchiwanie ustawione pomyślnie', data: result });
     } catch (error) {
       console.error('Error setting up watch:', error);
-      return res.status(500).json({ message: 'Failed to setup watch' });
+      return res.status(500).json({ message: 'Nie udało się ustawić nasłuchiwania' });
     }
   }
 
@@ -192,10 +192,10 @@ class GoogleCalendarController {
 
       await googleCalendarService.stopWatch(userId);
 
-      return res.json({ message: 'Watch stopped successfully' });
+      return res.json({ message: 'Nasłuchiwanie zatrzymane pomyślnie' });
     } catch (error) {
       console.error('Error stopping watch:', error);
-      return res.status(500).json({ message: 'Failed to stop watch' });
+      return res.status(500).json({ message: 'Nie udało się zatrzymać nasłuchiwania' });
     }
   }
 
@@ -218,13 +218,13 @@ class GoogleCalendarController {
       const importResult = await googleCalendarService.importExternalEvents(userId);
 
       return res.json({
-        message: 'Sync completed successfully',
+        message: 'Synchronizacja zakończona pomyślnie',
         lessonsSynced: pushResult,
         externalEventsImported: importResult,
       });
     } catch (error) {
       console.error('Error syncing with Google Calendar:', error);
-      return res.status(500).json({ message: 'Failed to sync with Google Calendar' });
+      return res.status(500).json({ message: 'Nie udało się zsynchronizować z Kalendarzem Google' });
     }
   }
 
@@ -247,12 +247,12 @@ class GoogleCalendarController {
       const events = await googleCalendarService.getExternalEvents(userId, start, end);
 
       return res.json({
-        message: 'External events retrieved successfully',
+        message: 'Zdarzenia zewnętrzne pobrane pomyślnie',
         data: events,
       });
     } catch (error) {
       console.error('Error getting external events:', error);
-      return res.status(500).json({ message: 'Failed to get external events' });
+      return res.status(500).json({ message: 'Nie udało się pobrać zdarzeń zewnętrznych' });
     }
   }
 }
