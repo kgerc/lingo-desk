@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import paymentService, { Payment } from '../services/paymentService';
 import { Plus, Search, Trash2, Edit, DollarSign, Clock, CheckCircle, XCircle, Upload, Calculator, CreditCard, Bell } from 'lucide-react';
@@ -13,7 +14,31 @@ type TabType = 'payments' | 'settlements';
 
 export default function PaymentsPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<TabType>('payments');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Get initial values from URL params
+  const initialTab = (searchParams.get('tab') as TabType) || 'payments';
+  const initialStudentId = searchParams.get('studentId') || undefined;
+
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+  const [preselectedStudentId, setPreselectedStudentId] = useState<string | undefined>(initialStudentId);
+
+  // Handle tab change and update URL
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    if (tab === 'payments') {
+      // Clear URL params when switching to payments tab
+      setSearchParams({});
+      setPreselectedStudentId(undefined);
+    }
+  };
+
+  // Clear preselected student after it's been used
+  const handleStudentSelected = () => {
+    setPreselectedStudentId(undefined);
+    // Clear URL params
+    setSearchParams({});
+  };
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
@@ -189,7 +214,7 @@ export default function PaymentsPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`flex items-center gap-2 py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
                   isActive
                     ? 'border-primary text-primary'
@@ -434,7 +459,12 @@ export default function PaymentsPage() {
         </>
       )}
 
-      {activeTab === 'settlements' && <SettlementsTab />}
+      {activeTab === 'settlements' && (
+        <SettlementsTab
+          preselectedStudentId={preselectedStudentId}
+          onStudentSelected={handleStudentSelected}
+        />
+      )}
 
       {/* Payment Modal */}
       {isModalOpen && (

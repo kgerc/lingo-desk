@@ -1,8 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { studentService, Student } from '../services/studentService';
-import { Plus, Search, Mail, Phone, MoreVertical, Upload, X } from 'lucide-react';
+import { Plus, Search, Mail, Phone, MoreVertical, Upload, X, Calculator } from 'lucide-react';
+import { useAuthStore } from '../stores/authStore';
 import StudentModal from '../components/StudentModal';
 import ImportStudentsModal from '../components/ImportStudentsModal';
 import StudentCancellationsTab from '../components/StudentCancellationsTab';
@@ -13,6 +15,8 @@ import Dropdown from '../components/Dropdown';
 
 const StudentsPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -21,6 +25,14 @@ const StudentsPage: React.FC = () => {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; studentId: string | null }>({ isOpen: false, studentId: null });
   const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+
+  // Check if user has access to settlements (ADMIN, MANAGER, HR)
+  const canAccessSettlements = ['ADMIN', 'MANAGER', 'HR'].includes(user?.role || '');
+
+  // Navigate to settlements for a specific student
+  const handleGoToSettlements = (student: Student) => {
+    navigate(`/payments?tab=settlements&studentId=${student.id}`);
+  };
 
   // Fetch students
   const { data: students = [], isLoading } = useQuery({
@@ -159,6 +171,11 @@ const StudentsPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Saldo
                   </th>
+                  {canAccessSettlements && (
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Rozliczenie
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Akcje
                   </th>
@@ -219,6 +236,18 @@ const StudentsPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StudentBalanceBadge studentId={student.id} />
                     </td>
+                    {canAccessSettlements && (
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <button
+                          onClick={() => handleGoToSettlements(student)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                          title="Przejdź do rozliczeń ucznia"
+                        >
+                          <Calculator className="h-4 w-4" />
+                          Rozlicz
+                        </button>
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
                         ref={(el) => {

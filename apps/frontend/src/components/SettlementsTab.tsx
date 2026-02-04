@@ -8,7 +8,12 @@ import ConfirmDialog from './ConfirmDialog';
 
 type ViewMode = 'list' | 'settlement' | 'history';
 
-export default function SettlementsTab() {
+interface SettlementsTabProps {
+  preselectedStudentId?: string;
+  onStudentSelected?: () => void;
+}
+
+export default function SettlementsTab({ preselectedStudentId, onStudentSelected }: SettlementsTabProps) {
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedStudent, setSelectedStudent] = useState<StudentWithBalance | null>(null);
@@ -39,6 +44,17 @@ export default function SettlementsTab() {
     queryFn: () => settlementService.getStudentSettlements(selectedStudent!.id),
     enabled: !!selectedStudent && viewMode === 'history',
   });
+
+  // Auto-select student when preselectedStudentId is provided
+  useEffect(() => {
+    if (preselectedStudentId && students.length > 0 && !selectedStudent) {
+      const student = students.find((s) => s.id === preselectedStudentId);
+      if (student) {
+        handleSelectStudent(student);
+        onStudentSelected?.();
+      }
+    }
+  }, [preselectedStudentId, students, selectedStudent]);
 
   // Set default period dates when settlement info is loaded
   useEffect(() => {
