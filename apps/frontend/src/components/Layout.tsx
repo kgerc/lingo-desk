@@ -146,7 +146,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-1 flex-1 overflow-y-auto overflow-x-hidden">
+        <nav className="p-4 space-y-1 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
           {navigation.map((item) => {
             const Icon = item.icon;
             const hasBadge = 'badge' in item && item.badge && item.badge > 0;

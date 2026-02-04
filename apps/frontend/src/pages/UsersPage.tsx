@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -438,15 +438,10 @@ const UsersPage: React.FC = () => {
     variant: 'danger' | 'warning';
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, variant: 'warning' });
 
-  // Fetch users
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: ['users', roleFilter, statusFilter, searchQuery],
-    queryFn: () =>
-      userService.getUsers({
-        role: roleFilter || undefined,
-        isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
-        search: searchQuery || undefined,
-      }),
+  // Fetch all users once (no filters - filtering done on frontend)
+  const { data: allUsers = [], isLoading } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => userService.getUsers(),
   });
 
   // Fetch stats
@@ -454,6 +449,36 @@ const UsersPage: React.FC = () => {
     queryKey: ['userStats'],
     queryFn: userService.getUserStats,
   });
+
+  // Filter users locally based on search query, role filter, and status filter
+  const filteredUsers = useMemo(() => {
+    return allUsers.filter((user) => {
+      // Role filter
+      if (roleFilter && user.role !== roleFilter) {
+        return false;
+      }
+
+      // Status filter
+      if (statusFilter === 'active' && !user.isActive) {
+        return false;
+      }
+      if (statusFilter === 'inactive' && user.isActive) {
+        return false;
+      }
+
+      // Search filter (case-insensitive)
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
+        const email = user.email.toLowerCase();
+        if (!fullName.includes(query) && !email.includes(query)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [allUsers, roleFilter, statusFilter, searchQuery]);
 
   // Mutations
   const deactivateMutation = useMutation({
@@ -629,11 +654,15 @@ const UsersPage: React.FC = () => {
 
       {/* Users Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        {users.length === 0 ? (
+        {filteredUsers.length === 0 ? (
           <div className="p-12 text-center">
             <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Brak użytkowników</h3>
-            <p className="text-gray-600 mb-4">Nie znaleziono użytkowników spełniających kryteria wyszukiwania.</p>
+            <p className="text-gray-600 mb-4">
+              {allUsers.length === 0
+                ? 'Nie masz jeszcze żadnych użytkowników w organizacji.'
+                : 'Nie znaleziono użytkowników spełniających kryteria wyszukiwania.'}
+            </p>
             <button
               onClick={() => setIsInviteModalOpen(true)}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
@@ -667,7 +696,7 @@ const UsersPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {users.map((user) => {
+              {filteredUsers.map((user) => {
                 const roleColors = ROLE_COLORS[user.role];
                 return (
                   <tr key={user.id} className={`hover:bg-gray-50 ${!user.isActive ? 'opacity-60' : ''}`}>
