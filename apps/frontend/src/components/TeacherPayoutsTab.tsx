@@ -6,6 +6,8 @@ import payoutService, {
   PayoutPreview,
   LessonForDay,
   TeacherPayoutStatus,
+  groupLessonsByStudent,
+  groupLessonsForDayByStudent,
 } from '../services/payoutService';
 import {
   Search,
@@ -21,6 +23,7 @@ import {
   XCircle,
   DollarSign,
   ChevronLeft,
+  ChevronDown,
   User,
   AlertCircle,
 } from 'lucide-react';
@@ -44,6 +47,8 @@ export default function TeacherPayoutsTab() {
   });
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [rangeDraft, setRangeDraft] = useState<string | null>(null);
+  const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
+  const [expandedLessonsStudents, setExpandedLessonsStudents] = useState<Set<string>>(new Set());
   type CalendarFilter =
     | { type: 'ALL' }
     | { type: 'DAY'; date: string }
@@ -237,6 +242,61 @@ export default function TeacherPayoutsTab() {
 
     return lessons;
   }, [lessonsRangeQuery.data, calendarFilter]);
+
+  // Group preview lessons by student
+  const groupedPreviewLessons = useMemo(() => {
+    if (!preview) return [];
+    return groupLessonsByStudent(preview.qualifiedLessons);
+  }, [preview]);
+
+  // Group filtered lessons by student (for lessons list view)
+  const groupedFilteredLessons = useMemo(() => {
+    return groupLessonsForDayByStudent(filteredLessons);
+  }, [filteredLessons]);
+
+  // Toggle student expansion in preview
+  const toggleStudentExpansion = (studentName: string) => {
+    setExpandedStudents((prev) => {
+      const next = new Set(prev);
+      if (next.has(studentName)) {
+        next.delete(studentName);
+      } else {
+        next.add(studentName);
+      }
+      return next;
+    });
+  };
+
+  // Toggle student expansion in lessons list
+  const toggleLessonsStudentExpansion = (studentName: string) => {
+    setExpandedLessonsStudents((prev) => {
+      const next = new Set(prev);
+      if (next.has(studentName)) {
+        next.delete(studentName);
+      } else {
+        next.add(studentName);
+      }
+      return next;
+    });
+  };
+
+  // Expand/collapse all students in preview
+  const expandAllStudents = () => {
+    setExpandedStudents(new Set(groupedPreviewLessons.map((g) => g.studentName)));
+  };
+
+  const collapseAllStudents = () => {
+    setExpandedStudents(new Set());
+  };
+
+  // Expand/collapse all students in lessons list
+  const expandAllLessonsStudents = () => {
+    setExpandedLessonsStudents(new Set(groupedFilteredLessons.map((g) => g.studentName)));
+  };
+
+  const collapseAllLessonsStudents = () => {
+    setExpandedLessonsStudents(new Set());
+  };
 
   const formatCurrency = (amount: number, currency = 'PLN') => {
     return `${amount.toFixed(2)} ${currency}`;
@@ -818,11 +878,30 @@ export default function TeacherPayoutsTab() {
             )}
           </div>
 
-          {/* Lessons for selected day */}
+          {/* Lessons for selected day - grouped by student */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Lekcje:
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Lekcje: {filteredLessons.length > 0 && `(${filteredLessons.length}) • ${groupedFilteredLessons.length} uczniów`}
+              </h3>
+              {groupedFilteredLessons.length > 0 && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={expandAllLessonsStudents}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Rozwiń wszystko
+                  </button>
+                  <span className="text-gray-300">|</span>
+                  <button
+                    onClick={collapseAllLessonsStudents}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Zwiń wszystko
+                  </button>
+                </div>
+              )}
+            </div>
             {lessonsRangeQuery.isFetching ? (
               <LoadingSpinner message="Ładowanie lekcji..." />
             ) : filteredLessons.length === 0 ? (
@@ -830,43 +909,84 @@ export default function TeacherPayoutsTab() {
                 Brak lekcji w wybranym zakresie dat
               </div>
             ) : (
-              <div className="divide-y divide-gray-200">
-                {filteredLessons.map((lesson) => (
-                  <div key={lesson.id} className="py-3 flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-900">{lesson.title}</span>
-                        {getLessonStatusBadge(lesson)}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        <span className="flex items-center gap-1">
-                          <User className="w-3 h-3" />
-                          {lesson.studentName}
-                        </span>
-                        <span className="ml-2">
-                          {new Date(lesson.scheduledAt).toLocaleTimeString('pl-PL', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}{' '}
-                          • {lesson.durationMinutes} min
-                        </span>
-                      </div>
-                      {lesson.qualificationReason && (
-                        <span className="text-xs text-gray-500 mt-1">
-                          Powód: {getQualificationReasonLabel(lesson.qualificationReason)}
-                        </span>
+              <div className="divide-y divide-gray-200 max-h-[400px] overflow-y-auto">
+                {groupedFilteredLessons.map((group) => {
+                  const isExpanded = expandedLessonsStudents.has(group.studentName);
+                  return (
+                    <div key={group.studentName} className="py-2">
+                      {/* Student header row */}
+                      <button
+                        onClick={() => toggleLessonsStudentExpansion(group.studentName)}
+                        className="w-full flex items-center justify-between py-2 px-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <ChevronDown
+                            className={`w-4 h-4 text-gray-500 transition-transform ${
+                              isExpanded ? '' : '-rotate-90'
+                            }`}
+                          />
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm font-medium text-gray-900">
+                              {group.studentName}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+                            {group.lessonsCount} {group.lessonsCount === 1 ? 'lekcja' : group.lessonsCount < 5 ? 'lekcje' : 'lekcji'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-xs text-gray-500">
+                            {group.totalHours.toFixed(2)}h
+                          </span>
+                          <span className="text-sm font-semibold text-gray-900">
+                            {formatCurrency(group.totalAmount, group.currency)}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Expanded lessons list */}
+                      {isExpanded && (
+                        <div className="ml-7 mt-2 space-y-1">
+                          {group.lessons
+                            .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+                            .map((lesson) => (
+                              <div
+                                key={lesson.id}
+                                className="flex items-center justify-between py-2 px-3 bg-white border border-gray-100 rounded-lg"
+                              >
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-900">{lesson.title}</span>
+                                    {getLessonStatusBadge(lesson)}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {new Date(lesson.scheduledAt).toLocaleDateString('pl-PL')} •{' '}
+                                    {new Date(lesson.scheduledAt).toLocaleTimeString('pl-PL', {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })} •{' '}
+                                    {lesson.durationMinutes} min
+                                    {lesson.qualificationReason && (
+                                      <> • {getQualificationReasonLabel(lesson.qualificationReason)}</>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {formatCurrency(lesson.amount, lesson.currency)}
+                                  </div>
+                                  <div className="text-xs text-gray-400">
+                                    {formatCurrency(lesson.hourlyRate)}/h
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
                       )}
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-semibold text-gray-900">
-                        {formatCurrency(lesson.amount, lesson.currency)}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {formatCurrency(lesson.hourlyRate)}/h
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -901,30 +1021,98 @@ export default function TeacherPayoutsTab() {
                 </div>
               </div>
 
-              {/* Qualified lessons */}
+              {/* Qualified lessons grouped by student */}
               {preview.qualifiedLessons.length > 0 && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Lekcje do wypłaty ({preview.qualifiedLessons.length})
-                  </h3>
-                  <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
-                    {preview.qualifiedLessons.map((lesson) => (
-                      <div key={lesson.id} className="py-3 flex items-center justify-between">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{lesson.title}</div>
-                          <div className="text-xs text-gray-500">
-                            {new Date(lesson.scheduledAt).toLocaleDateString('pl-PL')} •{' '}
-                            {lesson.studentName} • {lesson.durationMinutes} min
-                          </div>
-                          <span className="text-xs text-gray-500">
-                            {getQualificationReasonLabel(lesson.qualificationReason)}
-                          </span>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Lekcje do wypłaty ({preview.qualifiedLessons.length}) • {groupedPreviewLessons.length} uczniów
+                    </h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={expandAllStudents}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Rozwiń wszystko
+                      </button>
+                      <span className="text-gray-300">|</span>
+                      <button
+                        onClick={collapseAllStudents}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Zwiń wszystko
+                      </button>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+                    {groupedPreviewLessons.map((group) => {
+                      const isExpanded = expandedStudents.has(group.studentName);
+                      return (
+                        <div key={group.studentName} className="py-2">
+                          {/* Student header row */}
+                          <button
+                            onClick={() => toggleStudentExpansion(group.studentName)}
+                            className="w-full flex items-center justify-between py-2 px-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <ChevronDown
+                                className={`w-4 h-4 text-gray-500 transition-transform ${
+                                  isExpanded ? '' : '-rotate-90'
+                                }`}
+                              />
+                              <div className="flex items-center gap-2">
+                                <User className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm font-medium text-gray-900">
+                                  {group.studentName}
+                                </span>
+                              </div>
+                              <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+                                {group.lessonsCount} {group.lessonsCount === 1 ? 'lekcja' : group.lessonsCount < 5 ? 'lekcje' : 'lekcji'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <span className="text-xs text-gray-500">
+                                {group.totalHours.toFixed(2)}h
+                              </span>
+                              <span className="text-sm font-semibold text-green-600">
+                                {formatCurrency(group.totalAmount, group.currency)}
+                              </span>
+                            </div>
+                          </button>
+
+                          {/* Expanded lessons list */}
+                          {isExpanded && (
+                            <div className="ml-7 mt-2 space-y-1">
+                              {group.lessons
+                                .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+                                .map((lesson) => (
+                                  <div
+                                    key={lesson.id}
+                                    className="flex items-center justify-between py-2 px-3 bg-white border border-gray-100 rounded-lg"
+                                  >
+                                    <div>
+                                      <div className="text-sm text-gray-900">{lesson.title}</div>
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(lesson.scheduledAt).toLocaleDateString('pl-PL')} •{' '}
+                                        {lesson.durationMinutes} min •{' '}
+                                        {getQualificationReasonLabel(lesson.qualificationReason)}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-sm font-medium text-green-600">
+                                        {formatCurrency(lesson.amount, lesson.currency)}
+                                      </div>
+                                      <div className="text-xs text-gray-400">
+                                        {formatCurrency(lesson.hourlyRate)}/h
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
                         </div>
-                        <div className="text-sm font-semibold text-green-600">
-                          {formatCurrency(lesson.amount, lesson.currency)}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

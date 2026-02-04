@@ -114,6 +114,92 @@ export interface PayoutFilters {
   periodEnd?: string;
 }
 
+// Grouped payout data by student
+export interface StudentPayoutGroup {
+  studentName: string;
+  lessonsCount: number;
+  totalMinutes: number;
+  totalHours: number;
+  totalAmount: number;
+  currency: string;
+  lessons: QualifiedLesson[];
+}
+
+// Utility function to group lessons by student
+export function groupLessonsByStudent(lessons: QualifiedLesson[]): StudentPayoutGroup[] {
+  const groupMap = new Map<string, StudentPayoutGroup>();
+
+  for (const lesson of lessons) {
+    const existing = groupMap.get(lesson.studentName);
+
+    if (existing) {
+      existing.lessons.push(lesson);
+      existing.lessonsCount++;
+      existing.totalMinutes += lesson.durationMinutes;
+      existing.totalHours = existing.totalMinutes / 60;
+      existing.totalAmount += lesson.amount;
+    } else {
+      groupMap.set(lesson.studentName, {
+        studentName: lesson.studentName,
+        lessonsCount: 1,
+        totalMinutes: lesson.durationMinutes,
+        totalHours: lesson.durationMinutes / 60,
+        totalAmount: lesson.amount,
+        currency: lesson.currency,
+        lessons: [lesson],
+      });
+    }
+  }
+
+  // Sort by student name
+  return Array.from(groupMap.values()).sort((a, b) =>
+    a.studentName.localeCompare(b.studentName, 'pl')
+  );
+}
+
+// Grouped lessons for day view (LessonForDay type)
+export interface StudentLessonsGroup {
+  studentName: string;
+  lessonsCount: number;
+  totalMinutes: number;
+  totalHours: number;
+  totalAmount: number;
+  currency: string;
+  lessons: LessonForDay[];
+}
+
+// Utility function to group LessonForDay by student
+export function groupLessonsForDayByStudent(lessons: LessonForDay[]): StudentLessonsGroup[] {
+  const groupMap = new Map<string, StudentLessonsGroup>();
+
+  for (const lesson of lessons) {
+    const existing = groupMap.get(lesson.studentName);
+
+    if (existing) {
+      existing.lessons.push(lesson);
+      existing.lessonsCount++;
+      existing.totalMinutes += lesson.durationMinutes;
+      existing.totalHours = existing.totalMinutes / 60;
+      existing.totalAmount += lesson.amount;
+    } else {
+      groupMap.set(lesson.studentName, {
+        studentName: lesson.studentName,
+        lessonsCount: 1,
+        totalMinutes: lesson.durationMinutes,
+        totalHours: lesson.durationMinutes / 60,
+        totalAmount: lesson.amount,
+        currency: lesson.currency,
+        lessons: [lesson],
+      });
+    }
+  }
+
+  // Sort by student name
+  return Array.from(groupMap.values()).sort((a, b) =>
+    a.studentName.localeCompare(b.studentName, 'pl')
+  );
+}
+
 const payoutService = {
   // Get teachers summary for overview
   getTeachersSummary: async (): Promise<TeacherSummary[]> => {
