@@ -690,6 +690,107 @@ class EmailService {
       html,
     });
   }
+
+  /**
+   * Send user invitation email with temporary password
+   */
+  async sendUserInvitation(data: {
+    to: string;
+    firstName: string;
+    organizationName: string;
+    temporaryPassword: string;
+    role: string;
+  }) {
+    const { to, firstName, organizationName, temporaryPassword, role } = data;
+
+    const roleNames: Record<string, string> = {
+      ADMIN: 'Administrator',
+      MANAGER: 'Manager',
+      HR: 'Kadrowy',
+      METHODOLOGIST: 'Metodyk',
+      TEACHER: 'Lektor',
+      STUDENT: 'Uczeń',
+      PARENT: 'Rodzic',
+    };
+
+    const loginUrl = process.env.FRONTEND_URL || 'https://lingodesk.pl';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #3b82f6;">🎉 Zaproszenie do LingoDesk</h2>
+        <p>Dzień dobry ${firstName},</p>
+        <p>Zostałeś/aś zaproszony/a do organizacji <strong>${organizationName}</strong> w systemie LingoDesk.</p>
+
+        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Rola:</strong> ${roleNames[role] || role}</p>
+          <p style="margin: 5px 0;"><strong>Email:</strong> ${to}</p>
+          <p style="margin: 5px 0;"><strong>Tymczasowe hasło:</strong></p>
+          <p style="margin: 5px 0; font-family: monospace; background-color: #e0e7ff; padding: 10px; border-radius: 4px; font-size: 18px; letter-spacing: 1px;">${temporaryPassword}</p>
+        </div>
+
+        <p style="color: #dc2626; font-weight: bold;">⚠️ Ze względów bezpieczeństwa zmień hasło po pierwszym logowaniu!</p>
+
+        <p>
+          <a href="${loginUrl}/login" style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
+            Zaloguj się
+          </a>
+        </p>
+
+        <p style="margin-top: 20px;">Jeśli nie prosiłeś/aś o to konto, zignoruj tę wiadomość.</p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
+      </div>
+    `;
+
+    return await this.sendEmail({
+      to,
+      subject: `🎉 Zaproszenie do ${organizationName} - LingoDesk`,
+      html,
+    });
+  }
+
+  /**
+   * Send password reset email with new temporary password
+   */
+  async sendPasswordReset(data: {
+    to: string;
+    firstName: string;
+    organizationName: string;
+    temporaryPassword: string;
+  }) {
+    const { to, firstName, organizationName, temporaryPassword } = data;
+
+    const loginUrl = process.env.FRONTEND_URL || 'https://lingodesk.pl';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #f59e0b;">🔐 Reset hasła</h2>
+        <p>Dzień dobry ${firstName},</p>
+        <p>Twoje hasło zostało zresetowane przez administratora.</p>
+
+        <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Nowe tymczasowe hasło:</strong></p>
+          <p style="margin: 5px 0; font-family: monospace; background-color: #fef3c7; padding: 10px; border-radius: 4px; font-size: 18px; letter-spacing: 1px;">${temporaryPassword}</p>
+        </div>
+
+        <p style="color: #dc2626; font-weight: bold;">⚠️ Ze względów bezpieczeństwa zmień hasło po zalogowaniu!</p>
+
+        <p>
+          <a href="${loginUrl}/login" style="display: inline-block; background-color: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
+            Zaloguj się
+          </a>
+        </p>
+
+        <p style="margin-top: 20px;">Jeśli nie prosiłeś/aś o reset hasła, skontaktuj się z administratorem.</p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">${organizationName} - LingoDesk</p>
+      </div>
+    `;
+
+    return await this.sendEmail({
+      to,
+      subject: `🔐 Reset hasła - ${organizationName}`,
+      html,
+    });
+  }
 }
 
 export default new EmailService();

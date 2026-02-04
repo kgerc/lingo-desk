@@ -23,6 +23,7 @@ import {
   Bell,
   BarChart3,
   Mail,
+  UserCog,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -61,6 +62,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         return [
           ...commonItems,
           { name: 'Alerty', href: '/alerts', icon: Bell, badge: unreadCount || 0 },
+          { name: 'Użytkownicy', href: '/users', icon: UserCog },
           { name: 'Uczniowie', href: '/students', icon: Users },
           { name: 'Lektorzy', href: '/teachers', icon: GraduationCap },
           { name: 'Kursy', href: '/courses', icon: BookOpen },

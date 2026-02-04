@@ -17,6 +17,8 @@ datasource db {
 enum UserRole {
   ADMIN
   MANAGER
+  HR            // HR (Kadrowy) - access to payments, teacher payouts, finance view
+  METHODOLOGIST // Methodologist (Metodyk) - access to courses, lessons, materials view
   TEACHER
   STUDENT
   PARENT

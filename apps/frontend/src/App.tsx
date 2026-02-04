@@ -22,6 +22,7 @@ const DebtorsPage = lazy(() => import('./pages/DebtorsPage'))
 const NotificationSettingsPage = lazy(() => import('./pages/NotificationSettingsPage'))
 const ReportsPage = lazy(() => import('./pages/ReportsPage'))
 const MailingsPage = lazy(() => import('./pages/MailingsPage'))
+const UsersPage = lazy(() => import('./pages/UsersPage'))
 
 // Wrapper to handle Suspense inside Layout
 const LazyPage = ({ children }: { children: ReactNode }) => (
@@ -121,6 +122,23 @@ function App() {
               <Layout>
                 <LazyPage><AlertsPage /></LazyPage>
               </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/users"
+          element={
+            isAuthenticated ? (
+              useAuthStore.getState().user?.role === 'ADMIN' || useAuthStore.getState().user?.role === 'MANAGER' ? (
+                <Layout>
+                  <LazyPage><UsersPage /></LazyPage>
+                </Layout>
+              ) : (
+                <Navigate to="/dashboard" />
+              )
             ) : (
               <Navigate to="/login" />
             )

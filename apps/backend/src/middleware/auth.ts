@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { UserRole } from '@prisma/client';
+import { Permission, hasPermission, hasAnyPermission } from '../config/permissions';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -58,6 +59,10 @@ export const authenticate = async (
   }
 };
 
+/**
+ * Role-based authorization middleware
+ * Checks if user has one of the allowed roles
+ */
 export const authorize = (...allowedRoles: UserRole[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
@@ -70,6 +75,62 @@ export const authorize = (...allowedRoles: UserRole[]) => {
     }
 
     if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Insufficient permissions',
+        },
+      });
+    }
+
+    return next();
+  };
+};
+
+/**
+ * Permission-based authorization middleware
+ * Checks if user has the required permission based on their role
+ */
+export const requirePermission = (permission: Permission) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Not authenticated',
+        },
+      });
+    }
+
+    if (!hasPermission(req.user.role, permission)) {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Insufficient permissions',
+        },
+      });
+    }
+
+    return next();
+  };
+};
+
+/**
+ * Permission-based authorization middleware
+ * Checks if user has any of the required permissions
+ */
+export const requireAnyPermission = (...permissions: Permission[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Not authenticated',
+        },
+      });
+    }
+
+    if (!hasAnyPermission(req.user.role, permissions)) {
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
