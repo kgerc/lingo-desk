@@ -16,7 +16,7 @@ export interface CreateUserData {
 export interface UpdateUserData {
   firstName?: string;
   lastName?: string;
-  phone?: string;
+  phone?: string | null;
   role?: UserRole;
   isActive?: boolean;
 }
@@ -119,7 +119,7 @@ class UserService {
    * Invite a new user to the organization
    * Creates user with temporary password and sends invitation email
    */
-  async inviteUser(organizationId: string, data: CreateUserData, invitedBy: string) {
+  async inviteUser(organizationId: string, data: CreateUserData, _invitedBy: string) {
     // Check if email already exists
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email },
