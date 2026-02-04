@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { z } from 'zod';
 import { AuthRequest } from '../middleware/auth';
 import paymentService from '../services/payment.service';
+import paymentReminderService from '../services/payment-reminder.service';
 import { PaymentStatus, PaymentMethod } from '@prisma/client';
 import {
   requiredUuid,
@@ -306,6 +307,84 @@ class PaymentController {
       return res.status(500).json({
         success: false,
         message: 'Nie udało się zaimportować płatności',
+      });
+    }
+  }
+
+  /**
+   * Send payment reminder
+   * POST /api/payments/:id/reminder
+   */
+  async sendReminder(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.id;
+
+      const result = await paymentReminderService.sendManualReminder(id, userId);
+
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          message: result.error,
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: { reminderId: result.reminderId },
+        message: 'Przypomnienie zostało wysłane',
+      });
+    } catch (error) {
+      console.error('Error sending payment reminder:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Nie udało się wysłać przypomnienia',
+      });
+    }
+  }
+
+  /**
+   * Check if reminder can be sent
+   * GET /api/payments/:id/reminder/status
+   */
+  async getReminderStatus(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const status = await paymentReminderService.canSendReminder(id);
+
+      return res.json({
+        success: true,
+        data: status,
+      });
+    } catch (error) {
+      console.error('Error checking reminder status:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Nie udało się sprawdzić statusu przypomnienia',
+      });
+    }
+  }
+
+  /**
+   * Get payment reminder history
+   * GET /api/payments/:id/reminders
+   */
+  async getPaymentReminders(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const reminders = await paymentReminderService.getPaymentReminders(id);
+
+      return res.json({
+        success: true,
+        data: reminders,
+      });
+    } catch (error) {
+      console.error('Error fetching payment reminders:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Nie udało się pobrać historii przypomnień',
       });
     }
   }

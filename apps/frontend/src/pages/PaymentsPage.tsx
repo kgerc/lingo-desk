@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import paymentService, { Payment } from '../services/paymentService';
-import { Plus, Search, Trash2, Edit, DollarSign, Clock, CheckCircle, XCircle, Upload, Calculator, CreditCard } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, DollarSign, Clock, CheckCircle, XCircle, Upload, Calculator, CreditCard, Bell } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal';
 import ImportPaymentsModal from '../components/ImportPaymentsModal';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -22,6 +22,7 @@ export default function PaymentsPage() {
   const [currencyFilter, setCurrencyFilter] = useState<string>('ALL');
   const [convertToCurrency, setConvertToCurrency] = useState<string>('');
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; paymentId: string | null }>({ isOpen: false, paymentId: null });
+  const [reminderDialog, setReminderDialog] = useState<{ isOpen: boolean; paymentId: string | null; studentName: string }>({ isOpen: false, paymentId: null, studentName: '' });
 
   // Fetch payments
   const { data: payments = [], isLoading } = useQuery({
@@ -52,6 +53,40 @@ export default function PaymentsPage() {
       toast.error(error.response?.data?.error?.message || 'Błąd usuwania płatności');
     },
   });
+
+  // Send reminder mutation
+  const sendReminderMutation = useMutation({
+    mutationFn: (paymentId: string) => paymentService.sendReminder(paymentId),
+    onSuccess: () => {
+      toast.success('Przypomnienie zostało wysłane');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Nie udało się wysłać przypomnienia');
+    },
+  });
+
+  const handleSendReminderClick = (payment: Payment) => {
+    const studentName = payment.student
+      ? `${payment.student.user.firstName} ${payment.student.user.lastName}`
+      : 'ucznia';
+    setReminderDialog({ isOpen: true, paymentId: payment.id, studentName });
+  };
+
+  const confirmSendReminder = async () => {
+    if (!reminderDialog.paymentId) return;
+
+    // Check if we can send reminder
+    try {
+      const status = await paymentService.getReminderStatus(reminderDialog.paymentId);
+      if (!status.canSend) {
+        toast.error(status.reason || 'Nie można wysłać przypomnienia');
+        return;
+      }
+      sendReminderMutation.mutate(reminderDialog.paymentId);
+    } catch {
+      sendReminderMutation.mutate(reminderDialog.paymentId);
+    }
+  };
 
   const handleDelete = (id: string) => {
     setConfirmDialog({ isOpen: true, paymentId: id });
@@ -365,6 +400,16 @@ export default function PaymentsPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center gap-2">
+                            {payment.status === 'PENDING' && (
+                              <button
+                                onClick={() => handleSendReminderClick(payment)}
+                                disabled={sendReminderMutation.isPending}
+                                className="text-amber-600 hover:text-amber-700 disabled:opacity-50"
+                                title="Wyślij przypomnienie"
+                              >
+                                <Bell className="w-4 h-4" />
+                              </button>
+                            )}
                             <button
                               onClick={() => handleEdit(payment)}
                               className="text-secondary hover:text-secondary-dark"
@@ -411,6 +456,18 @@ export default function PaymentsPage() {
         confirmText="Usuń"
         cancelText="Anuluj"
         variant="danger"
+      />
+
+      {/* Confirm Send Reminder Dialog */}
+      <ConfirmDialog
+        isOpen={reminderDialog.isOpen}
+        onClose={() => setReminderDialog({ isOpen: false, paymentId: null, studentName: '' })}
+        onConfirm={confirmSendReminder}
+        title="Wyślij przypomnienie"
+        message={`Czy na pewno chcesz wysłać przypomnienie o płatności do ${reminderDialog.studentName}?`}
+        confirmText="Wyślij"
+        cancelText="Anuluj"
+        variant="warning"
       />
     </div>
   );

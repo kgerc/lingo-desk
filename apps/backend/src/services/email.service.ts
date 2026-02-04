@@ -543,6 +543,108 @@ class EmailService {
   }
 
   /**
+   * Send payment reminder email
+   */
+  async sendPaymentReminder(data: {
+    studentEmail: string;
+    studentName: string;
+    amount: number;
+    currency: string;
+    dueDate: Date | null;
+    isOverdue: boolean;
+    daysUntilDue?: number; // Positive = days until due, negative = days overdue
+    organizationName: string;
+    organizationEmail?: string;
+    bankAccountInfo?: string;
+    lessonInfo?: string;
+  }) {
+    const {
+      studentEmail,
+      studentName,
+      amount,
+      currency,
+      dueDate,
+      isOverdue,
+      daysUntilDue,
+      organizationName,
+      organizationEmail,
+      bankAccountInfo,
+      lessonInfo,
+    } = data;
+
+    const formattedDueDate = dueDate
+      ? new Date(dueDate).toLocaleDateString('pl-PL', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+      : 'Natychmiast';
+
+    // Determine urgency level and styling
+    let headerColor = '#f59e0b'; // Yellow for upcoming
+    let headerEmoji = '⏰';
+    let headerText = 'Przypomnienie o płatności';
+    let urgencyMessage = '';
+
+    if (isOverdue) {
+      headerColor = '#ef4444'; // Red for overdue
+      headerEmoji = '⚠️';
+      headerText = 'Zaległa płatność';
+      if (daysUntilDue !== undefined) {
+        urgencyMessage = `Płatność jest przeterminowana o ${Math.abs(daysUntilDue)} dni.`;
+      } else {
+        urgencyMessage = 'Płatność jest przeterminowana.';
+      }
+    } else if (daysUntilDue !== undefined) {
+      if (daysUntilDue === 0) {
+        headerColor = '#f97316'; // Orange for due today
+        headerEmoji = '📅';
+        headerText = 'Płatność do dziś';
+        urgencyMessage = 'Termin płatności upływa dzisiaj.';
+      } else if (daysUntilDue <= 3) {
+        urgencyMessage = `Pozostało ${daysUntilDue} dni do terminu płatności.`;
+      } else {
+        urgencyMessage = `Termin płatności: ${formattedDueDate}.`;
+      }
+    }
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: ${headerColor};">${headerEmoji} ${headerText}</h2>
+        <p>Dzień dobry ${studentName},</p>
+        <p>${urgencyMessage || 'Przypominamy o oczekującej płatności:'}</p>
+        <div style="background-color: ${isOverdue ? '#fef2f2' : '#fffbeb'}; border-left: 4px solid ${headerColor}; padding: 20px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Kwota do zapłaty:</strong> <span style="font-size: 24px; color: ${headerColor};">${amount.toFixed(2)} ${currency}</span></p>
+          <p style="margin: 5px 0;"><strong>Termin płatności:</strong> ${formattedDueDate}</p>
+          ${lessonInfo ? `<p style="margin: 5px 0;"><strong>Dotyczy:</strong> ${lessonInfo}</p>` : ''}
+        </div>
+        ${bankAccountInfo ? `
+        <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; font-weight: bold; color: #374151;">Dane do przelewu:</p>
+          <p style="margin: 10px 0 0 0; white-space: pre-line; color: #4b5563;">${bankAccountInfo}</p>
+        </div>
+        ` : ''}
+        <p>Prosimy o terminowe uregulowanie należności.</p>
+        ${organizationEmail ? `<p>W razie pytań prosimy o kontakt: <a href="mailto:${organizationEmail}">${organizationEmail}</a></p>` : ''}
+        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">${organizationName} - LingoDesk</p>
+      </div>
+    `;
+
+    const subject = isOverdue
+      ? `⚠️ Zaległa płatność: ${amount.toFixed(2)} ${currency}`
+      : daysUntilDue === 0
+        ? `📅 Płatność do dziś: ${amount.toFixed(2)} ${currency}`
+        : `⏰ Przypomnienie o płatności: ${amount.toFixed(2)} ${currency}`;
+
+    return await this.sendEmail({
+      to: studentEmail,
+      subject,
+      html,
+    });
+  }
+
+  /**
    * Send welcome email to new user
    */
   async sendWelcomeEmail(data: {

@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import notificationService from '../services/notification.service';
+import paymentReminderService from '../services/payment-reminder.service';
 
 class Scheduler {
   private tasks: cron.ScheduledTask[] = [];
@@ -63,6 +64,25 @@ class Scheduler {
     this.tasks.push(cleanupTask);
     console.log('✅ Cleanup task scheduled (Sundays at 2:00 AM)');
 
+    // Payment reminders - every day at 9:00 AM
+    const paymentReminderTask = cron.schedule('0 9 * * *', async () => {
+      console.log('⏰ Running payment reminder task...');
+      try {
+        const results = await paymentReminderService.processAllOrganizationsReminders();
+        if (results.totalSent > 0 || results.totalFailed > 0) {
+          console.log(`✅ Payment reminders: ${results.totalSent} sent, ${results.totalFailed} failed, ${results.totalSkipped} skipped`);
+        }
+      } catch (error) {
+        console.error('❌ Error sending payment reminders:', error);
+      }
+    }, {
+      scheduled: true,
+      timezone: 'Europe/Warsaw',
+    });
+
+    this.tasks.push(paymentReminderTask);
+    console.log('✅ Payment reminder task scheduled (daily at 9:00 AM)');
+
     console.log(`⏰ ${this.tasks.length} scheduled tasks running`);
   }
 
@@ -93,6 +113,16 @@ class Scheduler {
     console.log('⏰ Manually triggering budget alerts...');
     const results = await notificationService.sendLowBudgetAlerts(organizationId, managerEmail);
     console.log(`✅ Sent ${results.filter(r => r.success).length}/${results.length} alerts`);
+    return results;
+  }
+
+  /**
+   * Manually trigger payment reminders (for testing)
+   */
+  async triggerPaymentReminders() {
+    console.log('⏰ Manually triggering payment reminders...');
+    const results = await paymentReminderService.processAllOrganizationsReminders();
+    console.log(`✅ Payment reminders: ${results.totalSent} sent, ${results.totalFailed} failed, ${results.totalSkipped} skipped`);
     return results;
   }
 }

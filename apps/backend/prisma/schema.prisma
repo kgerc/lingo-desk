@@ -600,6 +600,7 @@ model Payment {
   enrollment   StudentEnrollment? @relation(fields: [enrollmentId], references: [id])
   lesson       Lesson?            @relation(fields: [lessonId], references: [id])
   invoice      Invoice?
+  reminders    PaymentReminder[]
 
   @@index([organizationId])
   @@index([studentId])
@@ -633,6 +634,39 @@ model Invoice {
 
   @@unique([organizationId, invoiceNumber])
   @@map("invoices")
+}
+
+model PaymentReminder {
+  id              String                @id @default(uuid())
+  organizationId  String                @map("organization_id")
+  paymentId       String                @map("payment_id")
+  studentId       String                @map("student_id")
+  type            PaymentReminderType
+  sentAt          DateTime              @map("sent_at")
+  sentBy          String?               @map("sent_by") // User ID if manual, null if automatic
+  emailTo         String                @map("email_to")
+  subject         String
+  success         Boolean               @default(true)
+  errorMessage    String?               @map("error_message")
+  metadata        Json?                 // Additional data (e.g., amount, due date at time of sending)
+  createdAt       DateTime              @default(now()) @map("created_at")
+
+  // Relations
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([paymentId])
+  @@index([studentId])
+  @@index([sentAt])
+  @@index([type])
+  @@map("payment_reminders")
+}
+
+enum PaymentReminderType {
+  MANUAL           // Sent manually by user
+  AUTO_BEFORE_DUE  // Automatic reminder before due date
+  AUTO_ON_DUE      // Automatic reminder on due date
+  AUTO_AFTER_DUE   // Automatic reminder after due date (overdue)
 }
 
 model StudentBudget {
@@ -936,6 +970,11 @@ model OrganizationSettings {
   smsEnabled                 Boolean  @default(false) @map("sms_enabled")
   timezone                   String   @default("Europe/Warsaw")
   settings                   Json?
+  // Payment reminder settings
+  paymentReminderEnabled         Boolean @default(false) @map("payment_reminder_enabled")
+  paymentReminderDaysBefore      Int[]   @default([7, 3, 1]) @map("payment_reminder_days_before") // Days before due date
+  paymentReminderDaysAfter       Int[]   @default([1, 3, 7]) @map("payment_reminder_days_after") // Days after due date (overdue)
+  paymentReminderMinIntervalHours Int    @default(24) @map("payment_reminder_min_interval_hours") // Min hours between reminders
   createdAt                  DateTime @default(now()) @map("created_at")
   updatedAt                  DateTime @updatedAt @map("updated_at")
 

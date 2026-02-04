@@ -12,6 +12,7 @@ export interface Payment {
   paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'ONLINE' | 'OTHER';
   stripePaymentIntentId?: string;
   paidAt?: string;
+  dueAt?: string;
   notes?: string;
   exchangeRateOverride?: number;
   createdAt: string;
@@ -81,6 +82,29 @@ export interface PaymentStats {
   pendingRevenue: number;
   completedPayments: number;
   pendingPayments: number;
+}
+
+export interface ReminderStatus {
+  canSend: boolean;
+  reason?: string;
+  lastReminderAt?: string;
+  nextAvailableAt?: string;
+}
+
+export interface PaymentReminder {
+  id: string;
+  organizationId: string;
+  paymentId: string;
+  studentId: string;
+  type: 'MANUAL' | 'AUTO_BEFORE_DUE' | 'AUTO_ON_DUE' | 'AUTO_AFTER_DUE';
+  sentAt: string;
+  sentBy?: string;
+  emailTo: string;
+  subject: string;
+  success: boolean;
+  errorMessage?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
 }
 
 const paymentService = {
@@ -179,6 +203,30 @@ const paymentService = {
     }>;
   }>> {
     const response = await api.get('/payments/debtors') as any;
+    return response.data.data;
+  },
+
+  /**
+   * Send payment reminder
+   */
+  async sendReminder(paymentId: string): Promise<{ reminderId: string }> {
+    const response = await api.post(`/payments/${paymentId}/reminder`) as any;
+    return response.data.data;
+  },
+
+  /**
+   * Get reminder status for payment
+   */
+  async getReminderStatus(paymentId: string): Promise<ReminderStatus> {
+    const response = await api.get(`/payments/${paymentId}/reminder/status`) as any;
+    return response.data.data;
+  },
+
+  /**
+   * Get payment reminder history
+   */
+  async getPaymentReminders(paymentId: string): Promise<PaymentReminder[]> {
+    const response = await api.get(`/payments/${paymentId}/reminders`) as any;
     return response.data.data;
   },
 };

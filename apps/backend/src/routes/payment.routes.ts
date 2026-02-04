@@ -26,4 +26,9 @@ router.post('/', paymentController.createPayment);
 router.put('/:id', paymentController.updatePayment);
 router.delete('/:id', paymentController.deletePayment);
 
+// Payment reminders
+router.post('/:id/reminder', paymentController.sendReminder);
+router.get('/:id/reminder/status', paymentController.getReminderStatus);
+router.get('/:id/reminders', paymentController.getPaymentReminders);
+
 export default router;

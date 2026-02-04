@@ -1,17 +1,51 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import paymentService from '../services/paymentService';
-import { AlertCircle, Mail, Phone, ChevronDown, ChevronUp, Calendar, DollarSign } from 'lucide-react';
+import { AlertCircle, Mail, Phone, ChevronDown, ChevronUp, Calendar, DollarSign, Bell } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const DebtorsPage: React.FC = () => {
   const [expandedDebtors, setExpandedDebtors] = useState<Set<string>>(new Set());
+  const [reminderDialog, setReminderDialog] = useState<{ isOpen: boolean; paymentId: string | null; studentName: string }>({ isOpen: false, paymentId: null, studentName: '' });
 
   // Fetch debtors
   const { data: debtors = [], isLoading } = useQuery({
     queryKey: ['debtors'],
     queryFn: () => paymentService.getDebtors(),
   });
+
+  // Send reminder mutation
+  const sendReminderMutation = useMutation({
+    mutationFn: (paymentId: string) => paymentService.sendReminder(paymentId),
+    onSuccess: () => {
+      toast.success('Przypomnienie zostało wysłane');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Nie udało się wysłać przypomnienia');
+    },
+  });
+
+  const handleSendReminderClick = (paymentId: string, studentName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setReminderDialog({ isOpen: true, paymentId, studentName });
+  };
+
+  const confirmSendReminder = async () => {
+    if (!reminderDialog.paymentId) return;
+
+    try {
+      const status = await paymentService.getReminderStatus(reminderDialog.paymentId);
+      if (!status.canSend) {
+        toast.error(status.reason || 'Nie można wysłać przypomnienia');
+        return;
+      }
+      sendReminderMutation.mutate(reminderDialog.paymentId);
+    } catch {
+      sendReminderMutation.mutate(reminderDialog.paymentId);
+    }
+  };
 
   const toggleExpanded = (studentId: string) => {
     setExpandedDebtors(prev => {
@@ -179,8 +213,19 @@ const DebtorsPage: React.FC = () => {
                                   )}
                                 </div>
                               </div>
-                              <div className="text-sm font-semibold text-red-600">
-                                {payment.amount.toFixed(2)} PLN
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={(e) => handleSendReminderClick(payment.id, `${debtor.student.user.firstName} ${debtor.student.user.lastName}`, e)}
+                                  disabled={sendReminderMutation.isPending}
+                                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 bg-amber-100 rounded hover:bg-amber-200 disabled:opacity-50 transition-colors"
+                                  title="Wyślij przypomnienie"
+                                >
+                                  <Bell className="h-3 w-3" />
+                                  Przypomnij
+                                </button>
+                                <div className="text-sm font-semibold text-red-600">
+                                  {payment.amount.toFixed(2)} PLN
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -194,6 +239,18 @@ const DebtorsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Send Reminder Dialog */}
+      <ConfirmDialog
+        isOpen={reminderDialog.isOpen}
+        onClose={() => setReminderDialog({ isOpen: false, paymentId: null, studentName: '' })}
+        onConfirm={confirmSendReminder}
+        title="Wyślij przypomnienie"
+        message={`Czy na pewno chcesz wysłać przypomnienie o płatności do ${reminderDialog.studentName}?`}
+        confirmText="Wyślij"
+        cancelText="Anuluj"
+        variant="warning"
+      />
     </div>
   );
 };
