@@ -48,6 +48,7 @@ enum CourseDeliveryMode {
 }
 
 enum LanguageLevel {
+  A0
   A1
   A2
   B1

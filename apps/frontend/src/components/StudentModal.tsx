@@ -12,7 +12,7 @@ interface StudentModalProps {
   onSuccess: () => void;
 }
 
-const LANGUAGE_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
+const LANGUAGE_LEVELS = ['A0', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
 
 const LANGUAGES = [
   { value: 'en', label: 'Angielski' },

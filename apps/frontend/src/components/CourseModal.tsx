@@ -16,6 +16,30 @@ interface CourseModalProps {
 type TabType = 'basic' | 'details' | 'schedule' | 'students';
 type ScheduleMode = 'none' | 'manual' | 'recurring';
 
+// Mapping of form field names to their respective tabs
+const FIELD_TO_TAB_MAP: Record<string, TabType> = {
+  // Basic tab fields
+  name: 'basic',
+  courseType: 'basic',
+  teacherId: 'basic',
+  language: 'basic',
+  level: 'basic',
+  startDate: 'basic',
+  endDate: 'basic',
+  isActive: 'basic',
+  // Details tab fields
+  deliveryMode: 'details',
+  defaultDurationMinutes: 'details',
+  maxStudents: 'details',
+  pricePerLesson: 'details',
+  currency: 'details',
+  description: 'details',
+  // Students tab fields
+  students: 'students',
+  // Schedule tab fields
+  schedule: 'schedule',
+};
+
 const DAYS_OF_WEEK = [
   { value: 1, label: 'Poniedziałek' },
   { value: 2, label: 'Wtorek' },
@@ -36,6 +60,7 @@ const LANGUAGES = [
 ];
 
 const LEVELS = [
+  { value: 'A0', label: 'A0 (Od zera)' },
   { value: 'A1', label: 'A1' },
   { value: 'A2', label: 'A2' },
   { value: 'B1', label: 'B1' },
@@ -96,6 +121,27 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Calculate errors per tab
+  const tabErrors = useMemo(() => {
+    const counts: Record<TabType, number> = {
+      basic: 0,
+      details: 0,
+      students: 0,
+      schedule: 0,
+    };
+
+    Object.keys(errors).forEach((field) => {
+      if (errors[field]) {
+        const tab = FIELD_TO_TAB_MAP[field];
+        if (tab) {
+          counts[tab]++;
+        }
+      }
+    });
+
+    return counts;
+  }, [errors]);
 
   // Fetch teachers for dropdown
   const { data: teachers = [] } = useQuery({
@@ -339,6 +385,25 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
     }
 
     setErrors(newErrors);
+
+    // Auto-navigate to first tab with error
+    if (Object.keys(newErrors).length > 0) {
+      const tabOrder: TabType[] = ['basic', 'details', 'students', 'schedule'];
+      for (const tab of tabOrder) {
+        const hasErrorInTab = Object.keys(newErrors).some(
+          (field) => FIELD_TO_TAB_MAP[field] === tab
+        );
+        if (hasErrorInTab) {
+          // Only switch if the tab is available (schedule/students only in create mode)
+          const isTabAvailable = tab === 'basic' || tab === 'details' || !isEdit;
+          if (isTabAvailable) {
+            setActiveTab(tab);
+            break;
+          }
+        }
+      }
+    }
+
     return Object.keys(newErrors).length === 0;
   };
 
@@ -424,6 +489,8 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
+              const errorCount = tabErrors[tab.id] || 0;
+              const hasErrors = errorCount > 0;
 
               return (
                 <button
@@ -431,12 +498,25 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 py-4 px-2 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
                     isActive
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? hasErrors
+                        ? 'border-red-500 text-red-600'
+                        : 'border-primary text-primary'
+                      : hasErrors
+                        ? 'border-transparent text-red-500 hover:text-red-600 hover:border-red-300'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
-                  <Icon className="h-5 w-5" />
+                  {hasErrors ? (
+                    <AlertCircle className="h-5 w-5 text-red-500" />
+                  ) : (
+                    <Icon className="h-5 w-5" />
+                  )}
                   {tab.name}
+                  {hasErrors && (
+                    <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                      {errorCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
