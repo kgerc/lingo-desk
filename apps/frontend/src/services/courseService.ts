@@ -106,14 +106,23 @@ export interface ScheduleItem {
   meetingUrl?: string;
 }
 
+// Individual day schedule with time
+export interface DayScheduleItem {
+  dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
+  time: string; // HH:mm format
+}
+
 // Pattern for recurring lessons in schedule
 export interface SchedulePattern {
   frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
   startDate: string;
   endDate?: string;
   occurrencesCount?: number;
+  // Legacy: single time for all selected days
   daysOfWeek?: number[]; // 0 = Sunday, 1 = Monday, etc.
-  time: string; // HH:mm format
+  time?: string; // HH:mm format (used when daysOfWeek is set)
+  // New: individual time per day
+  daySchedules?: DayScheduleItem[]; // Each day has its own time
   durationMinutes: number;
   deliveryMode: 'IN_PERSON' | 'ONLINE';
   meetingUrl?: string;

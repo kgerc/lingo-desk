@@ -86,8 +86,7 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
     startDate: '',
     endDate: '',
     occurrencesCount: 10,
-    daysOfWeek: [],
-    time: '09:00',
+    daySchedules: [], // New format: each day has its own time
     durationMinutes: 60,
     deliveryMode: 'IN_PERSON',
     meetingUrl: '',
@@ -110,25 +109,29 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
     queryFn: () => studentService.getStudents({ isActive: true }),
   });
 
-  // Generate preview of lessons from recurring pattern
+  // Generate preview of lessons from recurring pattern (using new daySchedules format)
   const previewLessons = useMemo(() => {
-    if (scheduleMode !== 'recurring' || !recurringPattern.startDate || !recurringPattern.time) {
+    if (scheduleMode !== 'recurring' || !recurringPattern.startDate) {
+      return [];
+    }
+
+    // Need at least one day selected with time
+    const daySchedules = recurringPattern.daySchedules || [];
+    if (daySchedules.length === 0) {
       return [];
     }
 
     const lessons: Date[] = [];
-    const [hours, minutes] = recurringPattern.time.split(':').map(Number);
     const startDate = new Date(recurringPattern.startDate);
-    startDate.setHours(hours, minutes, 0, 0);
-
     const maxOccurrences = recurringPattern.occurrencesCount || 52;
-    const effectiveDaysOfWeek = recurringPattern.daysOfWeek && recurringPattern.daysOfWeek.length > 0
-      ? recurringPattern.daysOfWeek
-      : [startDate.getDay()];
     const endDate = recurringPattern.endDate ? new Date(recurringPattern.endDate) : null;
 
+    // For MONTHLY frequency, use first day's time
     if (recurringPattern.frequency === 'MONTHLY') {
+      const [hours, minutes] = (daySchedules[0]?.time || '09:00').split(':').map(Number);
       let currentDate = new Date(startDate);
+      currentDate.setHours(hours, minutes, 0, 0);
+
       while (lessons.length < maxOccurrences && (!endDate || currentDate <= endDate)) {
         lessons.push(new Date(currentDate));
         currentDate.setMonth(currentDate.getMonth() + 1);
@@ -137,17 +140,19 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
     }
 
     const weekInterval = recurringPattern.frequency === 'BIWEEKLY' ? 2 : 1;
-    const maxWeeks = Math.ceil(maxOccurrences / Math.max(effectiveDaysOfWeek.length, 1)) + 1;
+    const maxWeeks = Math.ceil(maxOccurrences / Math.max(daySchedules.length, 1)) + 1;
 
     const weekStart = new Date(startDate);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    weekStart.setHours(hours, minutes, 0, 0);
+    weekStart.setHours(0, 0, 0, 0);
 
     let weekCount = 0;
     while (weekCount < maxWeeks && lessons.length < maxOccurrences) {
-      for (const dayOfWeek of [...effectiveDaysOfWeek].sort((a, b) => a - b)) {
+      // Sort by day of week
+      for (const daySchedule of [...daySchedules].sort((a, b) => a.dayOfWeek - b.dayOfWeek)) {
+        const [hours, minutes] = daySchedule.time.split(':').map(Number);
         const lessonDate = new Date(weekStart);
-        lessonDate.setDate(lessonDate.getDate() + dayOfWeek);
+        lessonDate.setDate(lessonDate.getDate() + daySchedule.dayOfWeek);
         lessonDate.setHours(hours, minutes, 0, 0);
 
         if (lessonDate < startDate) continue;
@@ -219,15 +224,45 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
     setRecurringPattern(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleDayOfWeekToggle = (day: number) => {
+  // Toggle day selection - adds/removes day with default time
+  const handleDayToggle = (day: number) => {
     setRecurringPattern(prev => {
-      const current = prev.daysOfWeek || [];
-      if (current.includes(day)) {
-        return { ...prev, daysOfWeek: current.filter(d => d !== day) };
+      const current = prev.daySchedules || [];
+      const existingIndex = current.findIndex(d => d.dayOfWeek === day);
+
+      if (existingIndex >= 0) {
+        // Remove day
+        return { ...prev, daySchedules: current.filter(d => d.dayOfWeek !== day) };
       } else {
-        return { ...prev, daysOfWeek: [...current, day].sort() };
+        // Add day with default time 09:00
+        return {
+          ...prev,
+          daySchedules: [...current, { dayOfWeek: day, time: '09:00' }].sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+        };
       }
     });
+  };
+
+  // Update time for a specific day
+  const handleDayTimeChange = (day: number, time: string) => {
+    setRecurringPattern(prev => {
+      const current = prev.daySchedules || [];
+      return {
+        ...prev,
+        daySchedules: current.map(d => d.dayOfWeek === day ? { ...d, time } : d)
+      };
+    });
+  };
+
+  // Get time for a specific day (for input value)
+  const getDayTime = (day: number): string => {
+    const daySchedule = recurringPattern.daySchedules?.find(d => d.dayOfWeek === day);
+    return daySchedule?.time || '09:00';
+  };
+
+  // Check if day is selected
+  const isDaySelected = (day: number): boolean => {
+    return recurringPattern.daySchedules?.some(d => d.dayOfWeek === day) || false;
   };
 
   const addManualItem = () => {
@@ -288,8 +323,15 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
       newErrors.students = 'Wybierz co najmniej jednego ucznia, aby utworzyć harmonogram lekcji';
     }
 
-    if (scheduleMode === 'recurring' && !recurringPattern.startDate) {
-      newErrors.schedule = 'Podaj datę rozpoczęcia harmonogramu';
+    if (scheduleMode === 'recurring') {
+      if (!recurringPattern.startDate) {
+        newErrors.schedule = 'Podaj datę rozpoczęcia harmonogramu';
+      }
+      // For WEEKLY/BIWEEKLY, require at least one day with time
+      if ((recurringPattern.frequency === 'WEEKLY' || recurringPattern.frequency === 'BIWEEKLY') &&
+          (!recurringPattern.daySchedules || recurringPattern.daySchedules.length === 0)) {
+        newErrors.schedule = 'Wybierz co najmniej jeden dzień tygodnia z godziną zajęć';
+      }
     }
 
     if (scheduleMode === 'manual' && manualItems.length === 0) {
@@ -896,18 +938,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Godzina
-                      </label>
-                      <input
-                        type="time"
-                        value={recurringPattern.time}
-                        onChange={(e) => handlePatternChange('time', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
                         Data zakończenia (opcjonalnie)
                       </label>
                       <input
@@ -948,27 +978,57 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
                     </div>
                   </div>
 
+                  {/* Days of week with individual times */}
                   {(recurringPattern.frequency === 'WEEKLY' || recurringPattern.frequency === 'BIWEEKLY') && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Dni tygodnia (opcjonalnie - domyślnie dzień z daty rozpoczęcia)
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Dni tygodnia i godziny zajęć *
                       </label>
-                      <div className="flex flex-wrap gap-2">
+                      <p className="text-sm text-gray-500 mb-3">
+                        Wybierz dni i ustaw godzinę dla każdego dnia osobno
+                      </p>
+                      <div className="space-y-2">
                         {DAYS_OF_WEEK.map((day) => (
-                          <button
+                          <div
                             key={day.value}
-                            type="button"
-                            onClick={() => handleDayOfWeekToggle(day.value)}
-                            className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                              recurringPattern.daysOfWeek?.includes(day.value)
-                                ? 'bg-primary text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                              isDaySelected(day.value)
+                                ? 'bg-primary/5 border-primary/30'
+                                : 'bg-gray-50 border-gray-200'
                             }`}
                           >
-                            {day.label}
-                          </button>
+                            <input
+                              type="checkbox"
+                              id={`day-${day.value}`}
+                              checked={isDaySelected(day.value)}
+                              onChange={() => handleDayToggle(day.value)}
+                              className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                            />
+                            <label
+                              htmlFor={`day-${day.value}`}
+                              className="flex-1 text-sm font-medium text-gray-700 cursor-pointer"
+                            >
+                              {day.label}
+                            </label>
+                            {isDaySelected(day.value) && (
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-gray-400" />
+                                <input
+                                  type="time"
+                                  value={getDayTime(day.value)}
+                                  onChange={(e) => handleDayTimeChange(day.value, e.target.value)}
+                                  className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                />
+                              </div>
+                            )}
+                          </div>
                         ))}
                       </div>
+                      {(recurringPattern.daySchedules?.length || 0) === 0 && (
+                        <p className="mt-2 text-sm text-amber-600">
+                          Wybierz co najmniej jeden dzień tygodnia
+                        </p>
+                      )}
                     </div>
                   )}
 

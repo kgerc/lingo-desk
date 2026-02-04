@@ -135,7 +135,7 @@ class MailingService {
         attachments: emailAttachments,
       }).catch((error) => {
         console.error(`Failed to send email to ${student.user.email}:`, error);
-        return { success: false, email: student.user.email, attachmentsFailed: false };
+        return { success: false, email: student.user.email, error: error?.message || 'Unknown error', attachmentsFailed: false };
       })
     );
 
@@ -146,11 +146,20 @@ class MailingService {
     const attachmentFailures = results.filter((r: any) => r?.attachmentsFailed === true);
     const successCount = students.length - failedEmails.length;
 
+    // Log detailed failure info for debugging
+    if (failedEmails.length > 0) {
+      console.error('❌ Bulk email failures:', failedEmails.map((r: any) => ({
+        email: r.email,
+        error: r.error
+      })));
+    }
+
     return {
       totalSent: successCount,
       totalFailed: failedEmails.length,
       totalRecipients: students.length,
       failedEmails: failedEmails.map((r: any) => r.email),
+      failedDetails: failedEmails.map((r: any) => ({ email: r.email, error: r.error })),
       attachmentsIncluded: emailAttachments ? emailAttachments.length : 0,
       attachmentFailures: attachmentFailures.length,
     };

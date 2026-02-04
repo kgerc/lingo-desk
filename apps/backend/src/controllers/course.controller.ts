@@ -86,17 +86,34 @@ const scheduleItemSchema = z.object({
   meetingUrl: optionalUrl('Link do spotkania'),
 });
 
+// Schema for individual day schedule with time
+const dayScheduleSchema = z.object({
+  dayOfWeek: z.number().int().min(0, { message: 'Dzień tygodnia musi być od 0 do 6' }).max(6, { message: 'Dzień tygodnia musi być od 0 do 6' }),
+  time: z.string().regex(/^\d{2}:\d{2}$/, { message: 'Godzina musi być w formacie HH:MM' }),
+});
+
 const schedulePatternSchema = z.object({
   frequency: requiredEnum('Częstotliwość', ['WEEKLY', 'BIWEEKLY', 'MONTHLY'] as const, frequencyLabels),
   startDate: requiredDateString('Data rozpoczęcia'),
   endDate: optionalDateString('Data zakończenia'),
   occurrencesCount: optionalPositiveInt('Liczba powtórzeń'),
+  // Legacy format: single time for all days
   daysOfWeek: z.array(z.number().int().min(0, { message: 'Dzień tygodnia musi być od 0 do 6' }).max(6, { message: 'Dzień tygodnia musi być od 0 do 6' })).optional(),
-  time: z.string().regex(/^\d{2}:\d{2}$/, { message: 'Godzina musi być w formacie HH:MM' }),
+  time: z.string().regex(/^\d{2}:\d{2}$/, { message: 'Godzina musi być w formacie HH:MM' }).optional(),
+  // New format: individual time per day
+  daySchedules: z.array(dayScheduleSchema).optional(),
   durationMinutes: requiredPositiveInt('Czas trwania'),
   deliveryMode: requiredEnum('Tryb lekcji', ['IN_PERSON', 'ONLINE'] as const, lessonDeliveryModeLabels),
   meetingUrl: optionalUrl('Link do spotkania'),
-});
+}).refine(
+  (data) => {
+    // Either daySchedules or (daysOfWeek + time) or just time must be provided
+    const hasNewFormat = data.daySchedules && data.daySchedules.length > 0;
+    const hasLegacyFormat = data.time !== undefined;
+    return hasNewFormat || hasLegacyFormat;
+  },
+  { message: 'Musisz podać harmonogram dni z godzinami (daySchedules) lub godzinę (time)' }
+);
 
 const createCourseWithScheduleSchema = createCourseSchema.extend({
   schedule: z.object({

@@ -3,27 +3,50 @@ import emailService from './email.service';
 
 const prisma = new PrismaClient();
 
+// Day schedule with individual time for each day
+interface DaySchedule {
+  dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
+  time: string; // HH:mm format
+}
+
 // Helper to generate dates from pattern
+// Supports both old format (single time) and new format (daySchedules with per-day times)
 function generateDatesFromPattern(pattern: {
   frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
   startDate: Date;
   endDate?: Date;
   occurrencesCount?: number;
-  daysOfWeek?: number[];
-  time: string;
+  daysOfWeek?: number[]; // Legacy: single time for all days
+  time?: string; // Legacy: single time for all days (HH:mm)
+  daySchedules?: DaySchedule[]; // New: individual time per day
 }): Date[] {
   const dates: Date[] = [];
-  const [hours, minutes] = pattern.time.split(':').map(Number);
-  let currentDate = new Date(pattern.startDate);
-  currentDate.setHours(hours, minutes, 0, 0);
+
+  // Build effective day schedules - support both old and new format
+  let effectiveDaySchedules: DaySchedule[] = [];
+
+  if (pattern.daySchedules && pattern.daySchedules.length > 0) {
+    // New format: use daySchedules directly
+    effectiveDaySchedules = pattern.daySchedules;
+  } else if (pattern.time) {
+    // Legacy format: convert daysOfWeek + single time to daySchedules
+    const legacyDays = pattern.daysOfWeek && pattern.daysOfWeek.length > 0
+      ? pattern.daysOfWeek
+      : [new Date(pattern.startDate).getDay()];
+    effectiveDaySchedules = legacyDays.map(day => ({ dayOfWeek: day, time: pattern.time! }));
+  } else {
+    // Fallback: use start date's day with default time
+    effectiveDaySchedules = [{ dayOfWeek: new Date(pattern.startDate).getDay(), time: '09:00' }];
+  }
 
   const maxOccurrences = pattern.occurrencesCount || 52; // Default max 1 year of weekly lessons
-  const effectiveDaysOfWeek = pattern.daysOfWeek && pattern.daysOfWeek.length > 0
-    ? pattern.daysOfWeek
-    : [currentDate.getDay()];
 
-  // For MONTHLY frequency, use simpler logic
+  // For MONTHLY frequency, use simpler logic (use first day's time)
   if (pattern.frequency === 'MONTHLY') {
+    const [hours, minutes] = (effectiveDaySchedules[0]?.time || '09:00').split(':').map(Number);
+    let currentDate = new Date(pattern.startDate);
+    currentDate.setHours(hours, minutes, 0, 0);
+
     let count = 0;
     while (count < maxOccurrences && (!pattern.endDate || currentDate <= pattern.endDate)) {
       dates.push(new Date(currentDate));
@@ -35,19 +58,20 @@ function generateDatesFromPattern(pattern: {
 
   // For WEEKLY/BIWEEKLY with multiple days, iterate day by day within each week
   let weekCount = 0;
-  const maxWeeks = Math.ceil(maxOccurrences / Math.max(effectiveDaysOfWeek.length, 1)) + 1;
+  const maxWeeks = Math.ceil(maxOccurrences / Math.max(effectiveDaySchedules.length, 1)) + 1;
   const weekInterval = pattern.frequency === 'BIWEEKLY' ? 2 : 1;
 
   // Find the start of the week containing startDate (Sunday = 0)
-  const weekStart = new Date(currentDate);
+  const weekStart = new Date(pattern.startDate);
   weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-  weekStart.setHours(hours, minutes, 0, 0);
+  weekStart.setHours(0, 0, 0, 0);
 
   while (weekCount < maxWeeks && dates.length < maxOccurrences) {
-    // Check each selected day of this week
-    for (const dayOfWeek of effectiveDaysOfWeek.sort((a, b) => a - b)) {
+    // Check each selected day of this week (sorted by day)
+    for (const daySchedule of [...effectiveDaySchedules].sort((a, b) => a.dayOfWeek - b.dayOfWeek)) {
+      const [hours, minutes] = daySchedule.time.split(':').map(Number);
       const lessonDate = new Date(weekStart);
-      lessonDate.setDate(lessonDate.getDate() + dayOfWeek);
+      lessonDate.setDate(lessonDate.getDate() + daySchedule.dayOfWeek);
       lessonDate.setHours(hours, minutes, 0, 0);
 
       // Skip if before start date
@@ -122,14 +146,23 @@ export interface ScheduleItem {
   meetingUrl?: string;
 }
 
+// Individual day schedule with time
+export interface DayScheduleItem {
+  dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
+  time: string; // HH:mm format
+}
+
 // Pattern for recurring lessons in schedule
 export interface SchedulePattern {
   frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
   startDate: Date;
   endDate?: Date;
   occurrencesCount?: number;
+  // Legacy: single time for all selected days
   daysOfWeek?: number[]; // 0 = Sunday, 1 = Monday, etc.
-  time: string; // HH:mm format
+  time?: string; // HH:mm format (used when daysOfWeek is set)
+  // New: individual time per day
+  daySchedules?: DayScheduleItem[]; // Each day has its own time
   durationMinutes: number;
   deliveryMode: 'IN_PERSON' | 'ONLINE';
   meetingUrl?: string;

@@ -31,7 +31,7 @@ class EmailService {
     if (!this.isEnabled) {
       console.warn('⚠️  Email service disabled - RESEND_API_KEY not configured');
     } else {
-      console.log('✉️  Email service enabled');
+      console.log('✉️  Email service enabled with FROM:', this.fromEmail);
     }
   }
 
@@ -73,10 +73,12 @@ class EmailService {
   /**
    * Send email using Resend
    */
-  async sendEmail(options: SendEmailOptions): Promise<{ success: boolean; messageId?: string; error?: string; attachmentsFailed?: boolean }> {
+  async sendEmail(options: SendEmailOptions): Promise<{ success: boolean; messageId?: string; error?: string; attachmentsFailed?: boolean; email?: string }> {
+    const recipientEmail = Array.isArray(options.to) ? options.to[0] : options.to;
+
     if (!this.isEnabled) {
       console.log('📧 Email (disabled):', options.subject, 'to', options.to);
-      return { success: false, error: 'Email service not configured' };
+      return { success: false, error: 'Email service not configured', email: recipientEmail };
     }
 
     // Validate attachments
@@ -120,25 +122,26 @@ class EmailService {
 
           if (retryResult.error) {
             console.error('❌ Email send error (retry):', retryResult.error);
-            return { success: false, error: retryResult.error.message };
+            return { success: false, error: retryResult.error.message, email: recipientEmail };
           }
 
           console.log('✅ Email sent (without attachments):', options.subject, 'to', options.to, '- ID:', retryResult.data?.id);
-          return { success: true, messageId: retryResult.data?.id, attachmentsFailed: true };
+          return { success: true, messageId: retryResult.data?.id, attachmentsFailed: true, email: recipientEmail };
         }
 
-        console.error('❌ Email send error:', error);
-        return { success: false, error: error.message };
+        console.error('❌ Email send error:', error, '| From:', options.from || this.fromEmail, '| To:', options.to);
+        return { success: false, error: error.message, email: recipientEmail };
       }
 
       const attachmentCount = attachmentsToSend?.length || 0;
       console.log('✅ Email sent:', options.subject, 'to', options.to, '- ID:', data?.id, attachmentCount > 0 ? `(${attachmentCount} attachments)` : '');
-      return { success: true, messageId: data?.id, attachmentsFailed };
+      return { success: true, messageId: data?.id, attachmentsFailed, email: recipientEmail };
     } catch (error) {
-      console.error('❌ Email send exception:', error);
+      console.error('❌ Email send exception:', error, '| From:', options.from || this.fromEmail, '| To:', options.to);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
+        email: recipientEmail
       };
     }
   }
