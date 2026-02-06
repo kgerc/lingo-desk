@@ -30,8 +30,9 @@ const OrganizationSwitcher: React.FC = () => {
         setAuth(updatedUser, localStorage.getItem('token') || '');
       }
 
-      // Invalidate all queries to refetch data for new organization
-      queryClient.invalidateQueries();
+      // Reload the page to refetch all data for new organization
+      // This is more reliable than invalidating queries and prevents infinite loops
+      window.location.reload();
 
       toast.success(`Przełączono na: ${data.organization.name}`);
       setIsOpen(false);
