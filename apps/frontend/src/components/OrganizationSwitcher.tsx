@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import organizationService from '../services/organizationService';
 import { useAuthStore } from '../stores/authStore';
 import { Building2, Check, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const OrganizationSwitcher: React.FC = () => {
-  const queryClient = useQueryClient();
   const { user, setAuth } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
 
