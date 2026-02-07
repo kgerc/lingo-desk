@@ -186,6 +186,7 @@ model Organization {
   studentSettlements    StudentSettlement[]
   substitutions         Substitution[]
   teacherPayouts        TeacherPayout[]
+  courseApplications    CourseApplication[]
 
   @@map("organizations")
 }
@@ -367,9 +368,10 @@ model Course {
   teacher       Teacher             @relation(fields: [teacherId], references: [id])
   location      Location?           @relation(fields: [locationId], references: [id])
   classroom     Classroom?          @relation(fields: [classroomId], references: [id])
-  enrollments   StudentEnrollment[]
-  lessons       Lesson[]
-  materials     CourseMaterial[]
+  enrollments        StudentEnrollment[]
+  lessons            Lesson[]
+  materials          CourseMaterial[]
+  courseApplications  CourseApplication[]
 
   @@index([organizationId])
   @@index([teacherId])
@@ -1153,4 +1155,41 @@ model ExchangeRate {
   @@index([currency])
   @@index([effectiveDate])
   @@map("exchange_rates")
+}
+
+// ============================================
+// COURSE APPLICATIONS
+// ============================================
+
+enum ApplicationStatus {
+  NEW
+  ACCEPTED
+  REJECTED
+}
+
+model CourseApplication {
+  id                 String            @id @default(uuid())
+  organizationId     String            @map("organization_id")
+  name               String
+  email              String
+  phone              String?
+  courseId            String?           @map("course_id")
+  preferences        String?
+  languageLevel      String?           @map("language_level")
+  availability       String?
+  notes              String?
+  status             ApplicationStatus @default(NEW)
+  internalNotes      String?           @map("internal_notes")
+  convertedStudentId String?           @map("converted_student_id")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  course       Course?      @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([email])
+  @@map("course_applications")
 }

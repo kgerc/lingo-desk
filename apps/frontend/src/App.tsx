@@ -23,6 +23,8 @@ const NotificationSettingsPage = lazy(() => import('./pages/NotificationSettings
 const ReportsPage = lazy(() => import('./pages/ReportsPage'))
 const MailingsPage = lazy(() => import('./pages/MailingsPage'))
 const UsersPage = lazy(() => import('./pages/UsersPage'))
+const CourseApplicationsPage = lazy(() => import('./pages/CourseApplicationsPage'))
+const PublicApplicationForm = lazy(() => import('./pages/PublicApplicationForm'))
 
 // Wrapper to handle Suspense inside Layout
 const LazyPage = ({ children }: { children: ReactNode }) => (
@@ -88,6 +90,16 @@ function App() {
           }
         />
 
+        {/* Public application form - no auth required */}
+        <Route
+          path="/apply/:orgSlug"
+          element={
+            <Suspense>
+              <PublicApplicationForm />
+            </Suspense>
+          }
+        />
+
         {/* Protected routes */}
         <Route
           path="/"
@@ -135,6 +147,23 @@ function App() {
               useAuthStore.getState().user?.role === 'ADMIN' || useAuthStore.getState().user?.role === 'MANAGER' ? (
                 <Layout>
                   <LazyPage><UsersPage /></LazyPage>
+                </Layout>
+              ) : (
+                <Navigate to="/dashboard" />
+              )
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/applications"
+          element={
+            isAuthenticated ? (
+              useAuthStore.getState().user?.role === 'ADMIN' || useAuthStore.getState().user?.role === 'MANAGER' ? (
+                <Layout>
+                  <LazyPage><CourseApplicationsPage /></LazyPage>
                 </Layout>
               ) : (
                 <Navigate to="/dashboard" />

@@ -30,6 +30,7 @@ import substitutionRoutes from './routes/substitution.routes';
 import settlementRoutes from './routes/settlement.routes';
 import payoutRoutes from './routes/payout.routes';
 import balanceRoutes from './routes/balance.routes';
+import courseApplicationRoutes from './routes/courseApplication.routes';
 
 // Import scheduler and jobs
 import scheduler from './utils/scheduler';
@@ -127,6 +128,7 @@ app.use('/api/substitutions', substitutionRoutes);
 app.use('/api/settlements', settlementRoutes);
 app.use('/api/payouts', payoutRoutes);
 app.use('/api/balance', balanceRoutes);
+app.use('/api/applications', courseApplicationRoutes);
 
 // ============================================
 // ERROR HANDLING
