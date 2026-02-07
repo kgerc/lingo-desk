@@ -6,6 +6,7 @@ interface DropdownItem {
   onClick: () => void;
   className?: string;
   variant?: 'default' | 'danger';
+  disabled?: boolean;
 }
 
 interface DropdownProps {
@@ -88,15 +89,19 @@ const Dropdown: React.FC<DropdownProps> = ({ isOpen, onClose, items, triggerRef 
         <button
           key={index}
           onClick={() => {
+            if (item.disabled) return;
             item.onClick();
             onClose();
           }}
+          disabled={item.disabled}
           className={
             item.className ||
             `w-full text-left px-4 py-2 text-sm transition-colors ${
-              item.variant === 'danger'
-                ? 'text-red-600 hover:bg-red-50'
-                : 'text-gray-700 hover:bg-gray-100'
+              item.disabled
+                ? 'text-gray-400 cursor-not-allowed'
+                : item.variant === 'danger'
+                  ? 'text-red-600 hover:bg-red-50'
+                  : 'text-gray-700 hover:bg-gray-100'
             } ${index === 0 ? 'rounded-t-lg' : ''} ${
               index === items.length - 1 ? 'rounded-b-lg' : ''
             }`

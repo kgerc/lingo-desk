@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import settlementService, { StudentWithBalance, SettlementPreview } from '../services/settlementService';
+import { courseService } from '../services/courseService';
 import { Search, Calculator, Calendar, TrendingUp, TrendingDown, Minus, ChevronRight, ArrowLeft, Save, Trash2, Eye, History } from 'lucide-react';
 import LoadingSpinner from './LoadingSpinner';
 import ConfirmDialog from './ConfirmDialog';
@@ -11,13 +12,16 @@ type ViewMode = 'list' | 'settlement' | 'history';
 interface SettlementsTabProps {
   preselectedStudentId?: string;
   onStudentSelected?: () => void;
+  preselectedCourseId?: string;
+  onCourseSelected?: () => void;
 }
 
-export default function SettlementsTab({ preselectedStudentId, onStudentSelected }: SettlementsTabProps) {
+export default function SettlementsTab({ preselectedStudentId, onStudentSelected, preselectedCourseId, onCourseSelected }: SettlementsTabProps) {
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedStudent, setSelectedStudent] = useState<StudentWithBalance | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(preselectedCourseId || '');
   const [periodStart, setPeriodStart] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -28,6 +32,13 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
   const { data: students = [], isLoading: isLoadingStudents } = useQuery({
     queryKey: ['settlements-students'],
     queryFn: () => settlementService.getStudentsWithBalance(),
+    enabled: viewMode === 'list',
+  });
+
+  // Fetch group courses for filter dropdown
+  const { data: groupCourses = [] } = useQuery({
+    queryKey: ['group-courses-for-settlement'],
+    queryFn: () => courseService.getCourses({ courseType: 'GROUP' }),
     enabled: viewMode === 'list',
   });
 
@@ -55,6 +66,13 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
       }
     }
   }, [preselectedStudentId, students, selectedStudent]);
+
+  // Notify parent that courseId has been consumed
+  useEffect(() => {
+    if (preselectedCourseId && selectedCourseId === preselectedCourseId) {
+      onCourseSelected?.();
+    }
+  }, [preselectedCourseId, selectedCourseId]);
 
   // Set default period dates when settlement info is loaded
   useEffect(() => {
@@ -170,11 +188,21 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
     }
   };
 
-  // Filter students
-  const filteredStudents = students.filter((student) =>
-    `${student.firstName} ${student.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Get enrolled student IDs from selected course for filtering
+  const enrolledStudentIds = useMemo(() => {
+    if (!selectedCourseId) return null;
+    const course = groupCourses.find((c) => c.id === selectedCourseId);
+    return course?.enrollments?.map((e) => e.studentId) || [];
+  }, [selectedCourseId, groupCourses]);
+
+  // Filter students by search and optional course filter
+  const filteredStudents = students.filter((student) => {
+    const matchesSearch =
+      `${student.firstName} ${student.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCourse = !enrolledStudentIds || enrolledStudentIds.includes(student.id);
+    return matchesSearch && matchesCourse;
+  });
 
   const formatCurrency = (amount: number, currency = 'PLN') => {
     return `${amount.toFixed(2)} ${currency}`;
@@ -202,17 +230,33 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
   if (viewMode === 'list') {
     return (
       <div>
-        {/* Search */}
+        {/* Search and Group Filter */}
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Szukaj ucznia..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
-            />
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Szukaj ucznia..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
+              />
+            </div>
+            <div className="w-full md:w-72">
+              <select
+                value={selectedCourseId}
+                onChange={(e) => setSelectedCourseId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
+              >
+                <option value="">Wszyscy uczniowie</option>
+                {groupCourses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.name} ({course.enrollments?.length || 0})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 

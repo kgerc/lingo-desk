@@ -112,7 +112,7 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({ onClose }) =>
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <Upload className="h-6 w-6 text-primary" />
-            <h2 className="text-2xl font-bold text-gray-900">Import Płatności z CSV</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Import wpłat z CSV</h2>
           </div>
           <button
             onClick={onClose}

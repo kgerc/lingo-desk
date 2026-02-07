@@ -17,11 +17,13 @@ export default function PaymentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Get initial values from URL params
-  const initialTab = (searchParams.get('tab') as TabType) || 'payments';
+  const initialTab = (searchParams.get('tab') as TabType) || 'settlements';
   const initialStudentId = searchParams.get('studentId') || undefined;
+  const initialCourseId = searchParams.get('courseId') || undefined;
 
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [preselectedStudentId, setPreselectedStudentId] = useState<string | undefined>(initialStudentId);
+  const [preselectedCourseId, setPreselectedCourseId] = useState<string | undefined>(initialCourseId);
 
   // Handle tab change and update URL
   const handleTabChange = (tab: TabType) => {
@@ -30,6 +32,7 @@ export default function PaymentsPage() {
       // Clear URL params when switching to payments tab
       setSearchParams({});
       setPreselectedStudentId(undefined);
+      setPreselectedCourseId(undefined);
     }
   };
 
@@ -172,8 +175,8 @@ export default function PaymentsPage() {
   };
 
   const tabs = [
-    { id: 'payments' as TabType, name: 'Płatności', icon: CreditCard },
     { id: 'settlements' as TabType, name: 'Rozliczenia', icon: Calculator },
+    { id: 'payments' as TabType, name: 'Wpłaty', icon: CreditCard },
   ];
 
   return (
@@ -181,8 +184,8 @@ export default function PaymentsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Płatności</h1>
-          <p className="text-gray-600 mt-1">Zarządzaj płatnościami i rozliczeniami uczniów</p>
+          <h1 className="text-3xl font-bold text-gray-900">Rozliczenia i wpłaty</h1>
+          <p className="text-gray-600 mt-1">Zarządzaj rozliczeniami i wpłatami uczniów</p>
         </div>
         {activeTab === 'payments' && (
           <div className="flex items-center gap-3">
@@ -198,7 +201,7 @@ export default function PaymentsPage() {
               className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors"
             >
               <Plus className="w-5 h-5" />
-              Dodaj płatność
+              Dodaj wpłatę
             </button>
           </div>
         )}
@@ -463,6 +466,8 @@ export default function PaymentsPage() {
         <SettlementsTab
           preselectedStudentId={preselectedStudentId}
           onStudentSelected={handleStudentSelected}
+          preselectedCourseId={preselectedCourseId}
+          onCourseSelected={() => setPreselectedCourseId(undefined)}
         />
       )}
 

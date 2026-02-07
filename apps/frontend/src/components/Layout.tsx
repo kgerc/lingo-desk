@@ -69,7 +69,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           // { name: 'Grupy', href: '/groups', icon: Users2 }, // Hidden temporarily
           { name: 'Materiały', href: '/materials', icon: FileText },
           { name: 'Lekcje', href: '/lessons', icon: Clock },
-          { name: 'Płatności', href: '/payments', icon: CreditCard },
+          { name: 'Rozliczenia', href: '/payments', icon: CreditCard },
           { name: 'Dłużnicy', href: '/debtors', icon: AlertCircle },
           { name: 'Mailing', href: '/mailing', icon: Mail },
           { name: 'Raporty', href: '/reports', icon: BarChart3 },
@@ -89,7 +89,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { name: 'Moje lekcje', href: '/lessons', icon: Clock },
           { name: 'Moje kursy', href: '/courses', icon: BookOpen },
           { name: 'Grafik', href: '/calendar', icon: Calendar },
-          { name: 'Płatności', href: '/payments', icon: CreditCard },
+          { name: 'Wpłaty', href: '/payments?tab=payments', icon: CreditCard },
         ];
 
       case 'PARENT':
@@ -97,7 +97,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           ...commonItems,
           { name: 'Dzieci', href: '/students', icon: Users },
           { name: 'Lekcje', href: '/lessons', icon: Clock },
-          { name: 'Płatności', href: '/payments', icon: CreditCard },
+          { name: 'Wpłaty', href: '/payments?tab=payments', icon: CreditCard },
         ];
 
       default:

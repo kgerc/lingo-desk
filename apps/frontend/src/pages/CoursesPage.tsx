@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { courseService, Course } from '../services/courseService';
 import { Plus, Search, Users, BookOpen, Calendar, MapPin, Wifi, Home, MoreVertical } from 'lucide-react';
+import { useAuthStore } from '../stores/authStore';
 import CourseModal from '../components/CourseModal';
 import EnrollStudentModal from '../components/EnrollStudentModal';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -13,6 +14,8 @@ import Dropdown from '../components/Dropdown';
 const CoursesPage: React.FC = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+  const canAccessSettlements = ['ADMIN', 'MANAGER'].includes(user?.role || '');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -62,6 +65,10 @@ const CoursesPage: React.FC = () => {
 
   const handleViewSchedule = (courseId: string) => {
     navigate(`/lessons?courseId=${courseId}&view=calendar`);
+  };
+
+  const handleGroupSettlement = (courseId: string) => {
+    navigate(`/payments?tab=settlements&courseId=${courseId}`);
   };
 
   const handleCloseModal = () => {
@@ -315,6 +322,13 @@ const CoursesPage: React.FC = () => {
                             label: 'Zarządzaj uczniami',
                             onClick: () => handleManageStudents(course),
                           },
+                          ...(course.courseType === 'GROUP' && canAccessSettlements
+                            ? [{
+                                label: 'Rozlicz grupę',
+                                onClick: () => handleGroupSettlement(course.id),
+                                disabled: (course.enrollments?.length || 0) === 0,
+                              }]
+                            : []),
                           {
                             label: 'Edytuj kurs',
                             onClick: () => handleEdit(course),
@@ -322,7 +336,7 @@ const CoursesPage: React.FC = () => {
                           {
                             label: 'Usuń kurs',
                             onClick: () => handleDelete(course.id),
-                            variant: 'danger',
+                            variant: 'danger' as const,
                           },
                         ]}
                       />
