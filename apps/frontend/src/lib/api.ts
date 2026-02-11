@@ -1,9 +1,13 @@
 import axios, { AxiosError } from 'axios';
+import { useAuthStore } from '../stores/authStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 // Request timeout in milliseconds
 const REQUEST_TIMEOUT = 30000; // 30 seconds
+
+// Flag to prevent multiple simultaneous 401 redirects
+let isRedirectingToLogin = false;
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -15,6 +19,14 @@ export const api = axios.create({
 
 // Request interceptor to add auth token
 api.interceptors.request.use((config) => {
+  // If we're already redirecting to login, cancel new requests
+  if (isRedirectingToLogin) {
+    const controller = new AbortController();
+    controller.abort();
+    config.signal = controller.signal;
+    return config;
+  }
+
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -45,16 +57,16 @@ api.interceptors.response.use(
 
     // Handle 401 - unauthorized
     if (error.response?.status === 401) {
-      // Only redirect to login if we're not already on the login page
-      // and this isn't a login request itself
       const isLoginRequest = error.config?.url?.includes('/auth/login');
       const isOnLoginPage = window.location.pathname === '/login';
 
-      if (!isLoginRequest && !isOnLoginPage) {
-        localStorage.removeItem('token');
-        // Use history API instead of hard redirect to preserve app state
+      if (!isLoginRequest && !isOnLoginPage && !isRedirectingToLogin) {
+        isRedirectingToLogin = true;
+        // Clear both token AND persisted auth state (zustand persist)
+        useAuthStore.getState().logout();
         window.location.href = '/login';
       }
+      return Promise.reject(error);
     }
 
     // Handle 429 - too many requests
