@@ -4,8 +4,10 @@ import toast from 'react-hot-toast';
 import { courseService, Course, CreateCourseWithScheduleData, ScheduleItem, SchedulePattern } from '../services/courseService';
 import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
-import { X, Info, Calendar, Users, Plus, Trash2, Clock, AlertCircle, Settings } from 'lucide-react';
+import organizationService from '../services/organizationService';
+import { X, Info, Calendar, Users, Plus, Trash2, Clock, AlertCircle, Settings, CalendarOff } from 'lucide-react';
 import { handleApiError } from '../lib/errorUtils';
+import { isPolishHoliday, getHolidayName } from '../utils/polish-holidays';
 
 interface CourseModalProps {
   course: Course | null;
@@ -156,19 +158,27 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
     queryFn: () => studentService.getStudents({ isActive: true }),
   });
 
+  // Fetch skipHolidays setting
+  const { data: holidaysSettings } = useQuery({
+    queryKey: ['skipHolidays'],
+    queryFn: () => organizationService.getSkipHolidays(),
+  });
+  const skipHolidays = holidaysSettings?.skipHolidays === true;
+
   // Generate preview of lessons from recurring pattern (using new daySchedules format)
-  const previewLessons = useMemo(() => {
+  const { previewLessons, skippedHolidaysPreview } = useMemo(() => {
     if (scheduleMode !== 'recurring' || !recurringPattern.startDate) {
-      return [];
+      return { previewLessons: [], skippedHolidaysPreview: [] as { date: Date; name: string }[] };
     }
 
     // Need at least one day selected with time
     const daySchedules = recurringPattern.daySchedules || [];
     if (daySchedules.length === 0) {
-      return [];
+      return { previewLessons: [], skippedHolidaysPreview: [] as { date: Date; name: string }[] };
     }
 
     const lessons: Date[] = [];
+    const skipped: { date: Date; name: string }[] = [];
     const startDate = new Date(recurringPattern.startDate);
     const maxOccurrences = recurringPattern.occurrencesCount || 52;
     const endDate = recurringPattern.endDate ? new Date(recurringPattern.endDate) : null;
@@ -180,10 +190,14 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
       currentDate.setHours(hours, minutes, 0, 0);
 
       while (lessons.length < maxOccurrences && (!endDate || currentDate <= endDate)) {
-        lessons.push(new Date(currentDate));
+        if (skipHolidays && isPolishHoliday(currentDate)) {
+          skipped.push({ date: new Date(currentDate), name: getHolidayName(currentDate)! });
+        } else {
+          lessons.push(new Date(currentDate));
+        }
         currentDate.setMonth(currentDate.getMonth() + 1);
       }
-      return lessons.slice(0, 20);
+      return { previewLessons: lessons.slice(0, 20), skippedHolidaysPreview: skipped };
     }
 
     const weekInterval = recurringPattern.frequency === 'BIWEEKLY' ? 2 : 1;
@@ -206,6 +220,11 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
         if (endDate && lessonDate > endDate) break;
         if (lessons.length >= maxOccurrences) break;
 
+        if (skipHolidays && isPolishHoliday(lessonDate)) {
+          skipped.push({ date: new Date(lessonDate), name: getHolidayName(lessonDate)! });
+          continue;
+        }
+
         lessons.push(new Date(lessonDate));
       }
 
@@ -213,8 +232,8 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
       weekCount++;
     }
 
-    return lessons.slice(0, 20);
-  }, [scheduleMode, recurringPattern]);
+    return { previewLessons: lessons.slice(0, 20), skippedHolidaysPreview: skipped };
+  }, [scheduleMode, recurringPattern, skipHolidays]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateCourseWithScheduleData) => courseService.createCourseWithSchedule(data),
@@ -223,6 +242,12 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
         toast.success(`Kurs został utworzony z ${result.lessonsCreated} lekcjami`);
       } else {
         toast.success('Kurs został pomyślnie utworzony');
+      }
+      if (result.skippedHolidays && result.skippedHolidays.length > 0) {
+        toast(`Pominięto ${result.skippedHolidays.length} świąt przy tworzeniu harmonogramu`, {
+          icon: '📅',
+          duration: 5000,
+        });
       }
       if (result.errors && result.errors.length > 0) {
         toast.error(`Niektóre lekcje nie zostały utworzone (${result.errors.length} błędów)`);
@@ -1127,6 +1152,25 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
                           ))}
                         </div>
                       </div>
+                      {skippedHolidaysPreview.length > 0 && (
+                        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <CalendarOff className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                            <div className="text-sm text-amber-700">
+                              <p className="font-medium mb-1">
+                                Pominięto {skippedHolidaysPreview.length} {skippedHolidaysPreview.length === 1 ? 'święto' : 'świąt'}:
+                              </p>
+                              <ul className="list-disc list-inside space-y-0.5">
+                                {skippedHolidaysPreview.map((h, i) => (
+                                  <li key={i}>
+                                    {h.date.toLocaleDateString('pl-PL', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })} - {h.name}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

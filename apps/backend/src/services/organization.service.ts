@@ -371,6 +371,68 @@ class OrganizationService {
   }
 
   /**
+   * Get skipHolidays setting for organization
+   */
+  async getSkipHolidays(organizationId: string): Promise<boolean> {
+    const settings = await prisma.organizationSettings.findUnique({
+      where: { organizationId },
+    });
+
+    if (!settings?.settings) {
+      return false;
+    }
+
+    const customSettings = settings.settings as Record<string, any>;
+    return customSettings.skipHolidays === true;
+  }
+
+  /**
+   * Update skipHolidays setting
+   */
+  async updateSkipHolidays(
+    organizationId: string,
+    skipHolidays: boolean,
+    userId: string
+  ) {
+    // Verify user has permission (ADMIN or MANAGER)
+    const userOrg = await prisma.userOrganization.findFirst({
+      where: {
+        userId,
+        organizationId,
+        role: {
+          in: ['ADMIN', 'MANAGER'],
+        },
+      },
+    });
+
+    if (!userOrg) {
+      throw new Error('You do not have permission to update organization settings');
+    }
+
+    // Get current settings
+    const currentSettings = await prisma.organizationSettings.findUnique({
+      where: { organizationId },
+    });
+
+    const existingSettings = (currentSettings?.settings as Record<string, any>) || {};
+    const mergedSettings = { ...existingSettings, skipHolidays } as Record<string, any>;
+
+    // Upsert with merged settings
+    const settings = await prisma.organizationSettings.upsert({
+      where: { organizationId },
+      create: {
+        organizationId,
+        settings: mergedSettings,
+      },
+      update: {
+        settings: mergedSettings,
+      },
+    });
+
+    return settings;
+  }
+
+  /**
    * Update visibility settings - ADMIN only
    */
   async updateVisibilitySettings(

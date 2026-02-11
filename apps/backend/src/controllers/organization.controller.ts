@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { organizationService, UpdateOrganizationData, CreateOrganizationData, UpdateOrganizationSettingsData, VisibilitySettings } from '../services/organization.service';
+import { getPolishHolidays, getHolidayName } from '../utils/polish-holidays';
 
 class OrganizationController {
   async getOrganization(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -181,6 +182,88 @@ class OrganizationController {
       res.json({
         success: true,
         data: settings,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+  async getSkipHolidays(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizationId = req.user!.organizationId;
+      const skipHolidays = await organizationService.getSkipHolidays(organizationId);
+
+      res.json({
+        success: true,
+        data: { skipHolidays },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateSkipHolidays(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizationId = req.user!.organizationId;
+      const { skipHolidays } = req.body;
+      const userId = req.user!.id;
+
+      if (typeof skipHolidays !== 'boolean') {
+        res.status(400).json({
+          success: false,
+          error: { message: 'Pole "skipHolidays" musi być typu boolean' },
+        });
+        return;
+      }
+
+      const settings = await organizationService.updateSkipHolidays(organizationId, skipHolidays, userId);
+
+      res.json({
+        success: true,
+        data: settings,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getHolidays(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const year = req.query.year ? parseInt(String(req.query.year), 10) : new Date().getFullYear();
+      const holidays = getPolishHolidays(year);
+
+      res.json({
+        success: true,
+        data: holidays.map(h => ({
+          date: h.date.toISOString(),
+          name: h.name,
+        })),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async checkHoliday(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { date } = req.query;
+
+      if (!date) {
+        res.status(400).json({
+          success: false,
+          error: { message: 'Parametr "date" jest wymagany' },
+        });
+        return;
+      }
+
+      const checkDate = new Date(String(date));
+      const holidayName = getHolidayName(checkDate);
+
+      res.json({
+        success: true,
+        data: {
+          isHoliday: holidayName !== null,
+          holidayName,
+        },
       });
     } catch (error) {
       next(error);

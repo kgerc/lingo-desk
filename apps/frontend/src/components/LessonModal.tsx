@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { lessonService, Lesson, CreateLessonData, LessonDeliveryMode } from '../services/lessonService';
@@ -6,10 +6,11 @@ import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
 import { courseService } from '../services/courseService';
 import substitutionService from '../services/substitutionService';
-import { X, Users as UsersIcon, Clock, ClipboardList, Info, XCircle, Loader2 } from 'lucide-react';
+import { X, Users as UsersIcon, Clock, ClipboardList, Info, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import AttendanceSection from './AttendanceSection';
 import { handleApiError } from '../lib/errorUtils';
 import CancelLessonDialog from './CancelLessonDialog';
+import { getHolidayName } from '../utils/polish-holidays';
 
 interface LessonModalProps {
   lesson: Lesson | null;
@@ -61,6 +62,13 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [priceWasManuallySet, setPriceWasManuallySet] = useState(!!lesson?.pricePerLesson);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+
+  // Holiday warning
+  const holidayWarning = useMemo(() => {
+    if (!formData.scheduledAt) return null;
+    const date = new Date(formData.scheduledAt);
+    return getHolidayName(date);
+  }, [formData.scheduledAt]);
 
   // Fetch existing substitution if editing
   const { data: existingSubstitution } = useQuery({
@@ -714,6 +722,15 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                       />
                       {errors.scheduledAt && (
                         <p className="mt-1 text-sm text-red-600">{errors.scheduledAt}</p>
+                      )}
+                      {holidayWarning && (
+                        <div className="mt-2 flex items-start gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-amber-700">
+                            Wybrany dzień jest świętem: <strong>{holidayWarning}</strong>.
+                            {' '}Jeśli pomijanie świąt jest włączone w ustawieniach szkoły, lekcja nie zostanie utworzona.
+                          </p>
+                        </div>
                       )}
                     </div>
 

@@ -236,6 +236,7 @@ export const courseService = {
       lessonsCreated: number;
       enrollmentsCreated: number;
       errors: Array<{ date: string; studentId: string; error: string }>;
+      skippedHolidays: Array<{ date: string; holidayName: string }>;
     };
   },
 

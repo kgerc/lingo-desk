@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import organizationService, { UpdateOrganizationData } from '../services/organizationService';
-import { Building2, Save } from 'lucide-react';
+import { Building2, Save, CalendarOff } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -36,6 +36,37 @@ const OrganizationSettingsPage: React.FC = () => {
       });
     }
   }, [organization]);
+
+  // Fetch skipHolidays setting
+  const { data: holidaysSettings } = useQuery({
+    queryKey: ['skipHolidays'],
+    queryFn: () => organizationService.getSkipHolidays(),
+  });
+
+  const [skipHolidays, setSkipHolidays] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    if (holidaysSettings) {
+      setSkipHolidays(holidaysSettings.skipHolidays);
+    }
+  }, [holidaysSettings]);
+
+  // Update skipHolidays mutation
+  const skipHolidaysMutation = useMutation({
+    mutationFn: (value: boolean) => organizationService.updateSkipHolidays(value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['skipHolidays'] });
+      toast.success('Ustawienia świąt zostały zaktualizowane');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Błąd podczas aktualizacji ustawień świąt');
+    },
+  });
+
+  const handleSkipHolidaysChange = (checked: boolean) => {
+    setSkipHolidays(checked);
+    skipHolidaysMutation.mutate(checked);
+  };
 
   // Update mutation
   const updateMutation = useMutation({
@@ -275,6 +306,36 @@ const OrganizationSettingsPage: React.FC = () => {
                   <option value="GB">Wielka Brytania</option>
                   <option value="US">Stany Zjednoczone</option>
                 </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Holiday Settings */}
+          <div className="border-t pt-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <CalendarOff className="h-5 w-5 text-primary" />
+              Święta i dni wolne
+            </h2>
+            <div className="flex items-start gap-4">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={skipHolidays}
+                  onChange={(e) => handleSkipHolidaysChange(e.target.checked)}
+                  className="sr-only peer"
+                  disabled={skipHolidaysMutation.isPending}
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+              </label>
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  Uwzględniaj polskie święta przy planowaniu lekcji
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Po włączeniu system automatycznie pominie dni ustawowo wolne od pracy
+                  przy tworzeniu harmonogramu kursu oraz zablokuje możliwość tworzenia
+                  pojedynczych lekcji w te dni.
+                </p>
               </div>
             </div>
           </div>

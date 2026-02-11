@@ -2,6 +2,7 @@ import { PrismaClient, NotificationType, LessonDeliveryMode, LessonStatus, Recur
 import emailService from './email.service';
 import googleCalendarService from './google-calendar.service';
 import balanceService from './balance.service';
+import { getHolidayName } from '../utils/polish-holidays';
 
 const prisma = new PrismaClient();
 
@@ -165,6 +166,19 @@ class LessonService {
 
     if (!student) {
       throw new Error('Student not found');
+    }
+
+    // Check if date falls on a Polish holiday (if skipHolidays is enabled)
+    const orgSettings = await prisma.organizationSettings.findUnique({
+      where: { organizationId },
+    });
+    const skipHolidays = (orgSettings?.settings as Record<string, any>)?.skipHolidays === true;
+
+    if (skipHolidays) {
+      const holidayName = getHolidayName(new Date(data.scheduledAt));
+      if (holidayName) {
+        throw new Error(`Nie można zaplanować lekcji na dzień ustawowo wolny: ${holidayName}. Zmień datę lub wyłącz pomijanie świąt w ustawieniach.`);
+      }
     }
 
     // Calculate teacher rate if not explicitly provided
@@ -1723,6 +1737,12 @@ class LessonService {
       occurrencesCount?: number;
     }
   ) {
+    // Check if organization has skipHolidays enabled
+    const orgSettings = await prisma.organizationSettings.findUnique({
+      where: { organizationId },
+    });
+    const skipHolidays = (orgSettings?.settings as Record<string, any>)?.skipHolidays === true;
+
     // For weekly/biweekly, if daysOfWeek is not provided, use the day of the start date
     const effectiveDaysOfWeek =
       pattern.daysOfWeek && pattern.daysOfWeek.length > 0
@@ -1748,6 +1768,20 @@ class LessonService {
         const dayOfWeek = currentDate.getDay();
         if (!effectiveDaysOfWeek.includes(dayOfWeek)) {
           // Move to next week
+          currentDate = this.getNextDate(currentDate, pattern.frequency, pattern.interval || 1);
+          continue;
+        }
+      }
+
+      // Skip Polish holidays if enabled
+      if (skipHolidays) {
+        const holidayName = getHolidayName(currentDate);
+        if (holidayName) {
+          errors.push({
+            date: currentDate.toISOString(),
+            error: `Pominięto święto: ${holidayName}`,
+          });
+          // Move to next occurrence
           currentDate = this.getNextDate(currentDate, pattern.frequency, pattern.interval || 1);
           continue;
         }

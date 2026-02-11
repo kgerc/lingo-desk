@@ -1,5 +1,6 @@
 import { PrismaClient, LessonStatus, LessonDeliveryMode, CourseFormat, LanguageLevel, CourseDeliveryMode } from '@prisma/client';
 import emailService from './email.service';
+import { isPolishHoliday, getHolidayName } from '../utils/polish-holidays';
 
 const prisma = new PrismaClient();
 
@@ -11,6 +12,7 @@ interface DaySchedule {
 
 // Helper to generate dates from pattern
 // Supports both old format (single time) and new format (daySchedules with per-day times)
+// When skipHolidays is true, dates that fall on Polish public holidays are excluded
 function generateDatesFromPattern(pattern: {
   frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
   startDate: Date;
@@ -19,7 +21,7 @@ function generateDatesFromPattern(pattern: {
   daysOfWeek?: number[]; // Legacy: single time for all days
   time?: string; // Legacy: single time for all days (HH:mm)
   daySchedules?: DaySchedule[]; // New: individual time per day
-}): Date[] {
+}, skipHolidays: boolean = false): Date[] {
   const dates: Date[] = [];
 
   // Build effective day schedules - support both old and new format
@@ -49,8 +51,10 @@ function generateDatesFromPattern(pattern: {
 
     let count = 0;
     while (count < maxOccurrences && (!pattern.endDate || currentDate <= pattern.endDate)) {
-      dates.push(new Date(currentDate));
-      count++;
+      if (!skipHolidays || !isPolishHoliday(currentDate)) {
+        dates.push(new Date(currentDate));
+        count++;
+      }
       currentDate.setMonth(currentDate.getMonth() + 1);
     }
     return dates;
@@ -82,6 +86,9 @@ function generateDatesFromPattern(pattern: {
 
       // Stop if we have enough occurrences
       if (dates.length >= maxOccurrences) break;
+
+      // Skip Polish holidays if enabled
+      if (skipHolidays && isPolishHoliday(lessonDate)) continue;
 
       dates.push(new Date(lessonDate));
     }
@@ -275,21 +282,38 @@ class CourseService {
       }
     }
 
+    // Check if organization has skipHolidays enabled
+    const orgSettings = await prisma.organizationSettings.findUnique({
+      where: { organizationId },
+    });
+    const skipHolidays = (orgSettings?.settings as Record<string, any>)?.skipHolidays === true;
+
     // Calculate lesson dates from schedule
     let lessonDates: { date: Date; durationMinutes: number; title?: string; deliveryMode: 'IN_PERSON' | 'ONLINE'; meetingUrl?: string }[] = [];
+    const skippedHolidays: { date: string; holidayName: string }[] = [];
 
     if (schedule?.items && schedule.items.length > 0) {
-      // Manual schedule items
-      lessonDates = schedule.items.map(item => ({
-        date: new Date(item.scheduledAt),
-        durationMinutes: item.durationMinutes,
-        title: item.title,
-        deliveryMode: item.deliveryMode,
-        meetingUrl: item.meetingUrl,
-      }));
+      // Manual schedule items - filter holidays if enabled
+      for (const item of schedule.items) {
+        const itemDate = new Date(item.scheduledAt);
+        if (skipHolidays) {
+          const holidayName = getHolidayName(itemDate);
+          if (holidayName) {
+            skippedHolidays.push({ date: itemDate.toISOString(), holidayName });
+            continue;
+          }
+        }
+        lessonDates.push({
+          date: itemDate,
+          durationMinutes: item.durationMinutes,
+          title: item.title,
+          deliveryMode: item.deliveryMode,
+          meetingUrl: item.meetingUrl,
+        });
+      }
     } else if (schedule?.pattern) {
-      // Recurring pattern
-      const dates = generateDatesFromPattern(schedule.pattern);
+      // Recurring pattern - holiday filtering handled inside generateDatesFromPattern
+      const dates = generateDatesFromPattern(schedule.pattern, skipHolidays);
       lessonDates = dates.map(date => ({
         date,
         durationMinutes: schedule.pattern!.durationMinutes,
@@ -412,6 +436,7 @@ class CourseService {
       lessonsCreated: result.lessons.length,
       enrollmentsCreated: result.enrollments.length,
       errors: result.errors,
+      skippedHolidays,
     };
   }
 

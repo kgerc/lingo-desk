@@ -135,6 +135,27 @@ const organizationService = {
     const response = await api.put('/organizations/visibility', data) as any;
     return response.data.data;
   },
+
+  async getSkipHolidays(): Promise<{ skipHolidays: boolean }> {
+    const response = await api.get('/organizations/holidays/settings') as any;
+    return response.data.data;
+  },
+
+  async updateSkipHolidays(skipHolidays: boolean): Promise<OrganizationSettings> {
+    const response = await api.put('/organizations/holidays/settings', { skipHolidays }) as any;
+    return response.data.data;
+  },
+
+  async getHolidays(year?: number): Promise<{ date: string; name: string }[]> {
+    const params = year ? `?year=${year}` : '';
+    const response = await api.get(`/organizations/holidays${params}`) as any;
+    return response.data.data;
+  },
+
+  async checkHoliday(date: string): Promise<{ isHoliday: boolean; holidayName: string | null }> {
+    const response = await api.get(`/organizations/holidays/check?date=${date}`) as any;
+    return response.data.data;
+  },
 };
 
 export default organizationService;

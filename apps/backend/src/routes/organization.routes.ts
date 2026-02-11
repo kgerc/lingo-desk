@@ -63,4 +63,30 @@ router.put(
   organizationController.updateVisibilitySettings.bind(organizationController)
 );
 
+// Get skipHolidays setting (ADMIN or MANAGER)
+router.get(
+  '/holidays/settings',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  organizationController.getSkipHolidays.bind(organizationController)
+);
+
+// Update skipHolidays setting (ADMIN or MANAGER)
+router.put(
+  '/holidays/settings',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  organizationController.updateSkipHolidays.bind(organizationController)
+);
+
+// Get Polish holidays for a given year
+router.get(
+  '/holidays',
+  organizationController.getHolidays.bind(organizationController)
+);
+
+// Check if a specific date is a holiday
+router.get(
+  '/holidays/check',
+  organizationController.checkHoliday.bind(organizationController)
+);
+
 export default router;
