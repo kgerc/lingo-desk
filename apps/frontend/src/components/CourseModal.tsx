@@ -9,6 +9,7 @@ import { handleApiError } from '../lib/errorUtils';
 
 interface CourseModalProps {
   course: Course | null;
+  isCopy?: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -80,8 +81,8 @@ const CURRENCIES = [
   { value: 'GBP', label: 'GBP' },
 ];
 
-const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess }) => {
-  const isEdit = !!course;
+const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSuccess }) => {
+  const isEdit = !!course && !isCopy;
 
   const [activeTab, setActiveTab] = useState<TabType>('basic');
   const [formData, setFormData] = useState({
@@ -473,7 +474,7 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, onClose, onSuccess })
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900">
-            {isEdit ? 'Edytuj kurs' : 'Dodaj nowy kurs'}
+            {isEdit ? 'Edytuj kurs' : isCopy ? 'Kopiuj kurs (nowy)' : 'Dodaj nowy kurs'}
           </h2>
           <button
             onClick={onClose}

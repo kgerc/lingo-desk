@@ -22,6 +22,7 @@ const CoursesPage: React.FC = () => {
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
   const [courseForEnrollment, setCourseForEnrollment] = useState<Course | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [isCopyMode, setIsCopyMode] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; courseId: string | null }>({ isOpen: false, courseId: null });
   const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
@@ -71,9 +72,16 @@ const CoursesPage: React.FC = () => {
     navigate(`/payments?tab=settlements&courseId=${courseId}`);
   };
 
+  const handleCopy = (course: Course) => {
+    setSelectedCourse(course);
+    setIsCopyMode(true);
+    setIsModalOpen(true);
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedCourse(null);
+    setIsCopyMode(false);
   };
 
   const handleCloseEnrollModal = () => {
@@ -330,6 +338,10 @@ const CoursesPage: React.FC = () => {
                               }]
                             : []),
                           {
+                            label: 'Kopiuj kurs',
+                            onClick: () => handleCopy(course),
+                          },
+                          {
                             label: 'Edytuj kurs',
                             onClick: () => handleEdit(course),
                           },
@@ -353,6 +365,7 @@ const CoursesPage: React.FC = () => {
       {isModalOpen && (
         <CourseModal
           course={selectedCourse}
+          isCopy={isCopyMode}
           onClose={handleCloseModal}
           onSuccess={handleSuccess}
         />
