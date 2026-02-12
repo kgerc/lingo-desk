@@ -1,10 +1,16 @@
 import api from '../lib/api';
 
+export type MailType = 'custom' | 'welcome' | 'reminder' | 'payment' | 'teacher-rating' | 'survey' | 'complaint';
+
 interface SendBulkEmailData {
   subject: string;
   message: string;
-  recipients: 'all' | 'selected' | 'debtors';
+  mailType: MailType;
+  recipients: 'all' | 'selected' | 'debtors' | 'course' | 'lesson';
   selectedStudentIds?: string[];
+  courseId?: string;
+  lessonId?: string;
+  scheduledAt?: string;
   attachments?: File[];
 }
 
@@ -15,6 +21,9 @@ interface SendBulkEmailResult {
   failedEmails: string[];
   attachmentsIncluded?: number;
   attachmentFailures?: number;
+  scheduled?: boolean;
+  scheduledAt?: string;
+  scheduledId?: string;
 }
 
 const mailingService = {
@@ -22,10 +31,23 @@ const mailingService = {
     const formData = new FormData();
     formData.append('subject', data.subject);
     formData.append('message', data.message);
+    formData.append('mailType', data.mailType);
     formData.append('recipients', data.recipients);
 
     if (data.selectedStudentIds && data.selectedStudentIds.length > 0) {
       formData.append('selectedStudentIds', JSON.stringify(data.selectedStudentIds));
+    }
+
+    if (data.courseId) {
+      formData.append('courseId', data.courseId);
+    }
+
+    if (data.lessonId) {
+      formData.append('lessonId', data.lessonId);
+    }
+
+    if (data.scheduledAt) {
+      formData.append('scheduledAt', data.scheduledAt);
     }
 
     if (data.attachments) {

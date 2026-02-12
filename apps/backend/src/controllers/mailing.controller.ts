@@ -29,11 +29,15 @@ const ALLOWED_MIME_TYPES = [
 const sendBulkEmailSchema = z.object({
   subject: z.string().min(1, 'Pole "Temat" jest wymagane'),
   message: z.string().min(1, 'Pole "Wiadomość" jest wymagane'),
-  recipients: z.enum(['all', 'selected', 'debtors'], {
+  mailType: z.enum(['custom', 'welcome', 'reminder', 'payment', 'teacher-rating', 'survey', 'complaint']).default('custom'),
+  recipients: z.enum(['all', 'selected', 'debtors', 'course', 'lesson'], {
     required_error: 'Pole "Odbiorcy" jest wymagane',
-    invalid_type_error: 'Pole "Odbiorcy" musi być jedną z wartości: wszyscy, wybrani, dłużnicy',
+    invalid_type_error: 'Pole "Odbiorcy" musi być jedną z wartości: wszyscy, wybrani, dłużnicy, kurs, lekcja',
   }),
   selectedStudentIds: z.array(z.string()).optional(),
+  courseId: z.string().optional(),
+  lessonId: z.string().optional(),
+  scheduledAt: z.string().optional(),
 });
 
 // Request type with multer files
@@ -99,10 +103,14 @@ export const sendBulkEmail = async (req: MulterRequest, res: Response) => {
     const result = await mailingService.sendBulkEmail({
       subject: validatedData.subject,
       message: validatedData.message,
+      mailType: validatedData.mailType,
       recipients: validatedData.recipients,
       selectedStudentIds: validatedData.selectedStudentIds,
+      courseId: validatedData.courseId,
+      lessonId: validatedData.lessonId,
       organizationId,
       attachments: attachments.length > 0 ? attachments : undefined,
+      scheduledAt: validatedData.scheduledAt ? new Date(validatedData.scheduledAt) : undefined,
     });
 
     return res.status(200).json(result);
