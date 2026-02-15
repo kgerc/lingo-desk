@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -9,10 +9,6 @@ import {
   Mail,
   Phone,
   Shield,
-  UserX,
-  UserCheck,
-  KeyRound,
-  Edit,
   X,
 } from 'lucide-react';
 import userService, {
@@ -26,6 +22,7 @@ import userService, {
 } from '../services/userService';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Dropdown from '../components/Dropdown';
 import { useAuthStore } from '../stores/authStore';
 
 // Invite User Modal
@@ -335,92 +332,6 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onClose, on
   );
 };
 
-// User Row Actions Menu
-interface UserActionsMenuProps {
-  user: User;
-  onEdit: () => void;
-  onDeactivate: () => void;
-  onReactivate: () => void;
-  onResetPassword: () => void;
-  currentUserId: string;
-}
-
-const UserActionsMenu: React.FC<UserActionsMenuProps> = ({
-  user,
-  onEdit,
-  onDeactivate,
-  onReactivate,
-  onResetPassword,
-  currentUserId,
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const isCurrentUser = user.id === currentUserId;
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-      >
-        <MoreVertical className="h-5 w-5" />
-      </button>
-
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-            <button
-              onClick={() => {
-                onEdit();
-                setIsOpen(false);
-              }}
-              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-            >
-              <Edit className="h-4 w-4" />
-              Edytuj
-            </button>
-            <button
-              onClick={() => {
-                onResetPassword();
-                setIsOpen(false);
-              }}
-              disabled={isCurrentUser}
-              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <KeyRound className="h-4 w-4" />
-              Resetuj hasło
-            </button>
-            {user.isActive ? (
-              <button
-                onClick={() => {
-                  onDeactivate();
-                  setIsOpen(false);
-                }}
-                disabled={isCurrentUser}
-                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <UserX className="h-4 w-4" />
-                Dezaktywuj
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  onReactivate();
-                  setIsOpen(false);
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2"
-              >
-                <UserCheck className="h-4 w-4" />
-                Aktywuj
-              </button>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
-
 // Main UsersPage Component
 const UsersPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -430,6 +341,8 @@ const UsersPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -753,13 +666,42 @@ const UsersPage: React.FC = () => {
                       {formatDate(user.lastLoginAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <UserActionsMenu
-                        user={user}
-                        currentUserId={currentUser?.id || ''}
-                        onEdit={() => setEditingUser(user)}
-                        onDeactivate={() => handleDeactivate(user)}
-                        onReactivate={() => handleReactivate(user)}
-                        onResetPassword={() => handleResetPassword(user)}
+                      <button
+                        ref={(el) => {
+                          if (el) dropdownTriggerRefs.current.set(user.id, el);
+                        }}
+                        onClick={() => setOpenDropdownId(openDropdownId === user.id ? null : user.id)}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <MoreVertical className="h-5 w-5" />
+                      </button>
+                      <Dropdown
+                        isOpen={openDropdownId === user.id}
+                        onClose={() => setOpenDropdownId(null)}
+                        triggerRef={{ current: dropdownTriggerRefs.current.get(user.id) || null }}
+                        items={[
+                          {
+                            label: 'Edytuj',
+                            onClick: () => setEditingUser(user),
+                          },
+                          {
+                            label: 'Resetuj hasło',
+                            onClick: () => handleResetPassword(user),
+                            disabled: user.id === currentUser?.id,
+                          },
+                          ...(user.isActive
+                            ? [{
+                                label: 'Dezaktywuj',
+                                onClick: () => handleDeactivate(user),
+                                variant: 'danger' as const,
+                                disabled: user.id === currentUser?.id,
+                              }]
+                            : [{
+                                label: 'Aktywuj',
+                                onClick: () => handleReactivate(user),
+                              }]
+                          ),
+                        ]}
                       />
                     </td>
                   </tr>

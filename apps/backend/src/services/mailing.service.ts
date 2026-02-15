@@ -128,9 +128,7 @@ class MailingService {
         ${badgeHtml}
         <h2 style="color: ${config.color};">${subject}</h2>
         ${contextHtml}
-        <div style="white-space: pre-wrap; line-height: 1.6;">
-          ${message}
-        </div>
+        <div style="white-space: pre-wrap; line-height: 1.6;">${message.trim()}</div>
         ${attachmentsInfoHtml || ''}
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;" />
         <p style="color: #6b7280; font-size: 14px;">

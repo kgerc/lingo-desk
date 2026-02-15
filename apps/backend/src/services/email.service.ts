@@ -175,8 +175,8 @@ class EmailService {
     const teacherHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #2d4a65;">Przypomnienie o zajęciach</h2>
-        <p>Dzień dobry ${teacherName},</p>
-        <p>Przypominamy o jutrzejszych zajęciach:</p>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${teacherName},</p>
+        <p style="margin: 0 0 16px 0;">Przypominamy o jutrzejszych zajęciach:</p>
         <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>Uczeń:</strong> ${studentName}</p>
           <p style="margin: 5px 0;"><strong>Temat:</strong> ${lessonTitle}</p>
@@ -185,7 +185,7 @@ class EmailService {
           <p style="margin: 5px 0;"><strong>Tryb:</strong> ${deliveryMode === 'ONLINE' ? 'Online' : 'Stacjonarnie'}</p>
           ${meetingUrl ? `<p style="margin: 5px 0;"><strong>Link:</strong> <a href="${meetingUrl}">${meetingUrl}</a></p>` : ''}
         </div>
-        <p>Miłego dnia!</p>
+        <p style="margin: 0 0 16px 0;">Miłego dnia!</p>
         <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
       </div>
     `;
@@ -194,8 +194,8 @@ class EmailService {
     const studentHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #2d4a65;">Przypomnienie o zajęciach</h2>
-        <p>Dzień dobry ${studentName},</p>
-        <p>Przypominamy o jutrzejszych zajęciach:</p>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${studentName},</p>
+        <p style="margin: 0 0 16px 0;">Przypominamy o jutrzejszych zajęciach:</p>
         <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>Lektor:</strong> ${teacherName}</p>
           <p style="margin: 5px 0;"><strong>Temat:</strong> ${lessonTitle}</p>
@@ -204,7 +204,7 @@ class EmailService {
           <p style="margin: 5px 0;"><strong>Tryb:</strong> ${deliveryMode === 'ONLINE' ? 'Online' : 'Stacjonarnie'}</p>
           ${meetingUrl ? `<p style="margin: 5px 0;"><strong>Link:</strong> <a href="${meetingUrl}">${meetingUrl}</a></p>` : ''}
         </div>
-        <p>Do zobaczenia!</p>
+        <p style="margin: 0 0 16px 0;">Do zobaczenia!</p>
         <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
       </div>
     `;
@@ -243,13 +243,13 @@ class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #dc2626;">⚠️ Alert: Niski stan konta</h2>
-        <p>Dzień dobry ${studentName},</p>
-        <p>Informujemy, że Twoje konto godzinowe jest na wyczerpaniu:</p>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${studentName},</p>
+        <p style="margin: 0 0 16px 0;">Informujemy, że Twoje konto godzinowe jest na wyczerpaniu:</p>
         <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 20px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>Kurs:</strong> ${courseName}</p>
           <p style="margin: 5px 0;"><strong>Pozostało godzin:</strong> <span style="color: #dc2626; font-size: 24px; font-weight: bold;">${hoursRemaining.toFixed(1)}h</span></p>
         </div>
-        <p>Prosimy o kontakt w celu doładowania konta, aby uniknąć przerwy w nauce.</p>
+        <p style="margin: 0 0 16px 0;">Prosimy o kontakt w celu doładowania konta, aby uniknąć przerwy w nauce.</p>
         <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
       </div>
     `;
@@ -267,14 +267,14 @@ class EmailService {
       const managerHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #dc2626;">⚠️ Alert: Uczeń z niskim budżetem</h2>
-          <p>Informacja o niskim stanie konta ucznia:</p>
+          <p style="margin: 0 0 16px 0;">Informacja o niskim stanie konta ucznia:</p>
           <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 20px; margin: 20px 0;">
             <p style="margin: 5px 0;"><strong>Uczeń:</strong> ${studentName}</p>
             <p style="margin: 5px 0;"><strong>Email:</strong> ${studentEmail}</p>
             <p style="margin: 5px 0;"><strong>Kurs:</strong> ${courseName}</p>
             <p style="margin: 5px 0;"><strong>Pozostało godzin:</strong> <span style="color: #dc2626; font-size: 24px; font-weight: bold;">${hoursRemaining.toFixed(1)}h</span></p>
           </div>
-          <p>Prosimy o kontakt z uczniem w celu doładowania konta.</p>
+          <p style="margin: 0 0 16px 0;">Prosimy o kontakt z uczniem w celu doładowania konta.</p>
           <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
         </div>
       `;
@@ -317,15 +317,15 @@ class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #10b981;">✓ Zajęcia potwierdzone</h2>
-        <p>Dzień dobry ${studentName},</p>
-        <p>Lektor potwierdził Twoje zajęcia:</p>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${studentName},</p>
+        <p style="margin: 0 0 16px 0;">Lektor potwierdził Twoje zajęcia:</p>
         <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>Lektor:</strong> ${teacherName}</p>
           <p style="margin: 5px 0;"><strong>Temat:</strong> ${lessonTitle}</p>
           <p style="margin: 5px 0;"><strong>Data:</strong> ${formattedDate}</p>
           <p style="margin: 5px 0;"><strong>Czas trwania:</strong> ${lessonDuration} minut</p>
         </div>
-        <p>Do zobaczenia na zajęciach!</p>
+        <p style="margin: 0 0 16px 0;">Do zobaczenia na zajęciach!</p>
         <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
       </div>
     `;
@@ -363,15 +363,15 @@ class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #dc2626;">❌ Zajęcia odwołane</h2>
-        <p>Dzień dobry ${recipientName},</p>
-        <p>Informujemy, że następujące zajęcia zostały odwołane:</p>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${recipientName},</p>
+        <p style="margin: 0 0 16px 0;">Informujemy, że następujące zajęcia zostały odwołane:</p>
         <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 20px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>${otherPersonRole === 'lektor' ? 'Lektor' : 'Uczeń'}:</strong> ${otherPersonName}</p>
           <p style="margin: 5px 0;"><strong>Temat:</strong> ${lessonTitle}</p>
           <p style="margin: 5px 0;"><strong>Data:</strong> ${formattedDate}</p>
           ${cancellationReason ? `<p style="margin: 5px 0;"><strong>Powód:</strong> ${cancellationReason}</p>` : ''}
         </div>
-        <p>Prosimy o kontakt w celu ustalenia nowego terminu.</p>
+        <p style="margin: 0 0 16px 0;">Prosimy o kontakt w celu ustalenia nowego terminu.</p>
         <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
       </div>
     `;
@@ -404,14 +404,14 @@ class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #3b82f6;">🎓 Witamy na kursie!</h2>
-        <p>Dzień dobry ${studentName},</p>
-        <p>Gratulujemy! Zostałeś/aś pomyślnie zapisany/a na kurs:</p>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${studentName},</p>
+        <p style="margin: 0 0 16px 0;">Gratulujemy! Zostałeś/aś pomyślnie zapisany/a na kurs:</p>
         <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>Nazwa kursu:</strong> ${courseName}</p>
           <p style="margin: 5px 0;"><strong>Typ:</strong> ${courseType}</p>
           <p style="margin: 5px 0;"><strong>Data rozpoczęcia:</strong> ${formattedDate}</p>
         </div>
-        <p>Życzymy powodzenia w nauce!</p>
+        <p style="margin: 0 0 16px 0;">Życzymy powodzenia w nauce!</p>
         <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
       </div>
     `;
@@ -440,15 +440,15 @@ class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #10b981;">✓ Płatność potwierdzona</h2>
-        <p>Dzień dobry ${studentName},</p>
-        <p>Otrzymaliśmy Twoją płatność:</p>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${studentName},</p>
+        <p style="margin: 0 0 16px 0;">Otrzymaliśmy Twoją płatność:</p>
         <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>Kwota:</strong> <span style="font-size: 24px; color: #10b981;">${amount.toFixed(2)} ${currency}</span></p>
           <p style="margin: 5px 0;"><strong>Metoda płatności:</strong> ${paymentMethod}</p>
           ${courseName ? `<p style="margin: 5px 0;"><strong>Kurs:</strong> ${courseName}</p>` : ''}
         </div>
-        ${invoiceUrl ? `<p><a href="${invoiceUrl}" style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">Pobierz fakturę</a></p>` : ''}
-        <p>Dziękujemy!</p>
+        ${invoiceUrl ? `<p style="margin: 0 0 16px 0;"><a href="${invoiceUrl}" style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">Pobierz fakturę</a></p>` : ''}
+        <p style="margin: 0 0 16px 0;">Dziękujemy!</p>
         <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
       </div>
     `;
@@ -507,8 +507,8 @@ class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #f59e0b;">🔄 Zmiana terminu zajęć</h2>
-        <p>Dzień dobry ${recipientName},</p>
-        <p>Informujemy o zmianie terminu zajęć przez ${rescheduledBy}:</p>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${recipientName},</p>
+        <p style="margin: 0 0 16px 0;">Informujemy o zmianie terminu zajęć przez ${rescheduledBy}:</p>
 
         <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>${otherPersonRole === 'lektor' ? 'Lektor' : 'Uczeń'}:</strong> ${otherPersonName}</p>
@@ -530,7 +530,7 @@ class EmailService {
           </div>
         </div>
 
-        <p>Prosimy o potwierdzenie lub kontakt w razie pytań.</p>
+        <p style="margin: 0 0 16px 0;">Prosimy o potwierdzenie lub kontakt w razie pytań.</p>
         <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">LingoDesk - System zarządzania szkołą językową</p>
       </div>
     `;
@@ -612,8 +612,8 @@ class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: ${headerColor};">${headerEmoji} ${headerText}</h2>
-        <p>Dzień dobry ${studentName},</p>
-        <p>${urgencyMessage || 'Przypominamy o oczekującej płatności:'}</p>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${studentName},</p>
+        <p style="margin: 0 0 16px 0;">${urgencyMessage || 'Przypominamy o oczekującej płatności:'}</p>
         <div style="background-color: ${isOverdue ? '#fef2f2' : '#fffbeb'}; border-left: 4px solid ${headerColor}; padding: 20px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>Kwota do zapłaty:</strong> <span style="font-size: 24px; color: ${headerColor};">${amount.toFixed(2)} ${currency}</span></p>
           <p style="margin: 5px 0;"><strong>Termin płatności:</strong> ${formattedDueDate}</p>
@@ -625,8 +625,8 @@ class EmailService {
           <p style="margin: 10px 0 0 0; white-space: pre-line; color: #4b5563;">${bankAccountInfo}</p>
         </div>
         ` : ''}
-        <p>Prosimy o terminowe uregulowanie należności.</p>
-        ${organizationEmail ? `<p>W razie pytań prosimy o kontakt: <a href="mailto:${organizationEmail}">${organizationEmail}</a></p>` : ''}
+        <p style="margin: 0 0 16px 0;">Prosimy o terminowe uregulowanie należności.</p>
+        ${organizationEmail ? `<p style="margin: 0 0 16px 0;">W razie pytań prosimy o kontakt: <a href="mailto:${organizationEmail}">${organizationEmail}</a></p>` : ''}
         <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">${organizationName} - LingoDesk</p>
       </div>
     `;
@@ -667,14 +667,14 @@ class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #3b82f6;">👋 Witamy w LingoDesk!</h2>
-        <p>Dzień dobry ${userName},</p>
-        <p>Twoje konto zostało utworzone pomyślnie!</p>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${userName},</p>
+        <p style="margin: 0 0 16px 0;">Twoje konto zostało utworzone pomyślnie!</p>
         <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>Organizacja:</strong> ${organizationName}</p>
           <p style="margin: 5px 0;"><strong>Rola:</strong> ${roleNames[role] || role}</p>
           <p style="margin: 5px 0;"><strong>Email:</strong> ${userEmail}</p>
         </div>
-        <p>
+        <p style="margin: 0 0 16px 0;">
           <a href="${loginUrl}" style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
             Zaloguj się
           </a>
@@ -718,8 +718,8 @@ class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #3b82f6;">🎉 Zaproszenie do LingoDesk</h2>
-        <p>Dzień dobry ${firstName},</p>
-        <p>Zostałeś/aś zaproszony/a do organizacji <strong>${organizationName}</strong> w systemie LingoDesk.</p>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${firstName},</p>
+        <p style="margin: 0 0 16px 0;">Zostałeś/aś zaproszony/a do organizacji <strong>${organizationName}</strong> w systemie LingoDesk.</p>
 
         <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>Rola:</strong> ${roleNames[role] || role}</p>
@@ -730,7 +730,7 @@ class EmailService {
 
         <p style="color: #dc2626; font-weight: bold;">⚠️ Ze względów bezpieczeństwa zmień hasło po pierwszym logowaniu!</p>
 
-        <p>
+        <p style="margin: 0 0 16px 0;">
           <a href="${loginUrl}/login" style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
             Zaloguj się
           </a>
@@ -764,8 +764,8 @@ class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #f59e0b;">🔐 Reset hasła</h2>
-        <p>Dzień dobry ${firstName},</p>
-        <p>Twoje hasło zostało zresetowane przez administratora.</p>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${firstName},</p>
+        <p style="margin: 0 0 16px 0;">Twoje hasło zostało zresetowane przez administratora.</p>
 
         <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>Nowe tymczasowe hasło:</strong></p>
@@ -774,7 +774,7 @@ class EmailService {
 
         <p style="color: #dc2626; font-weight: bold;">⚠️ Ze względów bezpieczeństwa zmień hasło po zalogowaniu!</p>
 
-        <p>
+        <p style="margin: 0 0 16px 0;">
           <a href="${loginUrl}/login" style="display: inline-block; background-color: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
             Zaloguj się
           </a>

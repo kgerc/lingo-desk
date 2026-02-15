@@ -18,35 +18,42 @@ interface DropdownProps {
 
 const Dropdown: React.FC<DropdownProps> = ({ isOpen, onClose, items, triggerRef }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
-    if (!isOpen || !triggerRef.current) return;
+    if (!isOpen || !triggerRef.current) {
+      setPosition(null);
+      return;
+    }
 
     const updatePosition = () => {
       if (!triggerRef.current) return;
 
       const triggerRect = triggerRef.current.getBoundingClientRect();
-      const dropdownHeight = 200; // Approximate max height
+      const dropdownEl = dropdownRef.current;
+      const dropdownHeight = dropdownEl ? dropdownEl.offsetHeight : 150;
       const dropdownWidth = 192; // 12rem = 192px
 
-      let top = triggerRect.bottom + window.scrollY + 8; // 8px gap
-      let left = triggerRect.right + window.scrollX - dropdownWidth;
+      // Use viewport-relative coordinates since we use position: fixed
+      let top = triggerRect.bottom + 4;
+      let left = triggerRect.right - dropdownWidth;
 
       // Check if dropdown would go off bottom of screen
       if (triggerRect.bottom + dropdownHeight > window.innerHeight) {
-        top = triggerRect.top + window.scrollY - dropdownHeight - 8;
+        top = triggerRect.top - dropdownHeight - 4;
       }
 
       // Check if dropdown would go off left of screen
       if (left < 0) {
-        left = triggerRect.left + window.scrollX;
+        left = triggerRect.left;
       }
 
       setPosition({ top, left });
     };
 
     updatePosition();
+    // Recalculate after first render to get actual dropdown height
+    requestAnimationFrame(updatePosition);
     window.addEventListener('scroll', updatePosition, true);
     window.addEventListener('resize', updatePosition);
 
@@ -79,10 +86,10 @@ const Dropdown: React.FC<DropdownProps> = ({ isOpen, onClose, items, triggerRef 
   return createPortal(
     <div
       ref={dropdownRef}
-      className="fixed w-48 bg-white rounded-lg shadow-lg border border-gray-200"
+      className="fixed w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50"
       style={{
-        top: `${position.top}px`,
-        left: `${position.left}px`,
+        top: position ? `${position.top}px` : '-9999px',
+        left: position ? `${position.left}px` : '-9999px',
       }}
     >
       {items.map((item, index) => (
