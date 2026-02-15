@@ -17,11 +17,17 @@ export const previewPayout = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'periodStart and periodEnd are required' });
     }
 
+    const startDate = new Date(periodStart as string);
+    startDate.setUTCHours(0, 0, 0, 0);
+
+    const endDate = new Date(periodEnd as string);
+    endDate.setUTCHours(23, 59, 59, 999);
+
     const preview = await payoutService.previewPayout(
       teacherId,
       organizationId,
-      new Date(periodStart as string),
-      new Date(periodEnd as string)
+      startDate,
+      endDate
     );
 
     return res.json(preview);
@@ -44,11 +50,17 @@ export const createPayout = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'teacherId, periodStart and periodEnd are required' });
     }
 
+    const startDate = new Date(periodStart);
+    startDate.setUTCHours(0, 0, 0, 0);
+
+    const endDate = new Date(periodEnd);
+    endDate.setUTCHours(23, 59, 59, 999);
+
     const result = await payoutService.createPayout({
       organizationId,
       teacherId,
-      periodStart: new Date(periodStart),
-      periodEnd: new Date(periodEnd),
+      periodStart: startDate,
+      periodEnd: endDate,
       notes,
     });
 
@@ -79,11 +91,15 @@ export const getPayouts = async (req: AuthRequest, res: Response) => {
     }
 
     if (periodStart) {
-      filters.periodStart = new Date(periodStart as string);
+      const ps = new Date(periodStart as string);
+      ps.setUTCHours(0, 0, 0, 0);
+      filters.periodStart = ps;
     }
 
     if (periodEnd) {
-      filters.periodEnd = new Date(periodEnd as string);
+      const pe = new Date(periodEnd as string);
+      pe.setUTCHours(23, 59, 59, 999);
+      filters.periodEnd = pe;
     }
 
     const payouts = await payoutService.getPayouts(organizationId, filters);
@@ -208,10 +224,13 @@ export const getLessonsForDay = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'date is required' });
     }
 
+    const dateObj = new Date(date as string);
+    dateObj.setUTCHours(0, 0, 0, 0);
+
     const lessons = await payoutService.getLessonsForDay(
       teacherId,
       organizationId,
-      new Date(date as string)
+      dateObj
     );
 
     return res.json(lessons);
@@ -239,11 +258,17 @@ export const getLessonsForRange = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'fromDate and toDate are required' });
     }
 
+    const from = new Date(fromDate as string);
+    from.setUTCHours(0, 0, 0, 0);
+
+    const to = new Date(toDate as string);
+    to.setUTCHours(23, 59, 59, 999);
+
     const lessons = await payoutService.getLessonsForRange(
       teacherId,
       organizationId,
-      new Date(fromDate as string),
-      new Date(toDate as string)
+      from,
+      to
     );
 
     return res.json(lessons);

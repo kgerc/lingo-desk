@@ -51,8 +51,7 @@ export default function TeacherPayoutsTab() {
   const [expandedLessonsStudents, setExpandedLessonsStudents] = useState<Set<string>>(new Set());
   type CalendarFilter =
     | { type: 'ALL' }
-    | { type: 'DAY'; date: string }
-    | { type: 'RANGE'; from: string; to: string };
+    | { type: 'DAY'; date: string };
 
   const [calendarFilter, setCalendarFilter] =
     useState<CalendarFilter>({ type: 'ALL' });
@@ -91,9 +90,11 @@ export default function TeacherPayoutsTab() {
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       setPeriodStart(formatDate(firstDay));
       setPeriodEnd(formatDate(lastDay));
+      setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1));
     }
   }, [viewMode]);
 
+  // Reset calendar day filter when period range changes
   useEffect(() => {
     setCalendarFilter({ type: 'ALL' });
   }, [periodStart, periodEnd]);
@@ -162,11 +163,8 @@ export default function TeacherPayoutsTab() {
     setViewMode('payout');
     setPreview(null);
     setNotes('');
-    setCalendarFilter({
-      type: 'DAY',
-      date: new Date().toISOString().slice(0, 10),
-    })
-    setCurrentMonth(new Date());
+    setCalendarFilter({ type: 'ALL' });
+    setRangeDraft(null);
   };
 
   const handleBackToList = () => {
@@ -231,13 +229,6 @@ export default function TeacherPayoutsTab() {
       return lessons.filter(
         l => l.scheduledAt.slice(0, 10) === calendarFilter.date
       );
-    }
-
-    if (calendarFilter.type === 'RANGE') {
-      return lessons.filter(l => {
-        const date = l.scheduledAt.slice(0, 10);
-        return date >= calendarFilter.from && date <= calendarFilter.to;
-      });
     }
 
     return lessons;
@@ -399,25 +390,20 @@ export default function TeacherPayoutsTab() {
     );
   };
 
-  const isSelected = (date: Date) => {
-    if (calendarFilter.type !== 'DAY') return false;
-    return formatDate(date) === calendarFilter.date;
-  };
-
   const isInRange = (date: Date) => {
-  if (calendarFilter.type !== 'RANGE') return false;
-  const d = formatDate(date);
-  return d >= calendarFilter.from && d <= calendarFilter.to;
+    if (!periodStart || !periodEnd) return false;
+    const d = formatDate(date);
+    return d >= periodStart && d <= periodEnd;
   };
 
   const isRangeStart = (date: Date) => {
-    if (calendarFilter.type !== 'RANGE') return false;
-    return formatDate(date) === calendarFilter.from;
+    if (!periodStart) return false;
+    return formatDate(date) === periodStart;
   };
 
   const isRangeEnd = (date: Date) => {
-    if (calendarFilter.type !== 'RANGE') return false;
-    return formatDate(date) === calendarFilter.to;
+    if (!periodEnd) return false;
+    return formatDate(date) === periodEnd;
   };
 
   const isDraftStart = (date: Date) => {
@@ -753,27 +739,25 @@ export default function TeacherPayoutsTab() {
                     const d = formatDate(date);
 
                     if (!rangeDraft) {
+                      // First click - start range draft
                       setRangeDraft(d);
-                      setCalendarFilter({ type: 'ALL' });
                     } else {
-                      setCalendarFilter({
-                        type: 'RANGE',
-                        from: rangeDraft < d ? rangeDraft : d,
-                        to: rangeDraft < d ? d : rangeDraft,
-                      });
+                      // Second click - finalize range and update period
+                      const from = rangeDraft < d ? rangeDraft : d;
+                      const to = rangeDraft < d ? d : rangeDraft;
+                      setPeriodStart(from);
+                      setPeriodEnd(to);
                       setRangeDraft(null);
                     }
                   }}
                   className={`py-1.5 rounded text-sm transition-colors relative
                     ${!isCurrentMonth(date) ? 'text-gray-300' : ''}
                     ${isDraftStart(date) ? 'bg-primary/30 text-primary font-semibold' : ''}
-                    ${isRangeStart(date) ? 'bg-primary text-white rounded-l-full' : ''}
-                    ${isRangeEnd(date) ? 'bg-primary text-white rounded-r-full' : ''}
+                    ${isRangeStart(date) && isRangeEnd(date) ? 'bg-primary text-white rounded-full' : ''}
+                    ${isRangeStart(date) && !isRangeEnd(date) ? 'bg-primary text-white rounded-l-full' : ''}
+                    ${isRangeEnd(date) && !isRangeStart(date) ? 'bg-primary text-white rounded-r-full' : ''}
                     ${isInRange(date) && !isRangeStart(date) && !isRangeEnd(date)
                       ? 'bg-primary/20 text-primary'
-                      : ''}
-                    ${calendarFilter.type === 'DAY' && isSelected(date)
-                      ? 'bg-primary text-white'
                       : ''}
                     ${isToday(date) ? 'ring-1 ring-blue-400' : ''}
                     hover:bg-gray-100
@@ -798,7 +782,13 @@ export default function TeacherPayoutsTab() {
                   <input
                     type="date"
                     value={periodStart}
-                    onChange={(e) => setPeriodStart(e.target.value)}
+                    onChange={(e) => {
+                      setPeriodStart(e.target.value);
+                      if (e.target.value) {
+                        const [y, m] = e.target.value.split('-').map(Number);
+                        setCurrentMonth(new Date(y, m - 1, 1));
+                      }
+                    }}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
@@ -851,17 +841,17 @@ export default function TeacherPayoutsTab() {
               </span>
             )}
 
-            {calendarFilter.type === 'DAY' && (
-              <span className="px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-800 flex items-center gap-1">
+            {periodStart && periodEnd && (
+              <span className="px-3 py-1 text-xs rounded-full bg-primary/10 text-primary flex items-center gap-1">
                 <Calendar className="w-3 h-3" />
-                {calendarFilter.date}
+                Zakres: {periodStart} – {periodEnd}
               </span>
             )}
 
-            {calendarFilter.type === 'RANGE' && (
-              <span className="px-3 py-1 text-xs rounded-full bg-primary/10 text-primary flex items-center gap-1">
+            {calendarFilter.type === 'DAY' && (
+              <span className="px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-800 flex items-center gap-1">
                 <Calendar className="w-3 h-3" />
-                {calendarFilter.from} – {calendarFilter.to}
+                Filtr dnia: {calendarFilter.date}
               </span>
             )}
 
@@ -873,7 +863,7 @@ export default function TeacherPayoutsTab() {
                 }}
                 className="text-xs text-gray-500 underline"
               >
-                Wyczyść
+                Wyczyść filtr
               </button>
             )}
           </div>
