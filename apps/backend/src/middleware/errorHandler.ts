@@ -97,7 +97,9 @@ function getPolishEntityName(modelName?: string): string {
 
 export const errorHandler = (
   err: ApiError,
-  res: Response
+  _req: any,
+  res: Response,
+  _next: any
 ) => {
   console.error('Error:', err);
 

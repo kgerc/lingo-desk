@@ -1754,6 +1754,8 @@ class LessonService {
     const errors: Array<{ date: string; error: string }> = [];
     let currentDate = new Date(pattern.startDate);
     let count = 0;
+    // For MONTHLY frequency, remember the original day to preserve it across months
+    const originalDayOfMonth = pattern.frequency === 'MONTHLY' ? currentDate.getDate() : undefined;
     // Max occurrences: use provided value, or if endDate is set use higher limit (104 = 2 years weekly)
     // If neither is provided, default to 100 for safety
     const maxOccurrences = pattern.occurrencesCount || (pattern.endDate ? 104 : 100);
@@ -1782,7 +1784,7 @@ class LessonService {
             error: `Pominięto święto: ${holidayName}`,
           });
           // Move to next occurrence
-          currentDate = this.getNextDate(currentDate, pattern.frequency, pattern.interval || 1);
+          currentDate = this.getNextDate(currentDate, pattern.frequency, pattern.interval || 1, originalDayOfMonth);
           continue;
         }
       }
@@ -1807,7 +1809,7 @@ class LessonService {
       }
 
       // Move to next occurrence
-      currentDate = this.getNextDate(currentDate, pattern.frequency, pattern.interval || 1);
+      currentDate = this.getNextDate(currentDate, pattern.frequency, pattern.interval || 1, originalDayOfMonth);
     }
 
     // Use transaction to ensure atomicity - either all lessons are created or none
@@ -1894,12 +1896,16 @@ class LessonService {
   }
 
   /**
-   * Calculate next date based on frequency and interval
+   * Calculate next date based on frequency and interval.
+   * For MONTHLY: preserves the original day of month. If the target month
+   * has fewer days (e.g., Jan 31 → Feb), clamps to the last day of the month.
+   * Pass originalDayOfMonth for MONTHLY to ensure consistent day across months.
    */
   private getNextDate(
     currentDate: Date,
     frequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY',
-    interval: number
+    interval: number,
+    originalDayOfMonth?: number
   ): Date {
     const nextDate = new Date(currentDate);
 
@@ -1913,9 +1919,14 @@ class LessonService {
       case 'BIWEEKLY':
         nextDate.setDate(nextDate.getDate() + 14 * interval);
         break;
-      case 'MONTHLY':
-        nextDate.setMonth(nextDate.getMonth() + interval);
+      case 'MONTHLY': {
+        const targetMonth = nextDate.getMonth() + interval;
+        nextDate.setMonth(targetMonth, 1); // Set to 1st to avoid overflow
+        const dayToUse = originalDayOfMonth ?? currentDate.getDate();
+        const maxDay = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
+        nextDate.setDate(Math.min(dayToUse, maxDay));
         break;
+      }
     }
 
     return nextDate;

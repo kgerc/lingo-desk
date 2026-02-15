@@ -40,13 +40,24 @@ export function getErrorMessage(error: any, fallback: string): string {
  * Returns a Record<string, string> mapping field names to error messages,
  * compatible with the existing `errors` state in form components.
  */
+/**
+ * Maps Polish field names (from backend) back to form field keys
+ */
+const polishFieldToKey: Record<string, string> = {
+  'Email': 'email',
+  'Imię': 'firstName',
+  'Nazwisko': 'lastName',
+  'Hasło': 'password',
+  'Telefon': 'phone',
+};
+
 export function getFieldErrors(error: any): Record<string, string> {
   const fieldErrors: Record<string, string> = {};
 
-  const validationError = error?.response?.data?.error as ApiValidationError | undefined;
+  const errorData = error?.response?.data?.error;
 
-  if (validationError?.code === 'VALIDATION_ERROR' && Array.isArray(validationError.errors)) {
-    for (const err of validationError.errors) {
+  if (errorData?.code === 'VALIDATION_ERROR' && Array.isArray(errorData.errors)) {
+    for (const err of (errorData as ApiValidationError).errors) {
       if (err.field && err.field !== 'unknown') {
         // Use the first segment of dotted paths (e.g. "address.street" -> "address")
         const fieldKey = err.field.split('.')[0];
@@ -55,6 +66,17 @@ export function getFieldErrors(error: any): Record<string, string> {
         }
       }
     }
+  }
+
+  // Handle DUPLICATE_ENTRY errors (e.g. unique email constraint from Prisma)
+  if (errorData?.code === 'DUPLICATE_ENTRY' && errorData?.field) {
+    const fieldKey = polishFieldToKey[errorData.field] || errorData.field;
+    fieldErrors[fieldKey] = errorData.message;
+  }
+
+  // Handle DUPLICATE_EMAIL errors (manual check in service)
+  if (errorData?.code === 'DUPLICATE_EMAIL') {
+    fieldErrors['email'] = errorData.message;
   }
 
   return fieldErrors;

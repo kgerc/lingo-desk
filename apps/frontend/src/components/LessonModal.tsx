@@ -415,29 +415,41 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     } else {
       if (isRecurring) {
         const scheduledDate = new Date(formData.scheduledAt);
-        const endDate = new Date(scheduledDate);
         const dayOfWeek = scheduledDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const count = Number(recurringCount);
 
-        // Calculate end date based on recurring type
-        // All modes now use WEEKLY frequency - the difference is only in how far the end date extends
-        if (recurringType === 'weeks') {
-          // X weeks: end date is X weeks from start
-          endDate.setDate(endDate.getDate() + (Number(recurringCount) * 7));
-        } else if (recurringType === 'months') {
-          // X months: end date is X months from start (weekly lessons for X months)
-          endDate.setMonth(endDate.getMonth() + Number(recurringCount));
-        } else {
-          // X years: end date is X years from start (weekly lessons for X years)
-          endDate.setFullYear(endDate.getFullYear() + Number(recurringCount));
-        }
-
-        const pattern = {
-          frequency: 'WEEKLY' as const, // Always use WEEKLY - creates lesson every week on selected day
-          interval: 1,
-          startDate: formData.scheduledAt,
-          endDate: endDate.toISOString(),
-          daysOfWeek: [dayOfWeek], // Always include daysOfWeek for proper date generation
+        let pattern: {
+          frequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+          interval: number;
+          startDate: string;
+          occurrencesCount: number;
+          daysOfWeek?: number[];
         };
+
+        if (recurringType === 'weeks') {
+          pattern = {
+            frequency: 'WEEKLY',
+            interval: 1,
+            startDate: formData.scheduledAt,
+            occurrencesCount: count,
+            daysOfWeek: [dayOfWeek],
+          };
+        } else if (recurringType === 'months') {
+          pattern = {
+            frequency: 'MONTHLY',
+            interval: 1,
+            startDate: formData.scheduledAt,
+            occurrencesCount: count,
+          };
+        } else {
+          // years - use MONTHLY with interval 12
+          pattern = {
+            frequency: 'MONTHLY',
+            interval: 12,
+            startDate: formData.scheduledAt,
+            occurrencesCount: count,
+          };
+        }
 
         createRecurringMutation.mutate({
           lessonData,
@@ -805,38 +817,31 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                           <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded p-3">
                             <p className="font-medium text-blue-800">Informacja:</p>
                             <p className="mt-1">
-                              System utworzy cotygodniowe lekcje przez {recurringCount || '0'}{' '}
-                              {recurringType === 'weeks' ? 'tygodni' : recurringType === 'months' ? 'miesięcy' : 'lat'}
-                              {' '}w tym samym dniu tygodnia i o tej samej godzinie.
-                              Lekcje z konfliktami harmonogramu zostaną automatycznie pominięte.
+                              {recurringType === 'weeks'
+                                ? `System utworzy cotygodniowe lekcje przez ${recurringCount || '0'} tygodni w tym samym dniu tygodnia i o tej samej godzinie.`
+                                : recurringType === 'months'
+                                ? `System utworzy ${recurringCount || '0'} lekcji co miesiąc w tym samym dniu miesiąca i o tej samej godzinie. Jeśli dzień nie istnieje w danym miesiącu (np. 31.), lekcja zostanie utworzona w ostatnim dniu miesiąca.`
+                                : `System utworzy ${recurringCount || '0'} lekcji co rok w tym samym dniu i o tej samej godzinie.`}
+                              {' '}Lekcje z konfliktami harmonogramu zostaną automatycznie pominięte.
                             </p>
                             {(() => {
-                              // Calculate approximate number of lessons
                               const count = Number(recurringCount) || 0;
-                              let approxLessons = 0;
-                              if (recurringType === 'weeks') {
-                                approxLessons = count;
-                              } else if (recurringType === 'months') {
-                                approxLessons = Math.round(count * 4.33); // ~4.33 weeks per month
-                              } else {
-                                approxLessons = Math.round(count * 52); // 52 weeks per year
-                              }
-                              return approxLessons > 0 && (
+                              return count > 0 && (
                                 <p className="mt-1 text-blue-600">
-                                  Szacowana liczba lekcji: ~{approxLessons}
+                                  Szacowana liczba lekcji: ~{count}
                                 </p>
                               );
                             })()}
                           </div>
 
-                          {/* Warning for very long series (> 2 years) */}
-                          {((recurringType === 'years' && Number(recurringCount) > 2) ||
-                            (recurringType === 'months' && Number(recurringCount) > 24)) && (
+                          {/* Warning for very long series */}
+                          {((recurringType === 'weeks' && Number(recurringCount) > 104) ||
+                            (recurringType === 'months' && Number(recurringCount) > 24) ||
+                            (recurringType === 'years' && Number(recurringCount) > 5)) && (
                             <div className="text-sm bg-amber-50 border border-amber-200 rounded p-3">
                               <p className="font-medium text-amber-800">Uwaga:</p>
                               <p className="mt-1 text-amber-700">
-                                Tworzysz serię lekcji na ponad 2 lata. To może wygenerować bardzo dużą liczbę lekcji
-                                ({recurringType === 'years' ? Math.round(Number(recurringCount) * 52) : Math.round(Number(recurringCount) * 4.33)}+).
+                                Tworzysz bardzo długą serię lekcji ({Number(recurringCount)} {recurringType === 'weeks' ? 'tygodni' : recurringType === 'months' ? 'miesięcy' : 'lat'}).
                                 Upewnij się, że to zamierzone działanie.
                               </p>
                             </div>

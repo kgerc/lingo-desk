@@ -70,7 +70,10 @@ export class StudentService {
     });
 
     if (existingUser) {
-      throw new Error('User with this email already exists');
+      const error: any = new Error('Użytkownik z tym adresem email już istnieje. Użyj innego adresu.');
+      error.statusCode = 409;
+      error.code = 'DUPLICATE_EMAIL';
+      throw error;
     }
 
     // Hash password

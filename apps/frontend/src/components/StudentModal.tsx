@@ -25,6 +25,19 @@ const LANGUAGES = [
 
 type TabType = 'personal' | 'cancellation' | 'balance';
 
+const PERSONAL_TAB_FIELDS = [
+  'firstName', 'lastName', 'email', 'phone', 'password',
+  'dateOfBirth', 'language', 'languageLevel', 'address', 'goals',
+  'isMinor', 'paymentDueDays', 'paymentDueDayOfMonth',
+];
+const CANCELLATION_TAB_FIELDS = [
+  'cancellationFeeEnabled', 'cancellationHoursThreshold', 'cancellationFeePercent',
+  'cancellationLimitEnabled', 'cancellationLimitCount', 'cancellationLimitPeriod',
+];
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[+]?[\d\s-]{9,15}$/;
+
 const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess }) => {
   const isEdit = !!student;
   const [activeTab, setActiveTab] = useState<TabType>('personal');
@@ -56,6 +69,18 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const switchToTabWithErrors = (fieldErrors: Record<string, string>) => {
+    const errorFields = Object.keys(fieldErrors);
+    const hasPersonalError = errorFields.some(f => PERSONAL_TAB_FIELDS.includes(f));
+    const hasCancellationError = errorFields.some(f => CANCELLATION_TAB_FIELDS.includes(f));
+
+    if (hasPersonalError) {
+      setActiveTab('personal');
+    } else if (hasCancellationError) {
+      setActiveTab('cancellation');
+    }
+  };
+
   const createMutation = useMutation({
     mutationFn: (data: CreateStudentData) => studentService.createStudent(data),
     onSuccess: () => {
@@ -63,9 +88,9 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
       onSuccess();
     },
     onError: (error: any) => {
-      const { fieldErrors, message } = handleApiError(error, 'Błąd tworzenia ucznia');
-      toast.error(message);
+      const { fieldErrors } = handleApiError(error, 'Błąd tworzenia ucznia');
       setErrors(fieldErrors);
+      switchToTabWithErrors(fieldErrors);
     },
   });
 
@@ -77,24 +102,73 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
       onSuccess();
     },
     onError: (error: any) => {
-      const { fieldErrors, message } = handleApiError(error, 'Błąd aktualizacji ucznia');
-      toast.error(message);
+      const { fieldErrors } = handleApiError(error, 'Błąd aktualizacji ucznia');
       setErrors(fieldErrors);
+      switchToTabWithErrors(fieldErrors);
     },
   });
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
+    // Required fields
     if (!formData.firstName.trim()) newErrors.firstName = 'Imię jest wymagane';
+    else if (formData.firstName.trim().length < 2) newErrors.firstName = 'Imię musi mieć min. 2 znaki';
+
     if (!formData.lastName.trim()) newErrors.lastName = 'Nazwisko jest wymagane';
+    else if (formData.lastName.trim().length < 2) newErrors.lastName = 'Nazwisko musi mieć min. 2 znaki';
+
     if (!formData.email.trim()) newErrors.email = 'Email jest wymagany';
+    else if (!EMAIL_REGEX.test(formData.email)) newErrors.email = 'Podaj poprawny adres email';
+
     if (!isEdit && !formData.password) newErrors.password = 'Hasło jest wymagane';
-    if (!isEdit && formData.password && formData.password.length < 8) {
+    else if (!isEdit && formData.password && formData.password.length < 8) {
       newErrors.password = 'Hasło musi mieć min. 8 znaków';
     }
 
+    // Optional field format validation
+    if (formData.phone && !PHONE_REGEX.test(formData.phone)) {
+      newErrors.phone = 'Podaj poprawny numer telefonu (9-15 cyfr)';
+    }
+
+    if (formData.paymentDueDayOfMonth !== null && formData.paymentDueDayOfMonth !== undefined) {
+      const day = Number(formData.paymentDueDayOfMonth);
+      if (isNaN(day) || day < 1 || day > 28) {
+        newErrors.paymentDueDayOfMonth = 'Dzień miesiąca musi być od 1 do 28';
+      }
+    }
+
+    // Cancellation fee validation
+    if (formData.cancellationFeeEnabled) {
+      if (!formData.cancellationHoursThreshold) {
+        newErrors.cancellationHoursThreshold = 'Próg godzinowy jest wymagany';
+      }
+      if (!formData.cancellationFeePercent) {
+        newErrors.cancellationFeePercent = 'Procent opłaty jest wymagany';
+      }
+    }
+
+    // Cancellation limit validation
+    if (formData.cancellationLimitEnabled) {
+      if (!formData.cancellationLimitCount) {
+        newErrors.cancellationLimitCount = 'Liczba odwołań jest wymagana';
+      }
+    }
+
     setErrors(newErrors);
+
+    // Auto-switch to the tab with the first error
+    if (Object.keys(newErrors).length > 0) {
+      const hasPersonalError = Object.keys(newErrors).some(f => PERSONAL_TAB_FIELDS.includes(f));
+      const hasCancellationError = Object.keys(newErrors).some(f => CANCELLATION_TAB_FIELDS.includes(f));
+
+      if (hasPersonalError) {
+        setActiveTab('personal');
+      } else if (hasCancellationError) {
+        setActiveTab('cancellation');
+      }
+    }
+
     return Object.keys(newErrors).length === 0;
   };
 
@@ -209,24 +283,30 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
             <button
               type="button"
               onClick={() => setActiveTab('personal')}
-              className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+              className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
                 activeTab === 'personal'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
               Dane osobowe
+              {Object.keys(errors).some(f => PERSONAL_TAB_FIELDS.includes(f)) && (
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+              )}
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('cancellation')}
-              className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+              className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
                 activeTab === 'cancellation'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
               Ustawienia odwołań
+              {Object.keys(errors).some(f => CANCELLATION_TAB_FIELDS.includes(f)) && (
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+              )}
             </button>
             {isEdit && (
               <button
@@ -324,8 +404,13 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                   autoComplete="off"
                   value={formData.phone}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                    errors.phone ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
+                {errors.phone && (
+                  <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                )}
               </div>
 
               {!isEdit && (
@@ -517,12 +602,18 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                     paymentDueDays: null, // Clear days when setting day of month
                   })}
                   disabled={formData.paymentDueDays !== null}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                    errors.paymentDueDayOfMonth ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="np. 10, 15, 25"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Konkretny dzień miesiąca (np. zawsze 10-go)
-                </p>
+                {errors.paymentDueDayOfMonth ? (
+                  <p className="mt-1 text-sm text-red-600">{errors.paymentDueDayOfMonth}</p>
+                ) : (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Konkretny dzień miesiąca (np. zawsze 10-go)
+                  </p>
+                )}
               </div>
 
               <div className="col-span-2">
@@ -572,12 +663,18 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                         ...formData,
                         cancellationHoursThreshold: e.target.value ? parseInt(e.target.value) : null,
                       })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+                        errors.cancellationHoursThreshold ? 'border-red-500' : 'border-gray-300'
+                      }`}
                       placeholder="np. 24"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Liczba godzin przed lekcją, po których naliczana jest opłata
-                    </p>
+                    {errors.cancellationHoursThreshold ? (
+                      <p className="mt-1 text-sm text-red-600">{errors.cancellationHoursThreshold}</p>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Liczba godzin przed lekcją, po których naliczana jest opłata
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -594,14 +691,20 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                           ...formData,
                           cancellationFeePercent: e.target.value ? parseInt(e.target.value) : null,
                         })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent pr-8"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent pr-8 ${
+                          errors.cancellationFeePercent ? 'border-red-500' : 'border-gray-300'
+                        }`}
                         placeholder="np. 70"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Procent ceny lekcji naliczany przy późnym odwołaniu
-                    </p>
+                    {errors.cancellationFeePercent ? (
+                      <p className="mt-1 text-sm text-red-600">{errors.cancellationFeePercent}</p>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Procent ceny lekcji naliczany przy późnym odwołaniu
+                      </p>
+                    )}
                   </div>
 
                   <div className="col-span-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
@@ -651,12 +754,18 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                         ...formData,
                         cancellationLimitCount: e.target.value ? parseInt(e.target.value) : null,
                       })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+                        errors.cancellationLimitCount ? 'border-red-500' : 'border-gray-300'
+                      }`}
                       placeholder="np. 5"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Ile razy uczeń może odwołać lekcję w okresie
-                    </p>
+                    {errors.cancellationLimitCount ? (
+                      <p className="mt-1 text-sm text-red-600">{errors.cancellationLimitCount}</p>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Ile razy uczeń może odwołać lekcję w okresie
+                      </p>
+                    )}
                   </div>
 
                   <div>
