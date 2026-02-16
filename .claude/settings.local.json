@@ -25,7 +25,8 @@
       "Bash(powershell -Command \"\\(Get-Content ''c:\\\\Users\\\\kgerc\\\\repos\\\\lingo-desk\\\\apps\\\\frontend\\\\src\\\\components\\\\LessonModal.tsx''\\).Count\")",
       "Bash(npm run build:frontend:*)",
       "Bash(npm run build:backend:*)",
-      "Bash(npx prisma db push:*)"
+      "Bash(npx prisma db push:*)",
+      "Bash(node -e:*)"
     ]
   }
 }

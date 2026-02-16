@@ -16,8 +16,12 @@ router.get('/debtors', paymentController.getDebtors);
 // Student payment history
 router.get('/student/:studentId', paymentController.getStudentPaymentHistory);
 
-// Import payments from CSV
+// Import payments from CSV (legacy)
 router.post('/import', paymentController.importPayments);
+
+// Smart CSV import (analyze + execute)
+router.post('/import/analyze', paymentController.analyzeCsvImport);
+router.post('/import/execute', paymentController.executeCsvImport);
 
 // CRUD operations
 router.get('/', paymentController.getPayments);

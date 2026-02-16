@@ -20,7 +20,6 @@ import {
   Video,
   MapPin,
   Search,
-  Plus,
   CheckCircle,
   AlertCircle,
   XCircle,
@@ -268,12 +267,7 @@ const LessonsPage: React.FC = () => {
     },
   });
 
-  // Shared handlers
-  const handleAddLesson = () => {
-    setSelectedLesson(null);
-    setSelectedSlot(null);
-    setIsModalOpen(true);
-  };
+
 
   const handleEditLesson = (lesson: Lesson) => {
     setSelectedLesson(lesson);
@@ -652,9 +646,9 @@ const LessonsPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Lekcje</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Grafik</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Zarządzaj lekcjami w systemie ({lessons.length} lekcji)
+            Zarządzaj grafikiem lekcji ({lessons.length} lekcji)
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -708,13 +702,7 @@ const LessonsPage: React.FC = () => {
                 <RefreshCw className={`h-5 w-5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
               </button>
             )}
-            <button
-              onClick={handleAddLesson}
-              className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors shadow-sm"
-            >
-              <Plus className="h-5 w-5" />
-              Dodaj lekcję
-            </button>
+            {/* Przycisk dodawania lekcji ukryty - lekcje dodaje się z poziomu kursów lub kalendarza */}
           </div>
         </div>
       </div>

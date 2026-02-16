@@ -1,31 +1,93 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Upload, FileText, AlertCircle, CheckCircle2, Download } from 'lucide-react';
-import paymentService from '../services/paymentService';
+import {
+  X, Upload, FileText, AlertCircle, CheckCircle2,
+  Download, ArrowRight, ArrowLeft, Columns, Eye, Loader2,
+} from 'lucide-react';
+import paymentService, {
+  ColumnMapping, CsvAnalysisResult, SYSTEM_FIELDS, SystemFieldKey,
+} from '../services/paymentService';
 import toast from 'react-hot-toast';
+
+/**
+ * Read file trying multiple encodings. Polish bank exports often use Windows-1250.
+ * Detects encoding by checking for replacement characters (�) in the output.
+ */
+async function readFileWithEncoding(file: File): Promise<string> {
+  // Try UTF-8 first
+  const utf8Text = await file.text();
+
+  // If no replacement characters, UTF-8 is fine
+  if (!utf8Text.includes('\uFFFD') && !utf8Text.includes('�')) {
+    return utf8Text;
+  }
+
+  // Try Windows-1250 (Polish) and ISO-8859-2 (Central European)
+  const encodings = ['windows-1250', 'iso-8859-2', 'windows-1252'];
+  const buffer = await file.arrayBuffer();
+
+  for (const encoding of encodings) {
+    try {
+      const decoder = new TextDecoder(encoding);
+      const text = decoder.decode(buffer);
+      // Check if decoded text has Polish characters (ą, ć, ę, ł, ń, ó, ś, ź, ż)
+      if (/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(text)) {
+        return text;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // Fallback to UTF-8
+  return utf8Text;
+}
 
 interface ImportPaymentsModalProps {
   onClose: () => void;
 }
 
+type Step = 'upload' | 'mapping' | 'preview' | 'results';
+
 const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({ onClose }) => {
   const queryClient = useQueryClient();
+
+  const [step, setStep] = useState<Step>('upload');
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<string>('');
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Analysis state
+  const [analysis, setAnalysis] = useState<CsvAnalysisResult | null>(null);
+  const [mapping, setMapping] = useState<ColumnMapping[]>([]);
+
+  // Results state
   const [importResults, setImportResults] = useState<{
     success: number;
     failed: number;
     errors: Array<{ row: number; error: string; data: string }>;
   } | null>(null);
 
+  // Analyze mutation
+  const analyzeMutation = useMutation({
+    mutationFn: (data: string) => paymentService.analyzeCsvImport(data),
+    onSuccess: (data) => {
+      setAnalysis(data);
+      setMapping(data.mapping);
+      setStep('mapping');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Błąd podczas analizy pliku CSV');
+    },
+  });
+
   // Import mutation
   const importMutation = useMutation({
-    mutationFn: async (csvData: string) => {
-      const response = await paymentService.importPayments(csvData);
-      return response;
-    },
+    mutationFn: () =>
+      paymentService.executeCsvImport(csvData, mapping, analysis!.separator),
     onSuccess: (data) => {
       setImportResults(data);
+      setStep('results');
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payment-stats'] });
 
@@ -46,14 +108,14 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({ onClose }) =>
       return;
     }
     setCsvFile(file);
+    setAnalysis(null);
+    setMapping([]);
     setImportResults(null);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      handleFileSelect(file);
-    }
+    if (file) handleFileSelect(file);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -72,25 +134,43 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({ onClose }) =>
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
-
     const file = e.dataTransfer.files?.[0];
-    if (file) {
-      handleFileSelect(file);
+    if (file) handleFileSelect(file);
+  };
+
+  const handleAnalyze = async () => {
+    if (!csvFile) return;
+    try {
+      // Try reading with multiple encodings - Polish bank exports often use Windows-1250
+      let text = await readFileWithEncoding(csvFile);
+      setCsvData(text);
+      analyzeMutation.mutate(text);
+    } catch {
+      toast.error('Błąd podczas odczytu pliku');
     }
   };
 
-  const handleImport = async () => {
-    if (!csvFile) {
-      toast.error('Proszę wybrać plik CSV');
-      return;
-    }
+  const handleMappingChange = (csvColumnIndex: number, systemField: SystemFieldKey | null) => {
+    setMapping((prev) => {
+      // Clear previous mapping of this system field (if any other column had it)
+      const updated = prev.map((m) => {
+        if (systemField && m.systemField === systemField && m.csvColumnIndex !== csvColumnIndex) {
+          return { ...m, systemField: null, confidence: 0 };
+        }
+        return m;
+      });
 
-    try {
-      const text = await csvFile.text();
-      importMutation.mutate(text);
-    } catch (error) {
-      toast.error('Błąd podczas odczytu pliku');
-    }
+      // Set new mapping
+      return updated.map((m) =>
+        m.csvColumnIndex === csvColumnIndex
+          ? { ...m, systemField, confidence: systemField ? 1 : 0 }
+          : m
+      );
+    });
+  };
+
+  const handleImport = () => {
+    importMutation.mutate();
   };
 
   const downloadTemplate = () => {
@@ -105,11 +185,18 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({ onClose }) =>
     link.click();
   };
 
+  // Check if required fields are mapped
+  const requiredFieldsMapped = SYSTEM_FIELDS
+    .filter((f) => f.required)
+    .every((f) => mapping.some((m) => m.systemField === f.key));
+
+  const isLoading = analyzeMutation.isPending || importMutation.isPending;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center gap-3">
             <Upload className="h-6 w-6 text-primary" />
             <h2 className="text-2xl font-bold text-gray-900">Import wpłat z CSV</h2>
@@ -117,174 +204,485 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({ onClose }) =>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
+            disabled={isLoading}
           >
             <X className="h-6 w-6" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-6">
-          {/* Instructions */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-blue-900 mb-2">Format pliku CSV</h3>
-                <p className="text-sm text-blue-800 mb-2">
-                  Plik CSV powinien zawierać następujące kolumny (oddzielone przecinkami).
-                  System akceptuje różne warianty nazw kolumn (wielkość liter nie ma znaczenia):
-                </p>
-                <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-                  <li><strong>data/date</strong> - format YYYY-MM-DD lub DD/MM/YYYY (np. 2025-01-15)</li>
-                  <li><strong>email/uczen</strong> - email ucznia (np. student@example.com)</li>
-                  <li><strong>kwota/amount</strong> - kwota płatności (np. 200 lub 200.50)</li>
-                  <li><strong>metodaPlatnosci/metoda/payment</strong> - CASH/GOTÓWKA, BANK_TRANSFER/PRZELEW lub STRIPE</li>
-                  <li><strong>status/stan</strong> - COMPLETED/OPŁACONE, PENDING/OCZEKUJĄCE, FAILED, REFUNDED (opcjonalnie)</li>
-                  <li><strong>notatki/notes</strong> - dodatkowe informacje (opcjonalnie)</li>
-                </ul>
-                <p className="text-xs text-blue-700 mt-2 italic">
-                  Kolumny mogą być w dowolnej kolejności. System automatycznie rozpozna polskie i angielskie nazwy.
-                </p>
-                <button
-                  onClick={downloadTemplate}
-                  className="mt-3 flex items-center gap-2 text-sm text-blue-700 hover:text-blue-900 font-medium"
+        {/* Steps indicator */}
+        <div className="px-6 py-3 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-2 text-sm">
+            {[
+              { key: 'upload' as Step, label: 'Plik', icon: Upload },
+              { key: 'mapping' as Step, label: 'Mapowanie', icon: Columns },
+              { key: 'preview' as Step, label: 'Podgląd', icon: Eye },
+              { key: 'results' as Step, label: 'Wyniki', icon: CheckCircle2 },
+            ].map(({ key, label, icon: Icon }, idx) => (
+              <React.Fragment key={key}>
+                {idx > 0 && <ArrowRight className="h-4 w-4 text-gray-300" />}
+                <div
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${
+                    step === key
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : key === 'results' && importResults
+                        ? 'text-green-600'
+                        : 'text-gray-400'
+                  }`}
                 >
-                  <Download className="h-4 w-4" />
-                  Pobierz przykładowy szablon
-                </button>
-              </div>
-            </div>
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </div>
+              </React.Fragment>
+            ))}
           </div>
+        </div>
 
-          {/* File Upload Area */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Wybierz plik CSV
-            </label>
-            <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                isDragOver
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-300 hover:border-primary'
-              }`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <input
-                type="file"
-                id="csv-upload"
-                onChange={handleFileChange}
-                accept=".csv"
-                className="hidden"
-                disabled={importMutation.isPending}
-              />
-              <label
-                htmlFor="csv-upload"
-                className="cursor-pointer flex flex-col items-center"
-              >
-                {csvFile ? (
-                  <>
-                    <FileText className="h-12 w-12 text-primary mb-2" />
-                    <p className="text-sm font-medium text-gray-900">{csvFile.name}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {(csvFile.size / 1024).toFixed(2)} KB
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-12 w-12 text-gray-400 mb-2" />
-                    <p className="text-sm font-medium text-gray-900">
-                      Przeciągnij plik CSV tutaj lub kliknij aby wybrać
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Obsługiwane formaty: CSV
-                    </p>
-                  </>
-                )}
-              </label>
-            </div>
-          </div>
+        {/* Content */}
+        <div className="p-6 overflow-y-auto flex-1">
+          {step === 'upload' && <UploadStep
+            csvFile={csvFile}
+            isDragOver={isDragOver}
+            isLoading={analyzeMutation.isPending}
+            onFileChange={handleFileChange}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onDownloadTemplate={downloadTemplate}
+          />}
 
-          {/* Import Results */}
-          {importResults && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <div>
-                      <p className="text-sm font-medium text-green-900">Pomyślnie zaimportowano</p>
-                      <p className="text-2xl font-bold text-green-700">{importResults.success}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-red-600" />
-                    <div>
-                      <p className="text-sm font-medium text-red-900">Błędy</p>
-                      <p className="text-2xl font-bold text-red-700">{importResults.failed}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          {step === 'mapping' && analysis && <MappingStep
+            analysis={analysis}
+            mapping={mapping}
+            onMappingChange={handleMappingChange}
+          />}
 
-              {importResults.errors.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-h-64 overflow-y-auto">
-                  <h4 className="font-semibold text-red-900 mb-2">Szczegóły błędów:</h4>
-                  <div className="space-y-2">
-                    {importResults.errors.map((error, index) => (
-                      <div key={index} className="text-sm">
-                        <p className="font-medium text-red-800">Wiersz {error.row}:</p>
-                        <p className="text-red-700">{error.error}</p>
-                        <p className="text-red-600 text-xs font-mono bg-red-100 p-1 rounded mt-1">
-                          {error.data}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          {step === 'preview' && analysis && <PreviewStep
+            analysis={analysis}
+            mapping={mapping}
+          />}
+
+          {step === 'results' && importResults && <ResultsStep
+            results={importResults}
+          />}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-lg">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            disabled={importMutation.isPending}
-          >
-            {importResults ? 'Zamknij' : 'Anuluj'}
-          </button>
-          {!importResults && (
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between rounded-b-lg flex-shrink-0">
+          <div>
+            {(step === 'mapping' || step === 'preview') && (
+              <button
+                onClick={() => setStep(step === 'preview' ? 'mapping' : 'upload')}
+                className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                disabled={isLoading}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Wstecz
+              </button>
+            )}
+          </div>
+          <div className="flex gap-3">
             <button
-              onClick={handleImport}
-              disabled={!csvFile || importMutation.isPending}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              disabled={isLoading}
             >
-              {importMutation.isPending ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Importowanie...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4" />
-                  Importuj płatności
-                </>
-              )}
+              {step === 'results' ? 'Zamknij' : 'Anuluj'}
             </button>
-          )}
+
+            {step === 'upload' && (
+              <button
+                onClick={handleAnalyze}
+                disabled={!csvFile || analyzeMutation.isPending}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {analyzeMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analizowanie...
+                  </>
+                ) : (
+                  <>
+                    <ArrowRight className="h-4 w-4" />
+                    Analizuj plik
+                  </>
+                )}
+              </button>
+            )}
+
+            {step === 'mapping' && (
+              <button
+                onClick={() => setStep('preview')}
+                disabled={!requiredFieldsMapped}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Eye className="h-4 w-4" />
+                Podgląd danych
+              </button>
+            )}
+
+            {step === 'preview' && (
+              <button
+                onClick={handleImport}
+                disabled={importMutation.isPending}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {importMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Importowanie...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Importuj {analysis?.rowCount} wierszy
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 };
+
+// ── Step 1: Upload ──────────────────────────────────────────────
+
+interface UploadStepProps {
+  csvFile: File | null;
+  isDragOver: boolean;
+  isLoading: boolean;
+  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  onDownloadTemplate: () => void;
+}
+
+const UploadStep: React.FC<UploadStepProps> = ({
+  csvFile, isDragOver, isLoading, onFileChange, onDragOver, onDragLeave, onDrop, onDownloadTemplate,
+}) => (
+  <div className="space-y-6">
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="flex items-start gap-3">
+        <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <h3 className="font-semibold text-blue-900 mb-2">Inteligentny import CSV</h3>
+          <p className="text-sm text-blue-800 mb-2">
+            System automatycznie rozpozna kolumny w pliku CSV - niezależnie od języka, kolejności i formatu.
+            Po analizie będziesz mógł zweryfikować i poprawić mapowanie kolumn przed importem.
+          </p>
+          <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+            <li>Obsługiwane separatory: przecinek, średnik, tabulator</li>
+            <li>Obsługiwane formaty dat: YYYY-MM-DD, DD/MM/YYYY, DD.MM.YYYY</li>
+            <li>Nazwy kolumn mogą być w dowolnym języku</li>
+          </ul>
+          <button
+            onClick={onDownloadTemplate}
+            className="mt-3 flex items-center gap-2 text-sm text-blue-700 hover:text-blue-900 font-medium"
+          >
+            <Download className="h-4 w-4" />
+            Pobierz przykładowy szablon
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Wybierz plik CSV</label>
+      <div
+        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          isDragOver
+            ? 'border-primary bg-primary/5'
+            : 'border-gray-300 hover:border-primary'
+        }`}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+      >
+        <input
+          type="file"
+          id="csv-upload"
+          onChange={onFileChange}
+          accept=".csv"
+          className="hidden"
+          disabled={isLoading}
+        />
+        <label htmlFor="csv-upload" className="cursor-pointer flex flex-col items-center">
+          {csvFile ? (
+            <>
+              <FileText className="h-12 w-12 text-primary mb-2" />
+              <p className="text-sm font-medium text-gray-900">{csvFile.name}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {(csvFile.size / 1024).toFixed(2)} KB
+              </p>
+            </>
+          ) : (
+            <>
+              <Upload className="h-12 w-12 text-gray-400 mb-2" />
+              <p className="text-sm font-medium text-gray-900">
+                Przeciągnij plik CSV tutaj lub kliknij aby wybrać
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Obsługiwane formaty: CSV</p>
+            </>
+          )}
+        </label>
+      </div>
+    </div>
+  </div>
+);
+
+// ── Step 2: Column Mapping ──────────────────────────────────────
+
+interface MappingStepProps {
+  analysis: CsvAnalysisResult;
+  mapping: ColumnMapping[];
+  onMappingChange: (csvColumnIndex: number, systemField: SystemFieldKey | null) => void;
+}
+
+const MappingStep: React.FC<MappingStepProps> = ({ analysis, mapping, onMappingChange }) => {
+  const usedFields = new Set(mapping.filter((m) => m.systemField).map((m) => m.systemField));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-gray-900">Mapowanie kolumn</h3>
+          <p className="text-sm text-gray-500">
+            Rozpoznano {analysis.rowCount} wierszy danych. Sprawdź i popraw mapowanie kolumn.
+          </p>
+        </div>
+        <span className="text-xs text-gray-400">
+          Separator: {analysis.separator === ',' ? 'przecinek' : analysis.separator === ';' ? 'średnik' : 'tabulator'}
+        </span>
+      </div>
+
+      {/* Warnings */}
+      {analysis.warnings.length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-yellow-800">
+              {analysis.warnings.map((w, i) => (
+                <p key={i}>{w}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mapping table */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="text-left px-4 py-2.5 font-medium text-gray-700">Kolumna CSV</th>
+              <th className="text-left px-4 py-2.5 font-medium text-gray-700">Przykładowe dane</th>
+              <th className="text-left px-4 py-2.5 font-medium text-gray-700">Pole systemowe</th>
+              <th className="text-center px-4 py-2.5 font-medium text-gray-700 w-20">Pewność</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {mapping.map((m) => {
+              const sampleValues = analysis.preview
+                .slice(0, 3)
+                .map((row) => row[m.csvColumnIndex] || '')
+                .filter(Boolean);
+
+              return (
+                <tr key={m.csvColumnIndex} className="hover:bg-gray-50">
+                  <td className="px-4 py-2.5 font-mono text-xs text-gray-800">
+                    {m.csvColumn}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-gray-500 max-w-48 truncate">
+                    {sampleValues.join(', ')}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <select
+                      value={m.systemField || ''}
+                      onChange={(e) =>
+                        onMappingChange(
+                          m.csvColumnIndex,
+                          (e.target.value as SystemFieldKey) || null
+                        )
+                      }
+                      className={`w-full text-sm border rounded-md px-2 py-1.5 ${
+                        m.systemField
+                          ? 'border-green-300 bg-green-50 text-green-800'
+                          : 'border-gray-300 text-gray-500'
+                      }`}
+                    >
+                      <option value="">— Pomiń —</option>
+                      {SYSTEM_FIELDS.map((f) => (
+                        <option
+                          key={f.key}
+                          value={f.key}
+                          disabled={usedFields.has(f.key) && m.systemField !== f.key}
+                        >
+                          {f.label}{f.required ? ' *' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    {m.systemField && (
+                      <span
+                        className={`inline-block w-2 h-2 rounded-full ${
+                          m.confidence >= 0.8
+                            ? 'bg-green-500'
+                            : m.confidence >= 0.5
+                              ? 'bg-yellow-500'
+                              : 'bg-red-500'
+                        }`}
+                        title={`${Math.round(m.confidence * 100)}%`}
+                      />
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Required fields status */}
+      <div className="flex flex-wrap gap-2">
+        {SYSTEM_FIELDS.filter((f) => f.required).map((f) => {
+          const isMapped = mapping.some((m) => m.systemField === f.key);
+          return (
+            <span
+              key={f.key}
+              className={`text-xs px-2.5 py-1 rounded-full ${
+                isMapped
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-red-100 text-red-700'
+              }`}
+            >
+              {isMapped ? '✓' : '✗'} {f.label}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ── Step 3: Preview ─────────────────────────────────────────────
+
+interface PreviewStepProps {
+  analysis: CsvAnalysisResult;
+  mapping: ColumnMapping[];
+}
+
+const PreviewStep: React.FC<PreviewStepProps> = ({ analysis, mapping }) => {
+  const mappedFields = mapping.filter((m) => m.systemField);
+  const fieldOrder: SystemFieldKey[] = ['date', 'email', 'amount', 'paymentMethod', 'status', 'notes'];
+  const sortedFields = fieldOrder
+    .map((key) => mappedFields.find((m) => m.systemField === key))
+    .filter(Boolean) as ColumnMapping[];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="font-semibold text-gray-900">Podgląd danych</h3>
+        <p className="text-sm text-gray-500">
+          Pierwsze {Math.min(10, analysis.preview.length)} z {analysis.rowCount} wierszy.
+          Sprawdź poprawność danych przed importem.
+        </p>
+      </div>
+
+      <div className="border border-gray-200 rounded-lg overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="text-left px-3 py-2 font-medium text-gray-500 text-xs w-10">#</th>
+              {sortedFields.map((m) => {
+                const field = SYSTEM_FIELDS.find((f) => f.key === m.systemField);
+                return (
+                  <th key={m.csvColumnIndex} className="text-left px-3 py-2 font-medium text-gray-700 text-xs">
+                    {field?.label}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {analysis.preview.slice(0, 10).map((row, rowIdx) => (
+              <tr key={rowIdx} className="hover:bg-gray-50">
+                <td className="px-3 py-2 text-xs text-gray-400">{rowIdx + 1}</td>
+                {sortedFields.map((m) => (
+                  <td key={m.csvColumnIndex} className="px-3 py-2 text-xs text-gray-800 max-w-40 truncate">
+                    {row[m.csvColumnIndex] || '—'}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {analysis.rowCount > 10 && (
+        <p className="text-xs text-gray-400 text-center">
+          ...i {analysis.rowCount - 10} więcej wierszy
+        </p>
+      )}
+    </div>
+  );
+};
+
+// ── Step 4: Results ─────────────────────────────────────────────
+
+interface ResultsStepProps {
+  results: {
+    success: number;
+    failed: number;
+    errors: Array<{ row: number; error: string; data: string }>;
+  };
+}
+
+const ResultsStep: React.FC<ResultsStepProps> = ({ results }) => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-2 gap-4">
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-5 w-5 text-green-600" />
+          <div>
+            <p className="text-sm font-medium text-green-900">Pomyślnie zaimportowano</p>
+            <p className="text-2xl font-bold text-green-700">{results.success}</p>
+          </div>
+        </div>
+      </div>
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="h-5 w-5 text-red-600" />
+          <div>
+            <p className="text-sm font-medium text-red-900">Błędy</p>
+            <p className="text-2xl font-bold text-red-700">{results.failed}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {results.errors.length > 0 && (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-h-64 overflow-y-auto">
+        <h4 className="font-semibold text-red-900 mb-2">Szczegóły błędów:</h4>
+        <div className="space-y-2">
+          {results.errors.map((error, index) => (
+            <div key={index} className="text-sm">
+              <p className="font-medium text-red-800">Wiersz {error.row}:</p>
+              <p className="text-red-700">{error.error}</p>
+              {error.data && (
+                <p className="text-red-600 text-xs font-mono bg-red-100 p-1 rounded mt-1">
+                  {error.data}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+);
 
 export default ImportPaymentsModal;

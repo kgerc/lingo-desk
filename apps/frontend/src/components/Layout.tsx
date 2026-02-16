@@ -69,7 +69,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { name: 'Kursy', href: '/courses', icon: BookOpen },
           // { name: 'Grupy', href: '/groups', icon: Users2 }, // Hidden temporarily
           { name: 'Materiały', href: '/materials', icon: FileText },
-          { name: 'Lekcje', href: '/lessons', icon: Clock },
+          { name: 'Grafik', href: '/lessons', icon: Clock },
           { name: 'Zgłoszenia', href: '/applications', icon: ClipboardList },
           { name: 'Rozliczenia', href: '/payments', icon: CreditCard },
           { name: 'Dłużnicy', href: '/debtors', icon: AlertCircle },
@@ -98,7 +98,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         return [
           ...commonItems,
           { name: 'Dzieci', href: '/students', icon: Users },
-          { name: 'Lekcje', href: '/lessons', icon: Clock },
+          { name: 'Grafik', href: '/lessons', icon: Clock },
           { name: 'Wpłaty', href: '/payments?tab=payments', icon: CreditCard },
         ];
 

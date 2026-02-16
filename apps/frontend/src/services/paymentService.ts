@@ -107,6 +107,34 @@ export interface PaymentReminder {
   createdAt: string;
 }
 
+// CSV Import types
+export type SystemFieldKey = 'date' | 'email' | 'amount' | 'paymentMethod' | 'status' | 'notes';
+
+export interface ColumnMapping {
+  csvColumn: string;
+  csvColumnIndex: number;
+  systemField: SystemFieldKey | null;
+  confidence: number;
+}
+
+export interface CsvAnalysisResult {
+  separator: string;
+  headers: string[];
+  rowCount: number;
+  preview: string[][];
+  mapping: ColumnMapping[];
+  warnings: string[];
+}
+
+export const SYSTEM_FIELDS: Array<{ key: SystemFieldKey; label: string; required: boolean }> = [
+  { key: 'date', label: 'Data płatności', required: true },
+  { key: 'email', label: 'Email ucznia', required: true },
+  { key: 'amount', label: 'Kwota', required: true },
+  { key: 'paymentMethod', label: 'Metoda płatności', required: true },
+  { key: 'status', label: 'Status', required: false },
+  { key: 'notes', label: 'Notatki', required: false },
+];
+
 const paymentService = {
   /**
    * Get all payments with filters
@@ -172,6 +200,34 @@ const paymentService = {
     errors: Array<{ row: number; error: string; data: string }>;
   }> {
     const response = await api.post('/payments/import', { csvData }) as any;
+    return response.data.data;
+  },
+
+  /**
+   * Analyze CSV file and get AI-based column mapping
+   */
+  async analyzeCsvImport(csvData: string): Promise<CsvAnalysisResult> {
+    const response = await api.post('/payments/import/analyze', { csvData }) as any;
+    return response.data.data;
+  },
+
+  /**
+   * Execute CSV import with confirmed mapping
+   */
+  async executeCsvImport(
+    csvData: string,
+    mapping: ColumnMapping[],
+    separator: string
+  ): Promise<{
+    success: number;
+    failed: number;
+    errors: Array<{ row: number; error: string; data: string }>;
+  }> {
+    const response = await api.post('/payments/import/execute', {
+      csvData,
+      mapping,
+      separator,
+    }) as any;
     return response.data.data;
   },
 

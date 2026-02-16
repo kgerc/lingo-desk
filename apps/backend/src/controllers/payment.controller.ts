@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AuthRequest } from '../middleware/auth';
 import paymentService from '../services/payment.service';
 import paymentReminderService from '../services/payment-reminder.service';
+import csvImportService from '../services/csv-import.service';
 import { PaymentStatus, PaymentMethod } from '@prisma/client';
 import {
   requiredUuid,
@@ -385,6 +386,72 @@ class PaymentController {
       return res.status(500).json({
         success: false,
         message: 'Nie udało się pobrać historii przypomnień',
+      });
+    }
+  }
+  /**
+   * Analyze CSV and propose column mapping
+   * POST /api/payments/import/analyze
+   */
+  async analyzeCsvImport(req: AuthRequest, res: Response) {
+    try {
+      const { csvData } = req.body;
+
+      if (!csvData) {
+        return res.status(400).json({
+          success: false,
+          message: 'Dane CSV są wymagane',
+        });
+      }
+
+      const analysis = await csvImportService.analyzeCsv(csvData);
+
+      return res.json({
+        success: true,
+        data: analysis,
+      });
+    } catch (error: any) {
+      console.error('Error analyzing CSV:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Nie udało się przeanalizować pliku CSV',
+      });
+    }
+  }
+
+  /**
+   * Execute import with confirmed mapping
+   * POST /api/payments/import/execute
+   */
+  async executeCsvImport(req: AuthRequest, res: Response) {
+    try {
+      const organizationId = req.user!.organizationId;
+      const { csvData, mapping, separator } = req.body;
+
+      if (!csvData || !mapping || !separator) {
+        return res.status(400).json({
+          success: false,
+          message: 'csvData, mapping i separator są wymagane',
+        });
+      }
+
+      const results = await csvImportService.executeImport({
+        csvData,
+        mapping,
+        separator,
+        organizationId,
+      });
+
+      return res.json({
+        success: true,
+        data: results,
+        message: `Import zakończony: ${results.success} sukces, ${results.failed} błędów`,
+      });
+    } catch (error: any) {
+      console.error('Error executing CSV import:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Nie udało się zaimportować płatności',
       });
     }
   }

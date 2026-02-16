@@ -276,7 +276,7 @@ class AlertService {
         const alert = await this.createAlert({
           organizationId,
           type: 'WARNING',
-          title: `Uczniowie bez zapisów (${studentsWithoutEnrollments.length})`,
+          title: `Uczniowie bez zaplanowanego grafiku (${studentsWithoutEnrollments.length})`,
           message: `${studentsWithoutEnrollments.length} aktywnych uczniów nie ma żadnych aktywnych zapisów na kursy.`,
           metadata: {
             alertType: 'STUDENTS_WITHOUT_ENROLLMENTS',
