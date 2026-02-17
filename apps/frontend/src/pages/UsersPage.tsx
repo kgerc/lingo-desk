@@ -302,7 +302,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, isOpen, onClose, on
               onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              {(['ADMIN', 'MANAGER', 'HR', 'METHODOLOGIST', 'TEACHER', 'STUDENT', 'PARENT'] as UserRole[]).map((role) => (
+              {STAFF_ROLES.map((role) => (
                 <option key={role} value={role}>
                   {ROLE_LABELS[role]}
                 </option>
@@ -363,9 +363,14 @@ const UsersPage: React.FC = () => {
     queryFn: userService.getUserStats,
   });
 
-  // Filter users locally based on search query, role filter, and status filter
+  // Filter users locally - exclude STUDENT and PARENT roles (managed in Students module)
   const filteredUsers = useMemo(() => {
     return allUsers.filter((user) => {
+      // Exclude students and parents - managed in dedicated modules
+      if (user.role === 'STUDENT' || user.role === 'PARENT') {
+        return false;
+      }
+
       // Role filter
       if (roleFilter && user.role !== roleFilter) {
         return false;
@@ -539,8 +544,6 @@ const UsersPage: React.FC = () => {
                 {ROLE_LABELS[role]}
               </option>
             ))}
-            <option value="STUDENT">Uczeń</option>
-            <option value="PARENT">Rodzic</option>
           </select>
 
           {/* Status Filter */}

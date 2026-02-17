@@ -38,6 +38,9 @@ class UserService {
 
     if (filters?.role) {
       where.role = filters.role;
+    } else {
+      // Exclude STUDENT and PARENT - they are managed in dedicated modules
+      where.role = { notIn: ['STUDENT', 'PARENT'] };
     }
 
     if (filters?.isActive !== undefined) {
@@ -393,12 +396,15 @@ class UserService {
    * Get user statistics for dashboard
    */
   async getUserStats(organizationId: string) {
+    // Exclude STUDENT and PARENT - they are managed in dedicated modules
+    const staffFilter = { organizationId, role: { notIn: ['STUDENT', 'PARENT'] as UserRole[] } };
+
     const [total, active, byRole] = await Promise.all([
-      prisma.user.count({ where: { organizationId } }),
-      prisma.user.count({ where: { organizationId, isActive: true } }),
+      prisma.user.count({ where: staffFilter }),
+      prisma.user.count({ where: { ...staffFilter, isActive: true } }),
       prisma.user.groupBy({
         by: ['role'],
-        where: { organizationId },
+        where: staffFilter,
         _count: true,
       }),
     ]);
