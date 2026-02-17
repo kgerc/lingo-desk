@@ -18,7 +18,6 @@ export interface User {
 
 export interface UserWithProfile extends User {
   profile?: {
-    dateOfBirth?: string | null;
     address?: string | null;
     notes?: string | null;
   } | null;

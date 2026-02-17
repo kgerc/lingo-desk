@@ -43,7 +43,6 @@ export interface VisibilitySettings {
     email: boolean;
     phone: boolean;
     address: boolean;
-    dateOfBirth: boolean;
     notes: boolean;
     payments: boolean;
     budget: boolean;
@@ -63,7 +62,6 @@ export const DEFAULT_VISIBILITY_SETTINGS: VisibilitySettings = {
     email: true,
     phone: true,
     address: true,
-    dateOfBirth: true,
     notes: true,
     payments: true,
     budget: true,

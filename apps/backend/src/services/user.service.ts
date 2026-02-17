@@ -103,7 +103,6 @@ class UserService {
         avatarUrl: true,
         profile: {
           select: {
-            dateOfBirth: true,
             address: true,
             notes: true,
           },

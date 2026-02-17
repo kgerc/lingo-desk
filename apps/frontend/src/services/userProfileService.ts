@@ -13,7 +13,6 @@ export interface NotificationPreferences {
 export interface UserProfile {
   id: string;
   userId: string;
-  dateOfBirth?: string;
   address?: string;
   emergencyContact?: string;
   notes?: string;
@@ -33,7 +32,6 @@ export interface UserProfile {
 }
 
 export interface UpdateProfileData {
-  dateOfBirth?: string;
   address?: string;
   emergencyContact?: string;
   notes?: string;

@@ -11,7 +11,6 @@ export interface NotificationPreferences {
 }
 
 export interface UpdateProfileData {
-  dateOfBirth?: Date;
   address?: string;
   emergencyContact?: string;
   notes?: string;
@@ -86,7 +85,6 @@ class UserProfileService {
     const profile = await prisma.userProfile.update({
       where: { userId },
       data: {
-        ...(data.dateOfBirth !== undefined && { dateOfBirth: data.dateOfBirth }),
         ...(data.address !== undefined && { address: data.address }),
         ...(data.emergencyContact !== undefined && { emergencyContact: data.emergencyContact }),
         ...(data.notes !== undefined && { notes: data.notes }),

@@ -88,7 +88,6 @@ export interface VisibilitySettings {
     email: boolean;
     phone: boolean;
     address: boolean;
-    dateOfBirth: boolean;
     notes: boolean;
     payments: boolean;
     budget: boolean;

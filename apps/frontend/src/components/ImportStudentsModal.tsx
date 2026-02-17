@@ -117,9 +117,9 @@ const ImportStudentsModal: React.FC<ImportStudentsModalProps> = ({ onClose, onSu
   };
 
   const downloadTemplate = () => {
-    const template = `email,firstName,lastName,phone,dateOfBirth,address,languageLevel,goals,isMinor,paymentDueDays,paymentDueDayOfMonth
-jan.kowalski@example.com,Jan,Kowalski,+48123456789,1990-01-15,ul. Przykładowa 1,A1,Nauka konwersacji,false,7,
-anna.nowak@example.com,Anna,Nowak,+48987654321,1985-05-20,ul. Testowa 2,B1,Przygotowanie do egzaminu,false,,15`;
+    const template = `email,firstName,lastName,phone,address,languageLevel,goals,isMinor,paymentDueDays,paymentDueDayOfMonth
+jan.kowalski@example.com,Jan,Kowalski,+48123456789,ul. Przykładowa 1,A1,Nauka konwersacji,false,7,
+anna.nowak@example.com,Anna,Nowak,+48987654321,ul. Testowa 2,B1,Przygotowanie do egzaminu,false,,15`;
 
     const blob = new Blob([template], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -140,7 +140,6 @@ anna.nowak@example.com,Anna,Nowak,+48987654321,1985-05-20,ul. Testowa 2,B1,Przyg
 
   const optionalFields = [
     { key: 'phone', label: 'Telefon', required: false },
-    { key: 'dateOfBirth', label: 'Data urodzenia', required: false },
     { key: 'address', label: 'Adres', required: false },
     { key: 'languageLevel', label: 'Poziom języka (A1-C2)', required: false },
     { key: 'goals', label: 'Cele', required: false },

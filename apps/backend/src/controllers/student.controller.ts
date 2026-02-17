@@ -32,7 +32,6 @@ const createStudentSchema = z.object({
   firstName: requiredString('Imię', { min: 2 }),
   lastName: requiredString('Nazwisko', { min: 2 }),
   phone: optionalPhone('Telefon'),
-  dateOfBirth: optionalString('Data urodzenia'),
   address: optionalString('Adres'),
   languageLevel: requiredEnum('Poziom języka', languageLevelValues, languageLevelLabels),
   language: optionalString('Język'), // Language being learned (ISO 639-1 code)
@@ -49,7 +48,6 @@ const updateStudentSchema = z.object({
   lastName: optionalString('Nazwisko', { min: 2 }),
   phone: optionalPhone('Telefon'),
   email: optionalEmail('Email'),
-  dateOfBirth: optionalString('Data urodzenia'),
   address: optionalString('Adres'),
   languageLevel: optionalEnum('Poziom języka', languageLevelValues, languageLevelLabels),
   language: optionalString('Język'), // Language being learned

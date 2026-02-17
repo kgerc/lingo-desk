@@ -2,10 +2,9 @@ import { Response, NextFunction } from 'express';
 import { z } from 'zod';
 import userProfileService from '../services/userProfile.service';
 import { AuthRequest } from '../middleware/auth';
-import { optionalString, optionalBoolean, optionalDateString } from '../utils/validation-messages';
+import { optionalString, optionalBoolean } from '../utils/validation-messages';
 
 const updateProfileSchema = z.object({
-  dateOfBirth: optionalDateString('Data urodzenia'),
   address: optionalString('Adres'),
   emergencyContact: optionalString('Kontakt awaryjny'),
   notes: optionalString('Notatki'),

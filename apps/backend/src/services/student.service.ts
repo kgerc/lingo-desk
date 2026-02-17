@@ -10,7 +10,6 @@ interface CreateStudentData {
   firstName: string;
   lastName: string;
   phone?: string;
-  dateOfBirth?: string;
   address?: string;
   languageLevel: LanguageLevel;
   language?: string; // Language being learned (ISO 639-1 code)
@@ -26,7 +25,6 @@ interface UpdateStudentData {
   lastName?: string;
   phone?: string;
   email?: string;
-  dateOfBirth?: string;
   address?: string;
   languageLevel?: LanguageLevel;
   language?: string; // Language being learned
@@ -53,7 +51,6 @@ export class StudentService {
       firstName,
       lastName,
       phone,
-      dateOfBirth,
       address,
       languageLevel,
       language,
@@ -108,7 +105,6 @@ export class StudentService {
       await tx.userProfile.create({
         data: {
           userId: user.id,
-          dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
           address,
         },
       });
@@ -303,11 +299,10 @@ export class StudentService {
       }
 
       // Update profile
-      if (data.dateOfBirth || data.address) {
+      if (data.address) {
         await tx.userProfile.update({
           where: { userId: student.userId },
           data: {
-            dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
             address: data.address,
           },
         });
@@ -591,7 +586,6 @@ export class StudentService {
 
         // Parse optional fields
         const phone = row[columnMapping.phone]?.trim() || undefined;
-        const dateOfBirth = row[columnMapping.dateOfBirth]?.trim() || undefined;
         const address = row[columnMapping.address]?.trim() || undefined;
         const goals = row[columnMapping.goals]?.trim() || undefined;
         const isMinor = row[columnMapping.isMinor]?.trim().toLowerCase() === 'true' ||
@@ -635,7 +629,6 @@ export class StudentService {
           await tx.userProfile.create({
             data: {
               userId: user.id,
-              dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
               address,
             },
           });
@@ -703,7 +696,6 @@ export class StudentService {
       firstName: ['firstname', 'first name', 'imię', 'imie', 'name'],
       lastName: ['lastname', 'last name', 'nazwisko', 'surname'],
       phone: ['phone', 'telefon', 'tel', 'mobile', 'phone number'],
-      dateOfBirth: ['dateofbirth', 'date of birth', 'birth date', 'data urodzenia', 'dob'],
       address: ['address', 'adres', 'street', 'ulica'],
       languageLevel: ['languagelevel', 'language level', 'level', 'poziom'],
       goals: ['goals', 'cele', 'notes', 'uwagi'],
@@ -752,12 +744,6 @@ export class StudentService {
     if (!visibility.address && filtered.user?.profile) {
       filtered.user = { ...filtered.user, profile: { ...filtered.user.profile } };
       delete filtered.user.profile.address;
-    }
-
-    // Filter dateOfBirth
-    if (!visibility.dateOfBirth && filtered.user?.profile) {
-      filtered.user = { ...filtered.user, profile: { ...filtered.user.profile } };
-      delete filtered.user.profile.dateOfBirth;
     }
 
     // Filter goals/notes

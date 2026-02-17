@@ -27,7 +27,7 @@ type TabType = 'personal' | 'cancellation' | 'balance';
 
 const PERSONAL_TAB_FIELDS = [
   'firstName', 'lastName', 'email', 'phone', 'password',
-  'dateOfBirth', 'language', 'languageLevel', 'address', 'goals',
+  'language', 'languageLevel', 'address', 'goals',
   'isMinor', 'paymentDueDays', 'paymentDueDayOfMonth',
 ];
 const CANCELLATION_TAB_FIELDS = [
@@ -49,7 +49,6 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
     email: student?.user.email || '',
     phone: student?.user.phone || '',
     password: '',
-    dateOfBirth: student?.user.profile?.dateOfBirth?.split('T')[0] || '',
     address: student?.user.profile?.address || '',
     languageLevel: student?.languageLevel || 'A1',
     language: student?.language || 'en',
@@ -185,7 +184,6 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
           lastName: formData.lastName,
           email: formData.email,
           phone: formData.phone || undefined,
-          dateOfBirth: formData.dateOfBirth || undefined,
           address: formData.address || undefined,
           languageLevel: formData.languageLevel,
           language: formData.language,
@@ -207,7 +205,6 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
       await createMutation.mutateAsync({
         ...formData,
         phone: formData.phone || undefined,
-        dateOfBirth: formData.dateOfBirth || undefined,
         address: formData.address || undefined,
         goals: formData.goals || undefined,
       });
@@ -469,19 +466,6 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                   )}
                 </div>
               )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Data urodzenia
-                </label>
-                <input
-                  type="date"
-                  name="dateOfBirth"
-                  value={formData.dateOfBirth}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

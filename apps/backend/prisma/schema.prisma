@@ -228,7 +228,6 @@ model User {
 model UserProfile {
   id                      String   @id @default(uuid())
   userId                  String   @unique @map("user_id")
-  dateOfBirth             DateTime? @map("date_of_birth")
   address                 String?
   emergencyContact        String?  @map("emergency_contact")
   notes                   String?

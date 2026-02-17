@@ -29,7 +29,6 @@ export interface Student {
     isActive: boolean;
     createdAt: string;
     profile?: {
-      dateOfBirth?: string;
       address?: string;
     };
   };
@@ -47,7 +46,6 @@ export interface CreateStudentData {
   firstName: string;
   lastName: string;
   phone?: string;
-  dateOfBirth?: string;
   address?: string;
   languageLevel: string;
   language?: string; // Language being learned
@@ -62,7 +60,6 @@ export interface UpdateStudentData {
   lastName?: string;
   phone?: string;
   email?: string;
-  dateOfBirth?: string;
   address?: string;
   languageLevel?: string;
   language?: string; // Language being learned
