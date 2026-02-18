@@ -77,6 +77,20 @@ router.put(
   organizationController.updateSkipHolidays.bind(organizationController)
 );
 
+// Get disabled holidays list (ADMIN or MANAGER)
+router.get(
+  '/holidays/disabled',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  organizationController.getDisabledHolidays.bind(organizationController)
+);
+
+// Update disabled holidays list (ADMIN or MANAGER)
+router.put(
+  '/holidays/disabled',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  organizationController.updateDisabledHolidays.bind(organizationController)
+);
+
 // Get Polish holidays for a given year
 router.get(
   '/holidays',

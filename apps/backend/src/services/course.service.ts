@@ -1,6 +1,6 @@
 import { PrismaClient, LessonStatus, LessonDeliveryMode, CourseFormat, LanguageLevel, CourseDeliveryMode } from '@prisma/client';
 import emailService from './email.service';
-import { isPolishHoliday, getHolidayName } from '../utils/polish-holidays';
+import { getHolidayName } from '../utils/polish-holidays';
 
 const prisma = new PrismaClient();
 
@@ -12,7 +12,8 @@ interface DaySchedule {
 
 // Helper to generate dates from pattern
 // Supports both old format (single time) and new format (daySchedules with per-day times)
-// When skipHolidays is true, dates that fall on Polish public holidays are excluded
+// When skipHolidays is true, dates that fall on Polish public holidays are excluded.
+// disabledHolidays is a list of holiday names that are excluded from the block (i.e. allowed).
 function generateDatesFromPattern(pattern: {
   frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
   startDate: Date;
@@ -21,7 +22,7 @@ function generateDatesFromPattern(pattern: {
   daysOfWeek?: number[]; // Legacy: single time for all days
   time?: string; // Legacy: single time for all days (HH:mm)
   daySchedules?: DaySchedule[]; // New: individual time per day
-}, skipHolidays: boolean = false): Date[] {
+}, skipHolidays: boolean = false, disabledHolidays: string[] = []): Date[] {
   const dates: Date[] = [];
 
   // Build effective day schedules - support both old and new format
@@ -51,7 +52,9 @@ function generateDatesFromPattern(pattern: {
 
     let count = 0;
     while (count < maxOccurrences && (!pattern.endDate || currentDate <= pattern.endDate)) {
-      if (!skipHolidays || !isPolishHoliday(currentDate)) {
+      const holidayName = getHolidayName(currentDate);
+      const isBlocked = skipHolidays && !!holidayName && !disabledHolidays.includes(holidayName);
+      if (!isBlocked) {
         dates.push(new Date(currentDate));
         count++;
       }
@@ -87,8 +90,9 @@ function generateDatesFromPattern(pattern: {
       // Stop if we have enough occurrences
       if (dates.length >= maxOccurrences) break;
 
-      // Skip Polish holidays if enabled
-      if (skipHolidays && isPolishHoliday(lessonDate)) continue;
+      // Skip Polish holidays if enabled (unless this holiday is in disabledHolidays = allowed)
+      const lessonHolidayName = getHolidayName(lessonDate);
+      if (skipHolidays && !!lessonHolidayName && !disabledHolidays.includes(lessonHolidayName)) continue;
 
       dates.push(new Date(lessonDate));
     }
@@ -282,11 +286,13 @@ class CourseService {
       }
     }
 
-    // Check if organization has skipHolidays enabled
+    // Check if organization has skipHolidays enabled and which holidays are disabled
     const orgSettings = await prisma.organizationSettings.findUnique({
       where: { organizationId },
     });
-    const skipHolidays = (orgSettings?.settings as Record<string, any>)?.skipHolidays === true;
+    const customSettings = (orgSettings?.settings as Record<string, any>) || {};
+    const skipHolidays = customSettings.skipHolidays === true;
+    const disabledHolidays: string[] = Array.isArray(customSettings.disabledHolidays) ? customSettings.disabledHolidays : [];
 
     // Calculate lesson dates from schedule
     let lessonDates: { date: Date; durationMinutes: number; title?: string; deliveryMode: 'IN_PERSON' | 'ONLINE'; meetingUrl?: string }[] = [];
@@ -298,7 +304,7 @@ class CourseService {
         const itemDate = new Date(item.scheduledAt);
         if (skipHolidays) {
           const holidayName = getHolidayName(itemDate);
-          if (holidayName) {
+          if (holidayName && !disabledHolidays.includes(holidayName)) {
             skippedHolidays.push({ date: itemDate.toISOString(), holidayName });
             continue;
           }
@@ -313,7 +319,7 @@ class CourseService {
       }
     } else if (schedule?.pattern) {
       // Recurring pattern - holiday filtering handled inside generateDatesFromPattern
-      const dates = generateDatesFromPattern(schedule.pattern, skipHolidays);
+      const dates = generateDatesFromPattern(schedule.pattern, skipHolidays, disabledHolidays);
       lessonDates = dates.map(date => ({
         date,
         durationMinutes: schedule.pattern!.durationMinutes,

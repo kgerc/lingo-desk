@@ -243,6 +243,38 @@ class OrganizationController {
     }
   }
 
+  async getDisabledHolidays(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizationId = req.user!.organizationId;
+      const disabledHolidays = await organizationService.getDisabledHolidays(organizationId);
+
+      res.json({ success: true, data: { disabledHolidays } });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateDisabledHolidays(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizationId = req.user!.organizationId;
+      const { disabledHolidays } = req.body;
+      const userId = req.user!.id;
+
+      if (!Array.isArray(disabledHolidays) || disabledHolidays.some(h => typeof h !== 'string')) {
+        res.status(400).json({
+          success: false,
+          error: { message: 'Pole "disabledHolidays" musi być tablicą ciągów znaków' },
+        });
+        return;
+      }
+
+      await organizationService.updateDisabledHolidays(organizationId, disabledHolidays, userId);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async checkHoliday(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { date } = req.query;

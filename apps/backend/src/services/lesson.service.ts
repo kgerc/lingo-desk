@@ -172,11 +172,13 @@ class LessonService {
     const orgSettings = await prisma.organizationSettings.findUnique({
       where: { organizationId },
     });
-    const skipHolidays = (orgSettings?.settings as Record<string, any>)?.skipHolidays === true;
+    const customSettings = (orgSettings?.settings as Record<string, any>) || {};
+    const skipHolidays = customSettings.skipHolidays === true;
+    const disabledHolidays: string[] = Array.isArray(customSettings.disabledHolidays) ? customSettings.disabledHolidays : [];
 
     if (skipHolidays) {
       const holidayName = getHolidayName(new Date(data.scheduledAt));
-      if (holidayName) {
+      if (holidayName && !disabledHolidays.includes(holidayName)) {
         throw new Error(`Nie można zaplanować lekcji na dzień ustawowo wolny: ${holidayName}. Zmień datę lub wyłącz pomijanie świąt w ustawieniach.`);
       }
     }
@@ -1741,7 +1743,9 @@ class LessonService {
     const orgSettings = await prisma.organizationSettings.findUnique({
       where: { organizationId },
     });
-    const skipHolidays = (orgSettings?.settings as Record<string, any>)?.skipHolidays === true;
+    const recurringCustomSettings = (orgSettings?.settings as Record<string, any>) || {};
+    const skipHolidays = recurringCustomSettings.skipHolidays === true;
+    const disabledHolidays: string[] = Array.isArray(recurringCustomSettings.disabledHolidays) ? recurringCustomSettings.disabledHolidays : [];
 
     // For weekly/biweekly, if daysOfWeek is not provided, use the day of the start date
     const effectiveDaysOfWeek =
@@ -1775,10 +1779,10 @@ class LessonService {
         }
       }
 
-      // Skip Polish holidays if enabled
+      // Skip Polish holidays if enabled (unless in disabledHolidays = explicitly allowed)
       if (skipHolidays) {
         const holidayName = getHolidayName(currentDate);
-        if (holidayName) {
+        if (holidayName && !disabledHolidays.includes(holidayName)) {
           errors.push({
             date: currentDate.toISOString(),
             error: `Pominięto święto: ${holidayName}`,

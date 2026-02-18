@@ -431,6 +431,51 @@ class OrganizationService {
   }
 
   /**
+   * Get disabledHolidays list for organization
+   */
+  async getDisabledHolidays(organizationId: string): Promise<string[]> {
+    const settings = await prisma.organizationSettings.findUnique({
+      where: { organizationId },
+    });
+
+    if (!settings?.settings) return [];
+    const customSettings = settings.settings as Record<string, any>;
+    return Array.isArray(customSettings.disabledHolidays) ? customSettings.disabledHolidays : [];
+  }
+
+  /**
+   * Update disabledHolidays list for organization
+   */
+  async updateDisabledHolidays(
+    organizationId: string,
+    disabledHolidays: string[],
+    userId: string
+  ) {
+    const userOrg = await prisma.userOrganization.findFirst({
+      where: { userId, organizationId, role: { in: ['ADMIN', 'MANAGER'] } },
+    });
+
+    if (!userOrg) {
+      throw new Error('You do not have permission to update organization settings');
+    }
+
+    const currentSettings = await prisma.organizationSettings.findUnique({
+      where: { organizationId },
+    });
+
+    const existingSettings = (currentSettings?.settings as Record<string, any>) || {};
+    const mergedSettings = { ...existingSettings, disabledHolidays };
+
+    const settings = await prisma.organizationSettings.upsert({
+      where: { organizationId },
+      create: { organizationId, settings: mergedSettings },
+      update: { settings: mergedSettings },
+    });
+
+    return settings;
+  }
+
+  /**
    * Update visibility settings - ADMIN only
    */
   async updateVisibilitySettings(

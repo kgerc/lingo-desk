@@ -414,7 +414,7 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
 
     // Auto-navigate to first tab with error
     if (Object.keys(newErrors).length > 0) {
-      const tabOrder: TabType[] = ['basic', 'details', 'students', 'schedule'];
+      const tabOrder: TabType[] = ['basic', 'students', 'schedule', 'details'];
       for (const tab of tabOrder) {
         const hasErrorInTab = Object.keys(newErrors).some(
           (field) => FIELD_TO_TAB_MAP[field] === tab
@@ -475,11 +475,11 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
 
   const tabs = [
     { id: 'basic' as TabType, name: 'Podstawowe', icon: Info },
-    { id: 'details' as TabType, name: 'Szczegóły', icon: Settings },
     ...(!isEdit ? [
       { id: 'students' as TabType, name: 'Uczniowie', icon: Users },
       { id: 'schedule' as TabType, name: 'Harmonogram', icon: Calendar },
     ] : []),
+    { id: 'details' as TabType, name: 'Szczegóły', icon: Settings },
   ];
 
   const formatDate = (date: Date) => {

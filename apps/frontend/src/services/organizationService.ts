@@ -155,6 +155,15 @@ const organizationService = {
     const response = await api.get(`/organizations/holidays/check?date=${date}`) as any;
     return response.data.data;
   },
+
+  async getDisabledHolidays(): Promise<{ disabledHolidays: string[] }> {
+    const response = await api.get('/organizations/holidays/disabled') as any;
+    return response.data.data;
+  },
+
+  async updateDisabledHolidays(disabledHolidays: string[]): Promise<void> {
+    await api.put('/organizations/holidays/disabled', { disabledHolidays });
+  },
 };
 
 export default organizationService;

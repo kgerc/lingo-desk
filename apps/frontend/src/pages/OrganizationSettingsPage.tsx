@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import organizationService, { UpdateOrganizationData } from '../services/organizationService';
-import { Building2, Save, CalendarOff } from 'lucide-react';
+import { Building2, Save, CalendarOff, Info } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -50,6 +50,47 @@ const OrganizationSettingsPage: React.FC = () => {
       setSkipHolidays(holidaysSettings.skipHolidays);
     }
   }, [holidaysSettings]);
+
+  // Fetch list of Polish holidays for current year
+  const currentYear = new Date().getFullYear();
+  const { data: holidays } = useQuery({
+    queryKey: ['holidays', currentYear],
+    queryFn: () => organizationService.getHolidays(currentYear),
+  });
+
+  // Fetch disabled holidays
+  const { data: disabledHolidaysData } = useQuery({
+    queryKey: ['disabledHolidays'],
+    queryFn: () => organizationService.getDisabledHolidays(),
+  });
+
+  const [disabledHolidays, setDisabledHolidays] = useState<string[]>([]);
+
+  React.useEffect(() => {
+    if (disabledHolidaysData) {
+      setDisabledHolidays(disabledHolidaysData.disabledHolidays);
+    }
+  }, [disabledHolidaysData]);
+
+  const disabledHolidaysMutation = useMutation({
+    mutationFn: (list: string[]) => organizationService.updateDisabledHolidays(list),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['disabledHolidays'] });
+    },
+    onError: () => {
+      toast.error('Błąd podczas aktualizacji ustawień świąt');
+    },
+  });
+
+  const handleHolidayToggle = (name: string, checked: boolean) => {
+    // checked = "uwzględniaj" → remove from disabled list
+    // unchecked = "nie uwzględniaj" → add to disabled list
+    const updated = checked
+      ? disabledHolidays.filter(h => h !== name)
+      : [...disabledHolidays, name];
+    setDisabledHolidays(updated);
+    disabledHolidaysMutation.mutate(updated);
+  };
 
   // Update skipHolidays mutation
   const skipHolidaysMutation = useMutation({
@@ -338,6 +379,50 @@ const OrganizationSettingsPage: React.FC = () => {
                 </p>
               </div>
             </div>
+
+            {skipHolidays && holidays && holidays.length > 0 && (
+              <div className="mt-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <p className="text-sm font-medium text-gray-900">
+                    Lista świąt ({currentYear})
+                  </p>
+                  <span
+                    className="text-gray-400 cursor-help"
+                    title="Odznacz święto, aby lekcje mogły odbywać się w tym dniu mimo włączonego blokowania świąt."
+                  >
+                    <Info className="h-4 w-4" />
+                  </span>
+                </div>
+                <div className="rounded-lg border border-gray-200 divide-y divide-gray-100">
+                  {holidays.map((holiday) => {
+                    const isActive = !disabledHolidays.includes(holiday.name);
+                    const date = new Date(holiday.date);
+                    const formatted = date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' });
+                    return (
+                      <label
+                        key={holiday.name}
+                        className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={isActive}
+                            onChange={(e) => handleHolidayToggle(holiday.name, e.target.checked)}
+                            disabled={disabledHolidaysMutation.isPending}
+                            className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                          />
+                          <span className="text-sm text-gray-900">{holiday.name}</span>
+                        </div>
+                        <span className="text-sm text-gray-500">{formatted}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  Odznacz święto, aby zezwolić na planowanie lekcji w ten dzień.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
