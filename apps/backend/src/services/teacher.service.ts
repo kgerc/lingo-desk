@@ -318,6 +318,34 @@ export class TeacherService {
     return { success: true, message: 'Teacher deactivated' };
   }
 
+  async deleteTeacherWithCascade(id: string, organizationId: string) {
+    const teacher = await prisma.teacher.findFirst({
+      where: { id, organizationId },
+    });
+
+    if (!teacher) {
+      throw new Error('Teacher not found');
+    }
+
+    // Cancel all future lessons
+    await prisma.lesson.updateMany({
+      where: {
+        teacherId: id,
+        scheduledAt: { gte: new Date() },
+        status: { in: ['SCHEDULED', 'CONFIRMED'] },
+      },
+      data: { status: 'CANCELLED' },
+    });
+
+    // Soft delete: deactivate user
+    await prisma.user.update({
+      where: { id: teacher.userId },
+      data: { isActive: false },
+    });
+
+    return { success: true, message: 'Teacher deactivated' };
+  }
+
   async getTeacherStats(organizationId: string) {
     const totalTeachers = await prisma.teacher.count({
       where: { organizationId },

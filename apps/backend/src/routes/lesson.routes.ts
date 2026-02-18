@@ -25,6 +25,13 @@ router.post(
   lessonController.createRecurringLessons.bind(lessonController)
 );
 
+// Bulk update lesson statuses (managers, admins)
+router.patch(
+  '/bulk-update-status',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  lessonController.bulkUpdateStatus.bind(lessonController)
+);
+
 // Get cancellation fee preview for a lesson
 router.get('/:id/cancellation-fee-preview', lessonController.getCancellationFeePreview.bind(lessonController));
 

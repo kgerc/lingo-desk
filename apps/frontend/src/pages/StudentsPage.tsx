@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { studentService, Student } from '../services/studentService';
-import { Plus, Search, Mail, Phone, MoreVertical, Upload, X, Calculator } from 'lucide-react';
+import { Plus, Search, Mail, Phone, MoreVertical, Upload, X, Calculator, Trash2, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import StudentModal from '../components/StudentModal';
 import ImportStudentsModal from '../components/ImportStudentsModal';
@@ -24,6 +24,8 @@ const StudentsPage: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; studentId: string | null }>({ isOpen: false, studentId: null });
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   // Check if user has access to settlements (ADMIN, MANAGER, HR)
@@ -39,6 +41,40 @@ const StudentsPage: React.FC = () => {
     queryKey: ['students', searchTerm],
     queryFn: () => studentService.getStudents({ search: searchTerm }),
   });
+
+  // Bulk delete mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => studentService.bulkDeleteStudents(ids),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      setSelectedIds(new Set());
+      if (result.failed === 0) {
+        toast.success(`Usunięto ${result.deleted} uczniów`);
+      } else {
+        toast.error(`Usunięto ${result.deleted}, błędy: ${result.failed}`);
+      }
+    },
+    onError: () => {
+      toast.error('Błąd podczas usuwania uczniów');
+    },
+  });
+
+  const handleToggle = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === students.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(students.map((s) => s.id)));
+    }
+  };
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -99,6 +135,9 @@ const StudentsPage: React.FC = () => {
     );
   };
 
+  const allSelected = students.length > 0 && selectedIds.size === students.length;
+  const someSelected = selectedIds.size > 0 && !allSelected;
+
   return (
     <div>
       <div className="mb-8 flex justify-between items-center">
@@ -140,6 +179,33 @@ const StudentsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-4 px-4 py-3 mb-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <span className="text-sm font-medium text-blue-800">
+            Zaznaczono {selectedIds.size} {selectedIds.size === 1 ? 'ucznia' : selectedIds.size < 5 ? 'uczniów' : 'uczniów'}
+          </span>
+          <button
+            onClick={() => setBulkConfirmOpen(true)}
+            disabled={bulkDeleteMutation.isPending}
+            className="flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+          >
+            {bulkDeleteMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Usuń zaznaczonych
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Odznacz wszystkich
+          </button>
+        </div>
+      )}
+
       {/* Students Table */}
       <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
         {isLoading ? (
@@ -153,6 +219,15 @@ const StudentsPage: React.FC = () => {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={(el) => { if (el) el.indeterminate = someSelected; }}
+                      onChange={handleSelectAll}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Nr
                   </th>
@@ -182,8 +257,18 @@ const StudentsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {students.map((student) => (
-                  <tr key={student.id} className="hover:bg-gray-50 transition-colors">
+                {students.map((student) => {
+                  const isSelected = selectedIds.has(student.id);
+                  return (
+                  <tr key={student.id} className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}>
+                    <td className="w-10 px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggle(student.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       #{student.studentNumber}
                     </td>
@@ -286,7 +371,8 @@ const StudentsPage: React.FC = () => {
                       />
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -320,6 +406,18 @@ const StudentsPage: React.FC = () => {
         onConfirm={confirmDelete}
         title="Usuń ucznia"
         message="Czy na pewno chcesz usunąć tego ucznia? Ta operacja jest nieodwracalna."
+        confirmText="Usuń"
+        cancelText="Anuluj"
+        variant="danger"
+      />
+
+      {/* Confirm Bulk Delete Dialog */}
+      <ConfirmDialog
+        isOpen={bulkConfirmOpen}
+        onClose={() => setBulkConfirmOpen(false)}
+        onConfirm={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+        title="Usuń zaznaczonych uczniów"
+        message={`Czy na pewno chcesz usunąć ${selectedIds.size} zaznaczonych uczniów? Ta operacja jest nieodwracalna.`}
         confirmText="Usuń"
         cancelText="Anuluj"
         variant="danger"

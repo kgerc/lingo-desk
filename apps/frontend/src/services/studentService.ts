@@ -109,6 +109,11 @@ export const studentService = {
     return response.data;
   },
 
+  async bulkDeleteStudents(ids: string[]) {
+    const response = await api.delete('/students/bulk', { data: { ids } });
+    return response.data as { deleted: number; failed: number; errors: { id: string; error: string }[] };
+  },
+
   async getStats() {
     const response = await api.get('/students/stats') as any;
     return response.data.data as { total: number; active: number; lowBudget: number };

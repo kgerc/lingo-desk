@@ -272,6 +272,43 @@ class LessonController {
     }
   }
 
+  async bulkUpdateStatus(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const organizationId = req.user!.organizationId;
+      const { lessonIds, status } = req.body;
+
+      if (!Array.isArray(lessonIds) || lessonIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Wymagana jest lista lekcji do aktualizacji',
+        });
+      }
+
+      const validStatuses = ['SCHEDULED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'PENDING_CONFIRMATION', 'NO_SHOW'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: `Nieprawidłowy status. Dozwolone: ${validStatuses.join(', ')}`,
+        });
+      }
+
+      const results = await lessonService.bulkUpdateStatus(
+        lessonIds,
+        status,
+        organizationId,
+        req.user!.id
+      );
+
+      return res.json({
+        success: true,
+        data: results,
+        message: `Zaktualizowano ${results.updated} lekcji${results.failed > 0 ? `, ${results.failed} błędów` : ''}`,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   async getCancellationStats(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { studentId } = req.params;

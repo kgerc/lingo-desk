@@ -93,6 +93,11 @@ export const teacherService = {
     return response.data;
   },
 
+  async bulkDeleteTeachers(ids: string[]) {
+    const response = await api.delete('/teachers/bulk', { data: { ids } });
+    return response.data as { deleted: number; failed: number; errors: { id: string; error: string }[] };
+  },
+
   async getStats() {
     const response = await api.get('/teachers/stats') as any;
     return response.data.data as { total: number; active: number; available: number };

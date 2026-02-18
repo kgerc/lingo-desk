@@ -295,6 +295,28 @@ class CourseController {
       next(error);
     }
   }
+
+  async bulkDelete(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Lista ID jest wymagana' } });
+      }
+      const results = { deleted: 0, failed: 0, errors: [] as { id: string; error: string }[] };
+      for (const id of ids) {
+        try {
+          await courseService.deleteCourseWithCascade(id as string, req.user!.organizationId);
+          results.deleted++;
+        } catch (error: any) {
+          results.failed++;
+          results.errors.push({ id, error: error.message || 'Nieznany błąd' });
+        }
+      }
+      return res.json(results);
+    } catch (error) {
+      return next(error);
+    }
+  }
 }
 
 export default new CourseController();

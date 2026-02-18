@@ -826,6 +826,40 @@ class CourseService {
     return { message: 'Course deleted successfully' };
   }
 
+  async deleteCourseWithCascade(id: string, organizationId: string) {
+    const course = await prisma.course.findFirst({
+      where: { id, organizationId },
+    });
+
+    if (!course) {
+      throw new Error('Course not found');
+    }
+
+    // Cancel all future lessons
+    await prisma.lesson.updateMany({
+      where: {
+        courseId: id,
+        scheduledAt: { gte: new Date() },
+        status: { in: ['SCHEDULED', 'CONFIRMED'] },
+      },
+      data: { status: 'CANCELLED' },
+    });
+
+    // Unenroll all active students
+    await prisma.studentEnrollment.updateMany({
+      where: { courseId: id, status: 'ACTIVE' },
+      data: { status: 'COMPLETED' },
+    });
+
+    // Soft delete the course
+    await prisma.course.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    return { message: 'Course deleted successfully' };
+  }
+
   async getCourseStats(organizationId: string) {
     const total = await prisma.course.count({
       where: { organizationId },

@@ -72,6 +72,13 @@ router.delete(
   courseController.unenrollStudent.bind(courseController)
 );
 
+// DELETE /api/courses/bulk - Bulk delete courses
+router.delete(
+  '/bulk',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  courseController.bulkDelete.bind(courseController)
+);
+
 // DELETE /api/courses/:id - Delete course
 router.delete(
   '/:id',

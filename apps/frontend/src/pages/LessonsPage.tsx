@@ -26,6 +26,8 @@ import {
   MoreVertical,
   RefreshCw,
   Users,
+  CheckSquare,
+  Loader2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
@@ -133,6 +135,10 @@ const LessonsPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null);
+
+  // Bulk selection state
+  const [selectedLessonIds, setSelectedLessonIds] = useState<Set<string>>(new Set());
+  const [bulkStatusTarget, setBulkStatusTarget] = useState<LessonStatus | ''>('');
 
   // List view states
   const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; lessonId: string | null }>({ isOpen: false, lessonId: null });
@@ -268,6 +274,57 @@ const LessonsPage: React.FC = () => {
   });
 
 
+
+  // Bulk update mutation
+  const bulkUpdateMutation = useMutation({
+    mutationFn: ({ lessonIds, status }: { lessonIds: string[]; status: LessonStatus }) =>
+      lessonService.bulkUpdateStatus(lessonIds, status),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      setSelectedLessonIds(new Set());
+      setBulkStatusTarget('');
+      if (data.failed === 0) {
+        toast.success(`Zaktualizowano ${data.updated} lekcji`);
+      } else {
+        toast.success(`Zaktualizowano ${data.updated} lekcji, ${data.failed} błędów`);
+        if (data.errors.length > 0) {
+          data.errors.forEach((e) => toast.error(`${e.title}: ${e.error}`));
+        }
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Błąd podczas masowej aktualizacji statusów');
+    },
+  });
+
+  // Bulk selection handlers
+  const handleToggleLesson = (lessonId: string) => {
+    setSelectedLessonIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(lessonId)) {
+        next.delete(lessonId);
+      } else {
+        next.add(lessonId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedLessonIds.size === lessons.length) {
+      setSelectedLessonIds(new Set());
+    } else {
+      setSelectedLessonIds(new Set(lessons.map((l) => l.id)));
+    }
+  };
+
+  const handleBulkStatusChange = () => {
+    if (!bulkStatusTarget || selectedLessonIds.size === 0) return;
+    bulkUpdateMutation.mutate({
+      lessonIds: Array.from(selectedLessonIds),
+      status: bulkStatusTarget,
+    });
+  };
 
   const handleEditLesson = (lesson: Lesson) => {
     setSelectedLesson(lesson);
@@ -486,9 +543,18 @@ const LessonsPage: React.FC = () => {
 
   // Render lesson row
   const renderLessonRow = (lesson: Lesson) => {
+    const isSelected = selectedLessonIds.has(lesson.id);
     return (
-      <div key={lesson.id} className="border-b border-gray-200">
+      <div key={lesson.id} className={`border-b border-gray-200 ${isSelected ? 'bg-primary/5' : ''}`}>
         <div className="px-6 py-4 hover:bg-gray-50 transition-colors flex items-center">
+          <div className="w-10 flex-shrink-0">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => handleToggleLesson(lesson.id)}
+              className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+            />
+          </div>
           <div className="flex-1 grid grid-cols-6 gap-4 items-center">
             <div>
               <div className="text-sm font-medium text-gray-900">{lesson.title}</div>
@@ -764,14 +830,65 @@ const LessonsPage: React.FC = () => {
       ) : viewMode === 'list' ? (
         /* List View with Virtualization */
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          {/* Bulk action bar */}
+          {selectedLessonIds.size > 0 && (
+            <div className="px-6 py-3 bg-primary/5 border-b border-primary/20 flex items-center gap-4">
+              <span className="text-sm font-medium text-primary">
+                <CheckSquare className="h-4 w-4 inline mr-1" />
+                Zaznaczono {selectedLessonIds.size} {selectedLessonIds.size === 1 ? 'lekcję' : selectedLessonIds.size < 5 ? 'lekcje' : 'lekcji'}
+              </span>
+              <select
+                value={bulkStatusTarget}
+                onChange={(e) => setBulkStatusTarget(e.target.value as LessonStatus | '')}
+                className="text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="">Zmień status na...</option>
+                <option value="SCHEDULED">Zaplanowana</option>
+                <option value="CONFIRMED">Potwierdzona</option>
+                <option value="COMPLETED">Zakończona</option>
+                <option value="CANCELLED">Anulowana</option>
+                <option value="PENDING_CONFIRMATION">Oczekuje potwierdzenia</option>
+                <option value="NO_SHOW">Nieobecność</option>
+              </select>
+              <button
+                onClick={handleBulkStatusChange}
+                disabled={!bulkStatusTarget || bulkUpdateMutation.isPending}
+                className="text-sm px-3 py-1.5 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                {bulkUpdateMutation.isPending ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Aktualizowanie...</>
+                ) : (
+                  'Zastosuj'
+                )}
+              </button>
+              <button
+                onClick={() => setSelectedLessonIds(new Set())}
+                className="text-sm text-gray-500 hover:text-gray-700 ml-auto"
+              >
+                Odznacz wszystko
+              </button>
+            </div>
+          )}
           <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
-            <div className="grid grid-cols-6 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
-              <div>Lekcja</div>
-              <div>Lektor</div>
-              <div>Uczeń</div>
-              <div>Data i czas</div>
-              <div>Tryb</div>
-              <div>Status</div>
+            <div className="flex items-center">
+              <div className="w-10 flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={lessons.length > 0 && selectedLessonIds.size === lessons.length}
+                  onChange={handleSelectAll}
+                  className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                  title="Zaznacz wszystko"
+                />
+              </div>
+              <div className="flex-1 grid grid-cols-6 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <div>Lekcja</div>
+                <div>Lektor</div>
+                <div>Uczeń</div>
+                <div>Data i czas</div>
+                <div>Tryb</div>
+                <div>Status</div>
+              </div>
+              <div className="w-10"></div>
             </div>
           </div>
           {lessons.length === 0 ? (

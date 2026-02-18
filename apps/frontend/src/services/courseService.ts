@@ -205,6 +205,11 @@ export const courseService = {
     return response.data;
   },
 
+  async bulkDeleteCourses(ids: string[]) {
+    const response = await api.delete('/courses/bulk', { data: { ids } });
+    return response.data as { deleted: number; failed: number; errors: { id: string; error: string }[] };
+  },
+
   async enrollStudent(
     courseId: string,
     studentId: string,

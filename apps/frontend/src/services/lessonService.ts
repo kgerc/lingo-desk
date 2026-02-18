@@ -279,4 +279,13 @@ export const lessonService = {
     const response = await api.get(`/lessons/student/${studentId}/cancellation-stats`) as any;
     return response.data.data as CancellationStats;
   },
+
+  async bulkUpdateStatus(lessonIds: string[], status: LessonStatus): Promise<{
+    updated: number;
+    failed: number;
+    errors: Array<{ lessonId: string; title: string; error: string }>;
+  }> {
+    const response = await api.patch('/lessons/bulk-update-status', { lessonIds, status }) as any;
+    return response.data.data;
+  },
 };

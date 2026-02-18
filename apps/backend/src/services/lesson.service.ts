@@ -1931,6 +1931,53 @@ class LessonService {
 
     return nextDate;
   }
+
+  /**
+   * Bulk update status of multiple lessons
+   * Uses updateLesson internally to preserve all side effects
+   */
+  async bulkUpdateStatus(
+    lessonIds: string[],
+    status: string,
+    organizationId: string,
+    userId?: string
+  ): Promise<{
+    updated: number;
+    failed: number;
+    errors: Array<{ lessonId: string; title: string; error: string }>;
+  }> {
+    const results = {
+      updated: 0,
+      failed: 0,
+      errors: [] as Array<{ lessonId: string; title: string; error: string }>,
+    };
+
+    for (const lessonId of lessonIds) {
+      try {
+        // For CONFIRMED status, use confirmLesson method
+        if (status === 'CONFIRMED') {
+          await this.confirmLesson(lessonId, organizationId);
+        } else {
+          await this.updateLesson(lessonId, organizationId, { status: status as any }, userId);
+        }
+        results.updated++;
+      } catch (error: any) {
+        // Get lesson title for error message
+        const lesson = await prisma.lesson.findFirst({
+          where: { id: lessonId, organizationId },
+          select: { title: true },
+        });
+        results.failed++;
+        results.errors.push({
+          lessonId,
+          title: lesson?.title || lessonId,
+          error: error.message || 'Nieznany błąd',
+        });
+      }
+    }
+
+    return results;
+  }
 }
 
 export default new LessonService();

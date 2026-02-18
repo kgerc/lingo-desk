@@ -53,6 +53,13 @@ router.post(
 // PUT /api/students/:id - Update student
 router.put('/:id', studentController.updateStudent.bind(studentController));
 
+// DELETE /api/students/bulk - Bulk delete students
+router.delete(
+  '/bulk',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  studentController.bulkDelete.bind(studentController)
+);
+
 // DELETE /api/students/:id - Delete student
 router.delete(
   '/:id',
