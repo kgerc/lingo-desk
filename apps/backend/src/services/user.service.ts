@@ -11,6 +11,7 @@ export interface CreateUserData {
   lastName: string;
   role: UserRole;
   phone?: string;
+  password?: string;
 }
 
 export interface UpdateUserData {
@@ -136,8 +137,8 @@ class UserService {
       throw new Error('Nieprawidłowa rola użytkownika');
     }
 
-    // Generate temporary password
-    const temporaryPassword = this.generateTemporaryPassword();
+    // Use provided password or generate a temporary one
+    const temporaryPassword = data.password || this.generateTemporaryPassword();
     const passwordHash = await bcrypt.hash(temporaryPassword, 10);
 
     // Create user

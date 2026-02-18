@@ -41,6 +41,7 @@ interface UpdateStudentData {
   cancellationLimitCount?: number | null;
   cancellationLimitPeriod?: string | null;
   isActive?: boolean;
+  internalNotes?: string | null;
 }
 
 export class StudentService {
@@ -326,6 +327,7 @@ export class StudentService {
           cancellationLimitEnabled: data.cancellationLimitEnabled,
           cancellationLimitCount: data.cancellationLimitCount,
           cancellationLimitPeriod: data.cancellationLimitPeriod,
+          internalNotes: data.internalNotes,
         },
         include: {
           user: {
@@ -785,7 +787,7 @@ export class StudentService {
       return students.map(student => this.filterStudentForManager(student, visibility.student));
     }
 
-    // Other roles - return basic info
+    // Other roles - return basic info (no internalNotes)
     return students.map(student => ({
       id: student.id,
       studentNumber: student.studentNumber,
@@ -811,13 +813,15 @@ export class StudentService {
       return student;
     }
 
-    // MANAGER - apply visibility settings
+    // MANAGER - apply visibility settings (internalNotes always visible for manager)
     if (userRole === UserRole.MANAGER) {
       const visibility = await organizationService.getVisibilitySettings(organizationId);
       return this.filterStudentForManager(student, visibility.student);
     }
 
-    return student;
+    // Other roles (TEACHER etc.) - strip internalNotes
+    const { internalNotes: _notes, ...studentWithoutNotes } = student as any;
+    return studentWithoutNotes;
   }
 }
 

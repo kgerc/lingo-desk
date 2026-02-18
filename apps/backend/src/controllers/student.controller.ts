@@ -68,6 +68,7 @@ const updateStudentSchema = z.object({
   cancellationLimitEnabled: optionalBoolean('Limit anulowań'),
   cancellationLimitCount: optionalPositiveInt('Limit liczby anulowań').nullable(),
   cancellationLimitPeriod: optionalEnum('Okres limitu anulowań', ['month', 'quarter', 'year', 'enrollment'] as const, cancellationPeriodLabels).nullable(),
+  internalNotes: z.string().max(10000, { message: 'Notatki nie mogą przekraczać 10 000 znaków' }).nullable().optional(),
 });
 
 export class StudentController {

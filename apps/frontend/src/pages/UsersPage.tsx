@@ -10,6 +10,9 @@ import {
   Phone,
   Shield,
   X,
+  RefreshCw,
+  Copy,
+  Check,
 } from 'lucide-react';
 import userService, {
   User,
@@ -24,6 +27,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Dropdown from '../components/Dropdown';
 import { useAuthStore } from '../stores/authStore';
+import { generateSecurePassword } from '../lib/passwordUtils';
 
 // Invite User Modal
 interface InviteUserModalProps {
@@ -39,8 +43,10 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, onSu
     lastName: '',
     role: 'TEACHER' as 'ADMIN' | 'MANAGER' | 'HR' | 'METHODOLOGIST' | 'TEACHER',
     phone: '',
+    password: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [passwordCopied, setPasswordCopied] = useState(false);
 
   const inviteMutation = useMutation({
     mutationFn: userService.inviteUser,
@@ -48,7 +54,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, onSu
       toast.success('Zaproszenie zostało wysłane');
       onSuccess();
       onClose();
-      setFormData({ email: '', firstName: '', lastName: '', role: 'TEACHER', phone: '' });
+      setFormData({ email: '', firstName: '', lastName: '', role: 'TEACHER', phone: '', password: '' });
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.error?.message || 'Nie udało się wysłać zaproszenia');
@@ -61,6 +67,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, onSu
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Nieprawidłowy format email';
     if (!formData.firstName || formData.firstName.length < 2) newErrors.firstName = 'Imię musi mieć min. 2 znaki';
     if (!formData.lastName || formData.lastName.length < 2) newErrors.lastName = 'Nazwisko musi mieć min. 2 znaki';
+    if (formData.password && formData.password.length < 8) newErrors.password = 'Hasło musi mieć min. 8 znaków';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -68,7 +75,8 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, onSu
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
-      inviteMutation.mutate(formData);
+      const payload = { ...formData, password: formData.password || undefined };
+      inviteMutation.mutate(payload);
     }
   };
 
@@ -153,6 +161,60 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, onSu
               ))}
             </select>
             <p className="text-sm text-gray-500 mt-1">{ROLE_DESCRIPTIONS[formData.role]}</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Hasło <span className="text-gray-400 font-normal">(opcjonalne)</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={formData.password}
+                autoComplete="off"
+                onChange={(e) => {
+                  setFormData({ ...formData, password: e.target.value });
+                  if (errors.password) setErrors((prev) => { const e = { ...prev }; delete e.password; return e; });
+                }}
+                placeholder="Zostaw puste, aby wygenerować automatycznie"
+                className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm ${
+                  errors.password ? 'border-red-500' : 'border-gray-300'
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const pwd = generateSecurePassword(12);
+                  setFormData((prev) => ({ ...prev, password: pwd }));
+                  setErrors((prev) => { const e = { ...prev }; delete e.password; return e; });
+                }}
+                title="Generuj hasło"
+                className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                <RefreshCw className="h-4 w-4 text-gray-600" />
+              </button>
+              <button
+                type="button"
+                disabled={!formData.password}
+                onClick={() => {
+                  navigator.clipboard.writeText(formData.password);
+                  setPasswordCopied(true);
+                  setTimeout(() => setPasswordCopied(false), 2000);
+                }}
+                title="Kopiuj hasło"
+                className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40"
+              >
+                {passwordCopied ? (
+                  <Check className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Copy className="h-4 w-4 text-gray-600" />
+                )}
+              </button>
+            </div>
+            {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
+            <p className="text-xs text-gray-500 mt-1">
+              Jeśli podasz hasło, zostanie użyte zamiast automatycznie wygenerowanego i wysłanego mailem.
+            </p>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

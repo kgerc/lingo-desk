@@ -17,6 +17,7 @@ const inviteUserSchema = z.object({
     errorMap: () => ({ message: 'Nieprawidłowa rola użytkownika' }),
   }),
   phone: optionalString('Telefon'),
+  password: z.string().min(8, { message: 'Hasło musi mieć min. 8 znaków' }).optional(),
 });
 
 const updateUserSchema = z.object({

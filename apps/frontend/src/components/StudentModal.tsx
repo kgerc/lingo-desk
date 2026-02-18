@@ -5,6 +5,8 @@ import { studentService, Student, CreateStudentData, UpdateStudentData } from '.
 import { X } from 'lucide-react';
 import StudentBalanceCard from './StudentBalanceCard';
 import { handleApiError } from '../lib/errorUtils';
+import { useAuthStore } from '../stores/authStore';
+import { generateSecurePassword } from '../lib/passwordUtils';
 
 interface StudentModalProps {
   student: Student | null;
@@ -23,7 +25,7 @@ const LANGUAGES = [
   { value: 'pl', label: 'Polski' },
 ];
 
-type TabType = 'personal' | 'cancellation' | 'balance';
+type TabType = 'personal' | 'cancellation' | 'balance' | 'notes';
 
 const PERSONAL_TAB_FIELDS = [
   'firstName', 'lastName', 'email', 'phone', 'password',
@@ -40,6 +42,8 @@ const PHONE_REGEX = /^[+]?[\d\s-]{9,15}$/;
 
 const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess }) => {
   const isEdit = !!student;
+  const { user } = useAuthStore();
+  const canSeeNotes = ['ADMIN', 'MANAGER'].includes(user?.role || '');
   const [activeTab, setActiveTab] = useState<TabType>('personal');
   const [passwordGenerated, setPasswordGenerated] = useState(false);
 
@@ -64,6 +68,8 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
     cancellationLimitEnabled: student?.cancellationLimitEnabled || false,
     cancellationLimitCount: student?.cancellationLimitCount || null,
     cancellationLimitPeriod: student?.cancellationLimitPeriod || 'month',
+    // Internal notes
+    internalNotes: student?.internalNotes || '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -199,6 +205,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
           cancellationLimitEnabled: formData.cancellationLimitEnabled,
           cancellationLimitCount: formData.cancellationLimitEnabled ? formData.cancellationLimitCount : null,
           cancellationLimitPeriod: formData.cancellationLimitEnabled ? formData.cancellationLimitPeriod : null,
+          internalNotes: canSeeNotes ? (formData.internalNotes || null) : undefined,
         },
       });
     } else {
@@ -227,35 +234,6 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
     }
   };
 
-  const generateSecurePassword = (length = 8) => {
-      const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      const lower = 'abcdefghijklmnopqrstuvwxyz';
-      const digits = '0123456789';
-      const special = '!@#$%^&*';
-      const all = upper + lower + digits + special;
-
-      const cryptoObj = window.crypto || (window as any).msCrypto;
-
-      const getRandomChar = (chars: string) =>
-        chars[cryptoObj.getRandomValues(new Uint32Array(1))[0] % chars.length];
-
-      // gwarantujemy spełnienie polityki
-      const passwordChars = [
-        getRandomChar(upper),
-        getRandomChar(lower),
-        getRandomChar(digits),
-        getRandomChar(special),
-      ];
-
-      while (passwordChars.length < length) {
-        passwordChars.push(getRandomChar(all));
-      }
-
-      // shuffle
-      return passwordChars
-        .sort(() => 0.5 - Math.random())
-        .join('');
-    };
 
 
   return (
@@ -316,6 +294,19 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                 }`}
               >
                 Saldo
+              </button>
+            )}
+            {isEdit && canSeeNotes && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('notes')}
+                className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'notes'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Notatki
               </button>
             )}
           </nav>
@@ -431,7 +422,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                     <button
                       type="button"
                       onClick={() => {
-                        const pwd = generateSecurePassword(8);
+                        const pwd = generateSecurePassword(12);
                         setFormData((prev) => ({ ...prev, password: pwd }));
                         setPasswordGenerated(true);
                         toast.success('Hasło zostało wygenerowane');
@@ -799,6 +790,28 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                 studentId={student.id}
                 studentName={`${student.user.firstName} ${student.user.lastName}`}
               />
+            </div>
+          )}
+
+          {/* Notes Tab */}
+          {activeTab === 'notes' && canSeeNotes && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Notatki dla ucznia</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Notatki wewnętrzne widoczne tylko dla administratorów i managerów. Uczeń nie ma do nich dostępu.
+              </p>
+              <textarea
+                name="internalNotes"
+                value={formData.internalNotes}
+                onChange={handleChange}
+                rows={12}
+                maxLength={10000}
+                placeholder="Wpisz notatki dotyczące ucznia (preferencje, ważne ustalenia, informacje organizacyjne)..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1 text-right">
+                {formData.internalNotes.length} / 10 000
+              </p>
             </div>
           )}
 

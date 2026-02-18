@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { teacherService, Teacher, CreateTeacherData, UpdateTeacherData } from '../services/teacherService';
-import { X } from 'lucide-react';
+import { X, RefreshCw, Copy, Check } from 'lucide-react';
 import { handleApiError } from '../lib/errorUtils';
+import { generateSecurePassword } from '../lib/passwordUtils';
 
 interface TeacherModalProps {
   teacher: Teacher | null;
@@ -20,6 +21,7 @@ const CONTRACT_TYPES = [
 
 const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess }) => {
   const isEdit = !!teacher;
+  const [passwordCopied, setPasswordCopied] = useState(false);
 
   const [formData, setFormData] = useState({
     firstName: teacher?.user.firstName || '',
@@ -217,17 +219,51 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Hasło * (min. 8 znaków)
                   </label>
-                  <input
-                    type="text"
-                    name="password"
-                    autoComplete="off"
-                    value={formData.password}
-                    onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                      errors.password ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      name="password"
+                      autoComplete="off"
+                      value={formData.password}
+                      onChange={handleChange}
+                      className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono ${
+                        errors.password ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pwd = generateSecurePassword(12);
+                        setFormData((prev) => ({ ...prev, password: pwd }));
+                        setErrors((prev) => { const e = { ...prev }; delete e.password; return e; });
+                      }}
+                      title="Generuj hasło"
+                      className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                      <RefreshCw className="h-4 w-4 text-gray-600" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!formData.password}
+                      onClick={() => {
+                        navigator.clipboard.writeText(formData.password);
+                        setPasswordCopied(true);
+                        setTimeout(() => setPasswordCopied(false), 2000);
+                      }}
+                      title="Kopiuj hasło"
+                      className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40"
+                    >
+                      {passwordCopied ? (
+                        <Check className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Copy className="h-4 w-4 text-gray-600" />
+                      )}
+                    </button>
+                  </div>
                   {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Wpisz hasło ręcznie lub wygeneruj automatycznie. Przekaż je lektorowi przed pierwszym logowaniem.
+                  </p>
                 </div>
               )}
             </div>

@@ -18,6 +18,7 @@ export interface Student {
   cancellationLimitEnabled?: boolean;
   cancellationLimitCount?: number | null;
   cancellationLimitPeriod?: string | null;
+  internalNotes?: string | null;
   enrollmentDate: string;
   user: {
     id: string;
@@ -76,6 +77,7 @@ export interface UpdateStudentData {
   cancellationLimitCount?: number | null;
   cancellationLimitPeriod?: string | null;
   isActive?: boolean;
+  internalNotes?: string | null;
 }
 
 export const studentService = {

@@ -29,6 +29,7 @@ export interface InviteUserData {
   lastName: string;
   role: 'ADMIN' | 'MANAGER' | 'HR' | 'METHODOLOGIST' | 'TEACHER';
   phone?: string;
+  password?: string;
 }
 
 export interface UpdateUserData {

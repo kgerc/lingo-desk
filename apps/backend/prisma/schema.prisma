@@ -296,6 +296,7 @@ model Student {
   cancellationLimitEnabled  Boolean  @default(false) @map("cancellation_limit_enabled")
   cancellationLimitCount    Int?     @map("cancellation_limit_count") // Max cancellations allowed per period
   cancellationLimitPeriod   String?  @map("cancellation_limit_period") // Period: 'month', 'quarter', 'year', 'enrollment'
+  internalNotes       String?       @map("internal_notes")
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
