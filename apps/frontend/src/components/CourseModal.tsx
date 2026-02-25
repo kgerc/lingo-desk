@@ -113,7 +113,7 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
     frequency: 'WEEKLY',
     startDate: '',
     endDate: '',
-    occurrencesCount: 10,
+    occurrencesCount: undefined,
     daySchedules: [], // New format: each day has its own time
     durationMinutes: 60,
     deliveryMode: 'IN_PERSON',
@@ -165,6 +165,47 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
   });
   const skipHolidays = holidaysSettings?.skipHolidays === true;
 
+  // Auto-calculate occurrences count from date range + selected days
+  const autoOccurrencesCount = useMemo(() => {
+    const { startDate, endDate, frequency, daySchedules } = recurringPattern;
+    if (!startDate || !endDate || !daySchedules || daySchedules.length === 0) return null;
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (end <= start) return null;
+
+    if (frequency === 'MONTHLY') {
+      let count = 0;
+      let current = new Date(start);
+      while (current <= end) {
+        if (!(skipHolidays && isPolishHoliday(current))) count++;
+        current.setMonth(current.getMonth() + 1);
+      }
+      return count || null;
+    }
+
+    const weekInterval = frequency === 'BIWEEKLY' ? 2 : 1;
+    const weekStart = new Date(start);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+
+    let count = 0;
+    const current = new Date(weekStart);
+    while (current <= end) {
+      for (const daySchedule of daySchedules) {
+        const lessonDate = new Date(current);
+        lessonDate.setDate(current.getDate() + daySchedule.dayOfWeek);
+        const [h, m] = daySchedule.time.split(':').map(Number);
+        lessonDate.setHours(h, m, 0, 0);
+        if (lessonDate < start || lessonDate > end) continue;
+        if (skipHolidays && isPolishHoliday(lessonDate)) continue;
+        count++;
+      }
+      current.setDate(current.getDate() + 7 * weekInterval);
+    }
+    return count || null;
+  }, [recurringPattern.startDate, recurringPattern.endDate, recurringPattern.frequency, recurringPattern.daySchedules, skipHolidays]);
+
   // Generate preview of lessons from recurring pattern (using new daySchedules format)
   const { previewLessons, skippedHolidaysPreview } = useMemo(() => {
     if (scheduleMode !== 'recurring' || !recurringPattern.startDate) {
@@ -180,7 +221,7 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
     const lessons: Date[] = [];
     const skipped: { date: Date; name: string }[] = [];
     const startDate = new Date(recurringPattern.startDate);
-    const maxOccurrences = recurringPattern.occurrencesCount || 52;
+    const maxOccurrences = recurringPattern.occurrencesCount || autoOccurrencesCount || 52;
     const endDate = recurringPattern.endDate ? new Date(recurringPattern.endDate) : null;
 
     // For MONTHLY frequency, use first day's time
@@ -357,11 +398,17 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
   };
 
   const toggleStudentSelection = (studentId: string) => {
-    setSelectedStudentIds(prev =>
-      prev.includes(studentId)
+    setSelectedStudentIds(prev => {
+      const next = prev.includes(studentId)
         ? prev.filter(id => id !== studentId)
-        : [...prev, studentId]
-    );
+        : [...prev, studentId];
+
+      if (next.length > 0 && errors.students) {
+        setErrors(e => ({ ...e, students: '' }));
+      }
+
+      return next;
+    });
   };
 
   const validate = () => {
@@ -1057,16 +1104,26 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Liczba lekcji
+                        {!recurringPattern.occurrencesCount && autoOccurrencesCount && (
+                          <span className="ml-2 text-xs font-normal text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                            auto
+                          </span>
+                        )}
                       </label>
                       <input
                         type="number"
                         value={recurringPattern.occurrencesCount || ''}
                         onChange={(e) => handlePatternChange('occurrencesCount', Number(e.target.value) || undefined)}
                         min="1"
-                        max="52"
+                        max="365"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        placeholder="np. 10"
+                        placeholder={autoOccurrencesCount ? `${autoOccurrencesCount} (z zakresu dat)` : 'np. 10'}
                       />
+                      {!recurringPattern.occurrencesCount && autoOccurrencesCount && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          Wyliczono automatycznie z zakresu dat. Wpisz własną wartość, aby nadpisać.
+                        </p>
+                      )}
                     </div>
 
                     <div>
