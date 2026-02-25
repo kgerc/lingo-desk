@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { displayEmail } from '../utils/email';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { lessonService, Lesson, CreateLessonData, LessonDeliveryMode } from '../services/lessonService';
@@ -997,7 +998,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                                     {student.user.firstName} {student.user.lastName}
                                   </div>
                                   <div className="text-sm text-gray-500">
-                                    {student.user.email}
+                                    {displayEmail(student.user.email) ?? <span className="italic text-gray-400">Brak adresu email</span>}
                                   </div>
                                 </div>
                               </label>

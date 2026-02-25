@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { displayEmail } from '../utils/email';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { courseService, Course } from '../services/courseService';
@@ -171,7 +172,7 @@ const EnrollStudentModal: React.FC<EnrollStudentModalProps> = ({ course, onClose
                 </option>
                 {availableStudents.map((student) => (
                   <option key={student.id} value={student.id}>
-                    {student.user.firstName} {student.user.lastName} - {student.user.email}
+                    {student.user.firstName} {student.user.lastName}{displayEmail(student.user.email) ? ` - ${displayEmail(student.user.email)}` : ''}
                   </option>
                 ))}
               </select>
@@ -272,7 +273,7 @@ const EnrollStudentModal: React.FC<EnrollStudentModalProps> = ({ course, onClose
                           <p className="font-medium text-gray-900">
                             {student.user.firstName} {student.user.lastName}
                           </p>
-                          <p className="text-sm text-gray-500">{student.user.email}</p>
+                          <p className="text-sm text-gray-500">{displayEmail(student.user.email) ?? <span className="italic text-gray-400">Brak adresu email</span>}</p>
                           {enrollment && (
                             <div className="flex items-center gap-2 mt-1 text-xs">
                               <span

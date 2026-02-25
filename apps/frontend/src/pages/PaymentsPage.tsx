@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { displayEmail } from '../utils/email';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -406,7 +407,9 @@ export default function PaymentsPage() {
                             <div className="text-sm font-medium text-gray-900">
                               {payment.student?.user.firstName} {payment.student?.user.lastName}
                             </div>
-                            <div className="text-sm text-gray-500">{payment.student?.user.email}</div>
+                            <div className="text-sm text-gray-500">
+                              {displayEmail(payment.student?.user.email) ?? <span className="italic text-gray-400">Brak adresu email</span>}
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

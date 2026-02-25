@@ -108,7 +108,7 @@ export interface PaymentReminder {
 }
 
 // CSV Import types
-export type SystemFieldKey = 'date' | 'email' | 'amount' | 'paymentMethod' | 'status' | 'notes';
+export type SystemFieldKey = 'date' | 'counterparty' | 'description' | 'bankAccount' | 'amount' | 'paymentMethod' | 'status' | 'notes';
 
 export interface ColumnMapping {
   csvColumn: string;
@@ -128,7 +128,9 @@ export interface CsvAnalysisResult {
 
 export const SYSTEM_FIELDS: Array<{ key: SystemFieldKey; label: string; required: boolean }> = [
   { key: 'date', label: 'Data płatności', required: true },
-  { key: 'email', label: 'Email ucznia', required: true },
+  { key: 'counterparty', label: 'Kontrahent', required: false },
+  { key: 'description', label: 'Opis transakcji', required: false },
+  { key: 'bankAccount', label: 'Numer konta', required: false },
   { key: 'amount', label: 'Kwota', required: true },
   { key: 'paymentMethod', label: 'Metoda płatności', required: true },
   { key: 'status', label: 'Status', required: false },

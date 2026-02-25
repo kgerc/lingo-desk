@@ -297,6 +297,7 @@ model Student {
   cancellationLimitCount    Int?     @map("cancellation_limit_count") // Max cancellations allowed per period
   cancellationLimitPeriod   String?  @map("cancellation_limit_period") // Period: 'month', 'quarter', 'year', 'enrollment'
   internalNotes       String?       @map("internal_notes")
+  bankAccountNumber   String?       @map("bank_account_number") // NRB/IBAN for payment matching in CSV import
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 

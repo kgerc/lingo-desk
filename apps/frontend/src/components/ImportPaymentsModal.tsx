@@ -9,38 +9,52 @@ import paymentService, {
 } from '../services/paymentService';
 import toast from 'react-hot-toast';
 
+/** Count Polish diacritic characters in a string (higher = better decode quality). */
+function countPolishChars(text: string): number {
+  return (text.match(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g) || []).length;
+}
+
 /**
  * Read file trying multiple encodings. Polish bank exports often use Windows-1250.
- * Detects encoding by checking for replacement characters (�) in the output.
+ *
+ * Strategy: always try all candidate encodings and pick the one that produces
+ * the most Polish diacritic characters. This handles the edge case where
+ * file.text() (UTF-8) silently replaces bytes without emitting U+FFFD,
+ * which made the old "check for replacement char" heuristic unreliable.
  */
 async function readFileWithEncoding(file: File): Promise<string> {
-  // Try UTF-8 first
-  const utf8Text = await file.text();
-
-  // If no replacement characters, UTF-8 is fine
-  if (!utf8Text.includes('\uFFFD') && !utf8Text.includes('�')) {
-    return utf8Text;
-  }
-
-  // Try Windows-1250 (Polish) and ISO-8859-2 (Central European)
-  const encodings = ['windows-1250', 'iso-8859-2', 'windows-1252'];
   const buffer = await file.arrayBuffer();
 
-  for (const encoding of encodings) {
+  const candidates: Array<{ encoding: string; text: string; score: number }> = [];
+
+  // UTF-8 via native browser API
+  const utf8Text = await file.text();
+  // Penalise UTF-8 result if it still contains replacement chars
+  const utf8Score = utf8Text.includes('\uFFFD')
+    ? -1
+    : countPolishChars(utf8Text);
+  candidates.push({ encoding: 'utf-8', text: utf8Text, score: utf8Score });
+
+  // Try single-byte encodings used by Polish banks.
+  // windows-1250 is the de-facto standard for Polish bank exports.
+  // iso-8859-2 overlaps heavily with windows-1250 for Polish chars but differs in
+  // the 0x80-0x9F range, which can produce false positives. We intentionally
+  // exclude iso-8859-2 to prevent it from winning over windows-1250.
+  for (const encoding of ['windows-1250', 'windows-1252'] as const) {
     try {
-      const decoder = new TextDecoder(encoding);
+      const decoder = new TextDecoder(encoding, { fatal: false });
       const text = decoder.decode(buffer);
-      // Check if decoded text has Polish characters (ą, ć, ę, ł, ń, ó, ś, ź, ż)
-      if (/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(text)) {
-        return text;
-      }
+      candidates.push({ encoding, text, score: countPolishChars(text) });
     } catch {
-      continue;
+      // encoding not supported in this browser - skip
     }
   }
 
-  // Fallback to UTF-8
-  return utf8Text;
+  // Pick the encoding that yielded the most Polish characters.
+  // If all scores are equal (e.g. file has no Polish chars at all), utf-8 wins
+  // because it appears first and sort is stable.
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0].text;
 }
 
 interface ImportPaymentsModalProps {
@@ -174,9 +188,9 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({ onClose }) =>
   };
 
   const downloadTemplate = () => {
-    const template = `data,email,kwota,metodaPlatnosci,status,notatki
-2025-01-15,student@example.com,200,CASH,COMPLETED,Opłata za styczeń
-2025-01-16,inny@example.com,150,BANK_TRANSFER,PENDING,`;
+    const template = `data,kontrahent,opisTransakcji,nrKonta,kwota,metodaPlatnosci,status,notatki
+2025-01-15,Jan Kowalski,Opłata za kurs angielskiego,PL61109010140000071219812874,200,CASH,COMPLETED,Styczeń
+2025-01-16,Anna Nowak,Przelew za lekcje,PL27114020040000300201355387,150,BANK_TRANSFER,PENDING,`;
 
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -376,7 +390,9 @@ const UploadStep: React.FC<UploadStepProps> = ({
           <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
             <li>Obsługiwane separatory: przecinek, średnik, tabulator</li>
             <li>Obsługiwane formaty dat: YYYY-MM-DD, DD/MM/YYYY, DD.MM.YYYY</li>
-            <li>Nazwy kolumn mogą być w dowolnym języku</li>
+            <li>Obsługiwane kodowania: UTF-8, Windows-1250 (polskie banki), ISO-8859-2</li>
+            <li>Dopasowanie ucznia: po imieniu i nazwisku w kolumnie „Kontrahent" lub „Opis transakcji", lub po numerze konta (IBAN/NRB)</li>
+            <li>Puste kolumny są automatycznie pomijane</li>
           </ul>
           <button
             onClick={onDownloadTemplate}
@@ -577,7 +593,7 @@ interface PreviewStepProps {
 
 const PreviewStep: React.FC<PreviewStepProps> = ({ analysis, mapping }) => {
   const mappedFields = mapping.filter((m) => m.systemField);
-  const fieldOrder: SystemFieldKey[] = ['date', 'email', 'amount', 'paymentMethod', 'status', 'notes'];
+  const fieldOrder: SystemFieldKey[] = ['date', 'counterparty', 'description', 'bankAccount', 'amount', 'paymentMethod', 'status', 'notes'];
   const sortedFields = fieldOrder
     .map((key) => mappedFields.find((m) => m.systemField === key))
     .filter(Boolean) as ColumnMapping[];

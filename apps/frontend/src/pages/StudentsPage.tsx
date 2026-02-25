@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { displayEmail } from '../utils/email';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -294,7 +295,7 @@ const StudentsPage: React.FC = () => {
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-1">
                           <Mail className="h-3 w-3" />
-                          {student.user.email}
+                          {displayEmail(student.user.email) ?? <span className="italic text-gray-400">Brak adresu email</span>}
                         </div>
                         {student.user.phone && (
                           <div className="flex items-center gap-1">

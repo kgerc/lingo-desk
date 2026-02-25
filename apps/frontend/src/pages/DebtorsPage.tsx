@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { displayEmail } from '../utils/email';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import paymentService from '../services/paymentService';
@@ -144,7 +145,7 @@ const DebtorsPage: React.FC = () => {
                             <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
                               <div className="flex items-center gap-1">
                                 <Mail className="h-4 w-4" />
-                                {debtor.student.user.email}
+                                {displayEmail(debtor.student.user.email) ?? <span className="italic text-gray-400">Brak adresu email</span>}
                               </div>
                               {debtor.student.user.phone && (
                                 <div className="flex items-center gap-1">

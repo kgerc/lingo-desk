@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { displayEmail } from '../utils/email';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { courseService, Course, CreateCourseWithScheduleData, ScheduleItem, SchedulePattern } from '../services/courseService';
@@ -27,8 +28,6 @@ const FIELD_TO_TAB_MAP: Record<string, TabType> = {
   teacherId: 'basic',
   language: 'basic',
   level: 'basic',
-  startDate: 'basic',
-  endDate: 'basic',
   isActive: 'basic',
   // Details tab fields
   deliveryMode: 'details',
@@ -39,8 +38,10 @@ const FIELD_TO_TAB_MAP: Record<string, TabType> = {
   description: 'details',
   // Students tab fields
   students: 'students',
-  // Schedule tab fields
+  // Schedule tab fields (dates live here in create mode)
   schedule: 'schedule',
+  startDate: 'schedule',
+  endDate: 'schedule',
 };
 
 const DAYS_OF_WEEK = [
@@ -422,8 +423,13 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
       newErrors.teacherId = 'Lektor jest wymagany';
     }
 
-    if (!formData.startDate) {
+    // In edit mode dates are still in formData (shown in Basic tab)
+    if (isEdit && !formData.startDate) {
       newErrors.startDate = 'Data rozpoczęcia jest wymagana';
+    }
+
+    if (isEdit && formData.endDate && formData.startDate && formData.endDate < formData.startDate) {
+      newErrors.endDate = 'Data zakończenia nie może być wcześniejsza niż data rozpoczęcia';
     }
 
     if (!formData.pricePerLesson || parseFloat(formData.pricePerLesson) < 0) {
@@ -432,10 +438,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
 
     if (formData.maxStudents && parseInt(formData.maxStudents) <= 0) {
       newErrors.maxStudents = 'Maksymalna liczba uczestników musi być większa od 0';
-    }
-
-    if (formData.endDate && formData.startDate && formData.endDate < formData.startDate) {
-      newErrors.endDate = 'Data zakończenia nie może być wcześniejsza niż data rozpoczęcia';
     }
 
     if (!isEdit && scheduleMode !== 'none' && selectedStudentIds.length === 0) {
@@ -485,6 +487,25 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
 
     if (!validate()) return;
 
+    // In create mode, derive course dates from the schedule (single source of truth).
+    // In edit mode, dates come from formData (shown in Basic tab).
+    let resolvedStartDate = formData.startDate;
+    let resolvedEndDate = formData.endDate || undefined;
+
+    if (!isEdit) {
+      if (scheduleMode === 'recurring' && recurringPattern.startDate) {
+        resolvedStartDate = recurringPattern.startDate;
+        resolvedEndDate = recurringPattern.endDate || undefined;
+      } else if (scheduleMode === 'manual' && manualItems.length > 0) {
+        const dates = manualItems
+          .map((item) => item.scheduledAt)
+          .filter(Boolean)
+          .sort();
+        resolvedStartDate = dates[0]?.split('T')[0] ?? '';
+        resolvedEndDate = dates[dates.length - 1]?.split('T')[0] ?? undefined;
+      }
+    }
+
     const data: any = {
       teacherId: formData.teacherId,
       name: formData.name,
@@ -496,8 +517,8 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
       pricePerLesson: parseFloat(formData.pricePerLesson) || 0,
       currency: formData.currency,
       description: formData.description || undefined,
-      startDate: formData.startDate,
-      endDate: formData.endDate || undefined,
+      startDate: resolvedStartDate,
+      endDate: resolvedEndDate,
       maxStudents: formData.maxStudents ? parseInt(formData.maxStudents) : undefined,
       isActive: formData.isActive,
     };
@@ -708,44 +729,46 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
                   </div>
                 </div>
 
-                {/* Dates */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Data rozpoczęcia *
-                    </label>
-                    <input
-                      type="date"
-                      name="startDate"
-                      value={formData.startDate}
-                      onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                        errors.startDate ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    />
-                    {errors.startDate && (
-                      <p className="mt-1 text-sm text-red-600">{errors.startDate}</p>
-                    )}
-                  </div>
+                {/* Dates - only in edit mode; in create mode dates come from the Schedule tab */}
+                {isEdit && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Data rozpoczęcia *
+                      </label>
+                      <input
+                        type="date"
+                        name="startDate"
+                        value={formData.startDate}
+                        onChange={handleChange}
+                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                          errors.startDate ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      {errors.startDate && (
+                        <p className="mt-1 text-sm text-red-600">{errors.startDate}</p>
+                      )}
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Data zakończenia (opcjonalnie)
-                    </label>
-                    <input
-                      type="date"
-                      name="endDate"
-                      value={formData.endDate}
-                      onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                        errors.endDate ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    />
-                    {errors.endDate && (
-                      <p className="mt-1 text-sm text-red-600">{errors.endDate}</p>
-                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Data zakończenia (opcjonalnie)
+                      </label>
+                      <input
+                        type="date"
+                        name="endDate"
+                        value={formData.endDate}
+                        onChange={handleChange}
+                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                          errors.endDate ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      {errors.endDate && (
+                        <p className="mt-1 text-sm text-red-600">{errors.endDate}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Status */}
                 <div className="flex items-center">
@@ -925,7 +948,7 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
                         <div className="font-medium">
                           {student.user.firstName} {student.user.lastName}
                         </div>
-                        <div className="text-sm text-gray-500">{student.user.email}</div>
+                        <div className="text-sm text-gray-500">{displayEmail(student.user.email) ?? <span className="italic text-gray-400">Brak adresu email</span>}</div>
                       </div>
                     </label>
                   ))

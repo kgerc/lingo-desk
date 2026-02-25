@@ -1,13 +1,18 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { parse } from 'csv-parse/sync';
-import { PaymentMethod, PaymentStatus } from '@prisma/client';
+import { LanguageLevel, PaymentMethod, PaymentStatus, UserRole } from '@prisma/client';
+import { randomUUID } from 'crypto';
+import bcrypt from 'bcrypt';
 import prisma from '../utils/prisma';
 import balanceService from './balance.service';
 
 // System fields that CSV columns can be mapped to
+// NOTE: 'email' removed - students are matched by name or bank account number
 export const SYSTEM_FIELDS = [
   { key: 'date', label: 'Data płatności', required: true },
-  { key: 'email', label: 'Email ucznia', required: true },
+  { key: 'counterparty', label: 'Kontrahent', required: false },
+  { key: 'description', label: 'Opis transakcji', required: false },
+  { key: 'bankAccount', label: 'Numer konta', required: false },
   { key: 'amount', label: 'Kwota', required: true },
   { key: 'paymentMethod', label: 'Metoda płatności', required: true },
   { key: 'status', label: 'Status', required: false },
@@ -60,10 +65,8 @@ function detectSeparator(text: string): string {
 
     if (headerCount <= 1) continue;
 
-    // Score based on: number of columns in header
     let score = headerCount;
 
-    // Bonus for consistency across lines (if multiple lines exist)
     if (lines.length >= 2) {
       const consistentLines = counts.filter((c) => c === headerCount).length;
       score += (consistentLines / lines.length) * headerCount;
@@ -79,25 +82,65 @@ function detectSeparator(text: string): string {
 }
 
 /**
- * Parse CSV text into rows using csv-parse
+ * Parse CSV text into rows using csv-parse.
+ * Filters out columns that are empty (blank header or all blank values).
  */
 function parseCsv(text: string, separator: string): string[][] {
+  let records: string[][];
+
   try {
-    const records: string[][] = parse(text, {
+    records = parse(text, {
       delimiter: separator,
       relax_column_count: true,
       skip_empty_lines: true,
       trim: true,
-      bom: true, // handle BOM
+      bom: true,
     });
-    return records;
   } catch {
-    // Fallback to manual parsing
-    return text
+    records = text
       .split('\n')
       .filter((l) => l.trim())
       .map((line) => line.split(separator).map((c) => c.trim()));
   }
+
+  if (records.length < 2) return records;
+
+  // Remove columns with empty header or fully empty values
+  const headers = records[0];
+  const dataRows = records.slice(1);
+
+  const keepIndices: number[] = [];
+  for (let col = 0; col < headers.length; col++) {
+    const header = (headers[col] || '').trim();
+    if (!header) continue; // blank header → skip column
+
+    const hasAnyValue = dataRows.some((row) => (row[col] || '').trim() !== '');
+    if (!hasAnyValue) continue; // all values empty → skip column
+
+    keepIndices.push(col);
+  }
+
+  // Rebuild rows keeping only non-empty columns
+  // We also remap csvColumnIndex to the NEW index within the filtered set
+  const filteredRecords = records.map((row) => keepIndices.map((i) => row[i] || ''));
+
+  return filteredRecords;
+}
+
+/**
+ * Normalize a string for matching: lowercase, strip non-alphanumeric except Polish chars
+ */
+function normalize(str: string): string {
+  return str.toLowerCase().replace(/[^a-z0-9ąćęłńóśźżü]/g, '');
+}
+
+/**
+ * Normalize an IBAN/NRB account number: strip spaces, optional PL prefix → digits only
+ */
+function normalizeAccountNumber(raw: string): string {
+  const stripped = raw.replace(/\s/g, '').toUpperCase();
+  // Remove country prefix (PL, DE, etc.) if present
+  return stripped.replace(/^[A-Z]{2}/, '');
 }
 
 /**
@@ -105,28 +148,29 @@ function parseCsv(text: string, separator: string): string[][] {
  */
 function ruleBasedMapping(headers: string[]): ColumnMapping[] {
   const aliases: Record<SystemFieldKey, string[]> = {
-    date: ['date', 'data', 'datum', 'dataplatnosci', 'datawplaty', 'paymentdate', 'termin'],
-    email: ['email', 'e-mail', 'mail', 'studentemail', 'uczen', 'student', 'emailucznia'],
-    amount: ['amount', 'kwota', 'suma', 'wartosc', 'wartość', 'cena', 'price', 'value', 'oplata', 'opłata'],
+    date: ['date', 'data', 'datum', 'dataplatnosci', 'datawplaty', 'paymentdate', 'termin', 'dataoperacji', 'dataksiegowania'],
+    counterparty: ['kontrahent', 'nadawca', 'zleceniodawca', 'odbiorca', 'counterparty', 'payer', 'sender', 'nazwa', 'podmiot'],
+    description: ['opis', 'opistransakcji', 'opisoperacji', 'tytul', 'tytuł', 'tytulprzelewu', 'description', 'title', 'szczegoly', 'szczegóły'],
+    bankAccount: ['nrkonta', 'numerokonta', 'konto', 'iban', 'nrb', 'account', 'accountnumber', 'rachuneknadawcy', 'rachunekzleceniodawcy'],
+    amount: ['amount', 'kwota', 'suma', 'wartosc', 'wartość', 'cena', 'price', 'value', 'oplata', 'opłata', 'kwotaoperacji'],
     paymentMethod: [
       'paymentmethod', 'metodaplatnosci', 'metoda', 'payment', 'platnosc',
       'płatność', 'typplatnosci', 'sposob', 'sposób', 'method',
+      'uznania', 'obciazenia', 'typoperacji', 'rodzajoperacji', 'operacja',
     ],
     status: ['status', 'stan', 'state'],
-    notes: ['notes', 'notatki', 'uwagi', 'note', 'notatka', 'komentarz', 'opis', 'description', 'comment'],
+    notes: ['notes', 'notatki', 'uwagi', 'note', 'notatka', 'komentarz', 'comment'],
   };
 
   return headers.map((header, index) => {
-    const normalized = header
-      .toLowerCase()
-      .replace(/[^a-z0-9ąćęłńóśźżü]/g, '');
+    const normalized = normalize(header);
 
     let bestMatch: SystemFieldKey | null = null;
     let bestConfidence = 0;
 
     for (const [field, fieldAliases] of Object.entries(aliases) as [SystemFieldKey, string[]][]) {
       for (const alias of fieldAliases) {
-        const normalizedAlias = alias.replace(/[^a-z0-9ąćęłńóśźżü]/g, '');
+        const normalizedAlias = normalize(alias);
         if (normalized === normalizedAlias) {
           bestMatch = field;
           bestConfidence = 0.9;
@@ -183,29 +227,31 @@ ${sampleData}
 
 System fields to map to:
 - "date" - payment date (any date format)
-- "email" - student email address
+- "counterparty" - payer name / kontrahent / nadawca / zleceniodawca (full name of the person)
+- "description" - transaction description / opis transakcji / tytuł przelewu
+- "bankAccount" - sender's bank account number (IBAN or NRB format)
 - "amount" - payment amount (numeric)
-- "paymentMethod" - payment method (cash, transfer, card, etc.)
+- "paymentMethod" - payment method (cash, transfer, card, etc.) — also matches Polish bank "Typ operacji" column with values like "Uznania", "Obciążenia", "770 Przelew krajowy", "772 Przelew wewnętrzny"
 - "status" - payment status (completed, pending, etc.)
 - "notes" - notes/comments
 
 Respond ONLY with a JSON array. Each element must have:
 - "csvColumnIndex": number (0-based index)
-- "systemField": string or null (one of: "date", "email", "amount", "paymentMethod", "status", "notes", or null if no match)
+- "systemField": string or null (one of: "date", "counterparty", "description", "bankAccount", "amount", "paymentMethod", "status", "notes", or null if no match)
 - "confidence": number between 0 and 1
 
 Rules:
 - Each system field can be mapped to at most ONE csv column
 - Columns that don't match any system field should have systemField: null
-- Be generous with matching - column names may be in Polish, English, German or other languages
-- Consider the sample data values to determine the field type (e.g., "@" suggests email, numbers suggest amount)
+- Be generous with matching - column names may be in Polish, English, or other languages
+- Consider sample data values (e.g., account numbers suggest "bankAccount", full names suggest "counterparty")
+- Do NOT map any column to "email" - email mapping is not supported
 
 JSON response:`;
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
 
-    // Extract JSON from response
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       return ruleBasedMapping(headers);
@@ -217,7 +263,6 @@ JSON response:`;
       confidence: number;
     }> = JSON.parse(jsonMatch[0]);
 
-    // Validate and build mapping
     const validFields = SYSTEM_FIELDS.map((f) => f.key);
 
     return headers.map((header, index) => {
@@ -252,7 +297,6 @@ JSON response:`;
 function deduplicateMapping(mapping: ColumnMapping[]): ColumnMapping[] {
   const fieldBestIndex = new Map<string, number>();
 
-  // Find best index for each field
   for (let i = 0; i < mapping.length; i++) {
     const m = mapping[i];
     if (!m.systemField) continue;
@@ -263,7 +307,6 @@ function deduplicateMapping(mapping: ColumnMapping[]): ColumnMapping[] {
     }
   }
 
-  // Clear duplicates
   return mapping.map((m, i) => {
     if (!m.systemField) return m;
     if (fieldBestIndex.get(m.systemField) !== i) {
@@ -273,6 +316,218 @@ function deduplicateMapping(mapping: ColumnMapping[]): ColumnMapping[] {
   });
 }
 
+/**
+ * Find student by full name appearing in a text string (counterparty or description).
+ * Tries exact match first, then partial (all name tokens present).
+ */
+async function findStudentByNameInText(
+  text: string,
+  organizationId: string
+): Promise<{ id: string } | null> {
+  if (!text.trim()) return null;
+
+  const normalizedText = normalize(text);
+
+  const students = await prisma.student.findMany({
+    where: { organizationId },
+    select: {
+      id: true,
+      user: { select: { firstName: true, lastName: true } },
+    },
+  });
+
+  // 1st pass: exact full-name match (normalized)
+  for (const s of students) {
+    const fullName = normalize(`${s.user.firstName} ${s.user.lastName}`);
+    const reverseName = normalize(`${s.user.lastName} ${s.user.firstName}`);
+    if (normalizedText.includes(fullName) || normalizedText.includes(reverseName)) {
+      return { id: s.id };
+    }
+  }
+
+  // 2nd pass: all name tokens present in text
+  for (const s of students) {
+    const tokens = [normalize(s.user.firstName), normalize(s.user.lastName)].filter(Boolean);
+    if (tokens.length >= 2 && tokens.every((t) => normalizedText.includes(t))) {
+      return { id: s.id };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find student by bank account number.
+ * Normalizes both sides: strips spaces and optional country prefix.
+ */
+async function findStudentByBankAccount(
+  accountRaw: string,
+  organizationId: string
+): Promise<{ id: string } | null> {
+  if (!accountRaw.trim()) return null;
+
+  const normalized = normalizeAccountNumber(accountRaw);
+  if (normalized.length < 10) return null; // too short to be a real account number
+
+  const students = await prisma.student.findMany({
+    where: {
+      organizationId,
+      bankAccountNumber: { not: null },
+    },
+    select: { id: true, bankAccountNumber: true },
+  });
+
+  for (const s of students) {
+    if (!s.bankAccountNumber) continue;
+    if (normalizeAccountNumber(s.bankAccountNumber) === normalized) {
+      return { id: s.id };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Parse first name and last name from a kontrahent (counterparty) string.
+ * Polish bank exports look like: "ANNA KOWALSKA UL LIPOWA 3 M 12 01-234 WARSZAWA"
+ * Strategy: take the leading ALL-CAPS word tokens (max 3) before the first
+ * address-indicator token (UL, AL, PL, OS, NR, M, etc.) or a digit token.
+ * Returns { firstName, lastName } or null if we cannot extract at least 2 tokens.
+ */
+function parseNameFromKontrahent(kontrahent: string): { firstName: string; lastName: string } | null {
+  if (!kontrahent.trim()) return null;
+
+  // Address-indicator words (common in Polish addresses) – stop before these
+  const ADDRESS_STOP = new Set(['UL', 'AL', 'PL', 'OS', 'NR', 'M', 'BLOK', 'BL', 'BLDG', 'APT', 'FLAT']);
+
+  const tokens = kontrahent
+    .trim()
+    .split(/\s+/)
+    .map((t) => t.toUpperCase().replace(/[^A-ZĄĆĘŁŃÓŚŹŻÜ-]/g, ''))
+    .filter(Boolean);
+
+  const nameTokens: string[] = [];
+
+  for (const token of tokens) {
+    // Stop at address indicator words
+    if (ADDRESS_STOP.has(token)) break;
+    // Stop at tokens containing digits (house numbers, postcodes)
+    if (/\d/.test(token)) break;
+    // Stop after 3 name tokens (edge case: "Jan Maria Kowalski" → still take 3)
+    if (nameTokens.length >= 3) break;
+    // Must be at least 2 chars to be a real name token
+    if (token.length >= 2) {
+      nameTokens.push(token);
+    }
+  }
+
+  if (nameTokens.length < 2) return null;
+
+  // Capitalize each token: KOWALSKA → Kowalska
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+
+  if (nameTokens.length === 2) {
+    return { firstName: capitalize(nameTokens[0]), lastName: capitalize(nameTokens[1]) };
+  }
+
+  // 3 tokens – use first as firstName, last two joined as lastName (or just last)
+  return {
+    firstName: capitalize(nameTokens[0]),
+    lastName: nameTokens
+      .slice(1)
+      .map(capitalize)
+      .join(' '),
+  };
+}
+
+/**
+ * Try to find an existing student. If not found, create a minimal stub student
+ * from data available in the CSV row (name from kontrahent, optional bank account).
+ * Returns { id, created: boolean }.
+ */
+async function findOrCreateStudentFromImport(
+  counterparty: string,
+  description: string,
+  bankAccount: string,
+  organizationId: string,
+): Promise<{ id: string; created: boolean; matchSource: string } | null> {
+  // --- 1. Try to find existing student ---
+  if (counterparty) {
+    const s = await findStudentByNameInText(counterparty, organizationId);
+    if (s) return { id: s.id, created: false, matchSource: 'kontrahent' };
+  }
+  if (description) {
+    const s = await findStudentByNameInText(description, organizationId);
+    if (s) return { id: s.id, created: false, matchSource: 'opis transakcji' };
+  }
+  if (bankAccount) {
+    const s = await findStudentByBankAccount(bankAccount, organizationId);
+    if (s) return { id: s.id, created: false, matchSource: 'numer konta' };
+  }
+
+  // --- 2. Parse name from kontrahent ---
+  const parsed = parseNameFromKontrahent(counterparty) || parseNameFromKontrahent(description);
+  if (!parsed) return null; // Cannot create stub without at least a name
+
+  const { firstName, lastName } = parsed;
+
+  // --- 3. Generate next student number ---
+  const lastStudent = await prisma.student.findFirst({
+    where: { organizationId },
+    orderBy: { studentNumber: 'desc' },
+  });
+  const studentNumber = lastStudent
+    ? String(parseInt(lastStudent.studentNumber) + 1).padStart(6, '0')
+    : '000001';
+
+  // --- 4. Create stub user + student + budget in a transaction ---
+  const placeholderEmail = `import-${randomUUID()}@placeholder.local`;
+  const passwordHash = await bcrypt.hash(randomUUID(), 10); // non-guessable, no login possible
+
+  const internalNotes = [
+    `Uczeń utworzony automatycznie podczas importu CSV (${new Date().toISOString().slice(0, 10)}).`,
+    `Źródło: ${counterparty || description}`,
+    bankAccount ? `Numer konta: ${bankAccount}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const student = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        email: placeholderEmail,
+        passwordHash,
+        firstName,
+        lastName,
+        role: UserRole.STUDENT,
+        organizationId,
+        isActive: true,
+      },
+    });
+
+    await tx.userProfile.create({ data: { userId: user.id } });
+
+    const newStudent = await tx.student.create({
+      data: {
+        userId: user.id,
+        organizationId,
+        studentNumber,
+        languageLevel: LanguageLevel.A1, // default; can be updated later
+        bankAccountNumber: bankAccount || null,
+        internalNotes,
+      },
+    });
+
+    await tx.studentBudget.create({
+      data: { studentId: newStudent.id, organizationId },
+    });
+
+    return newStudent;
+  });
+
+  return { id: student.id, created: true, matchSource: `nowy uczeń (${firstName} ${lastName})` };
+}
+
 class CsvImportService {
   /**
    * Analyze CSV file and propose column mapping
@@ -280,10 +535,7 @@ class CsvImportService {
   async analyzeCsv(csvData: string): Promise<CsvAnalysisResult> {
     const warnings: string[] = [];
 
-    // Detect separator
     const separator = detectSeparator(csvData);
-
-    // Parse CSV
     const allRows = parseCsv(csvData, separator);
 
     if (allRows.length < 2) {
@@ -294,11 +546,10 @@ class CsvImportService {
     const dataRows = allRows.slice(1);
     const preview = dataRows.slice(0, 10);
 
-    // Get AI-based mapping (falls back to rules if AI unavailable)
     let mapping = await aiBasedMapping(headers, preview);
     mapping = deduplicateMapping(mapping);
 
-    // Check for required fields
+    // Warn about required fields
     const mappedFields = mapping.filter((m) => m.systemField).map((m) => m.systemField);
     for (const field of SYSTEM_FIELDS) {
       if (field.required && !mappedFields.includes(field.key)) {
@@ -306,7 +557,14 @@ class CsvImportService {
       }
     }
 
-    // Check for low confidence mappings
+    // Warn if neither counterparty nor description nor bankAccount is mapped
+    const hasNameField = mappedFields.includes('counterparty') || mappedFields.includes('description');
+    const hasBankField = mappedFields.includes('bankAccount');
+    if (!hasNameField && !hasBankField) {
+      warnings.push('Brak kolumny "Kontrahent", "Opis transakcji" lub "Numer konta" – uczniowie nie będą dopasowywani automatycznie');
+    }
+
+    // Warn about low confidence mappings
     for (const m of mapping) {
       if (m.systemField && m.confidence < 0.7) {
         const fieldLabel = SYSTEM_FIELDS.find((f) => f.key === m.systemField)?.label || m.systemField;
@@ -331,7 +589,7 @@ class CsvImportService {
     const { csvData, mapping, separator, organizationId } = data;
 
     const allRows = parseCsv(csvData, separator);
-    const dataRows = allRows.slice(1); // skip header
+    const dataRows = allRows.slice(1);
 
     const results: ImportResult = {
       success: 0,
@@ -348,7 +606,7 @@ class CsvImportService {
     }
 
     // Validate required fields are mapped
-    const requiredFields: SystemFieldKey[] = ['date', 'email', 'amount', 'paymentMethod'];
+    const requiredFields: SystemFieldKey[] = ['date', 'amount', 'paymentMethod'];
     for (const field of requiredFields) {
       if (fieldIndex[field] === undefined) {
         const label = SYSTEM_FIELDS.find((f) => f.key === field)?.label || field;
@@ -362,15 +620,22 @@ class CsvImportService {
       }
     }
 
+    // Cache org currency to avoid N+1
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { currency: true },
+    });
+    const currency = org?.currency || 'PLN';
+
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
-      const rowNum = i + 2; // 1-indexed, skip header
+      const rowNum = i + 2;
       const rowText = row.join(separator);
 
       try {
         const getValue = (field: SystemFieldKey): string => {
           const idx = fieldIndex[field];
-          return idx !== undefined && idx < row.length ? row[idx].trim() : '';
+          return idx !== undefined && idx < row.length ? (row[idx] || '').trim() : '';
         };
 
         // Parse date
@@ -386,34 +651,37 @@ class CsvImportService {
           continue;
         }
 
-        // Find student
-        const studentEmail = getValue('email').toLowerCase();
-        if (!studentEmail) {
+        // --- Student lookup / auto-create ---
+        const counterparty = getValue('counterparty');
+        const description = getValue('description');
+        const bankAccount = getValue('bankAccount');
+
+        const studentResult = await findOrCreateStudentFromImport(
+          counterparty,
+          description,
+          bankAccount,
+          organizationId,
+        );
+
+        if (!studentResult) {
+          const tried: string[] = [];
+          if (counterparty) tried.push(`kontrahent: "${counterparty}"`);
+          if (description) tried.push(`opis: "${description}"`);
+          if (bankAccount) tried.push(`konto: "${bankAccount}"`);
+
           results.failed++;
           results.errors.push({
             row: rowNum,
-            error: 'Brak adresu email ucznia',
+            error: tried.length
+              ? `Nie znaleziono ucznia i nie można go utworzyć (${tried.join('; ')})`
+              : 'Brak danych do identyfikacji ucznia (kontrahent / opis / numer konta)',
             data: rowText,
           });
           continue;
         }
 
-        const student = await prisma.student.findFirst({
-          where: {
-            organizationId,
-            user: { email: studentEmail },
-          },
-        });
-
-        if (!student) {
-          results.failed++;
-          results.errors.push({
-            row: rowNum,
-            error: `Nie znaleziono ucznia z emailem: ${studentEmail}`,
-            data: rowText,
-          });
-          continue;
-        }
+        const student = { id: studentResult.id };
+        const matchSource = studentResult.matchSource;
 
         // Parse amount
         const amountStr = getValue('amount');
@@ -445,15 +713,9 @@ class CsvImportService {
         const statusStr = getValue('status');
         const status = statusStr ? this.parseStatus(statusStr) : PaymentStatus.COMPLETED;
 
-        // Notes (optional)
-        const notes = getValue('notes') || null;
-
-        // Get organization currency
-        const org = await prisma.organization.findUnique({
-          where: { id: organizationId },
-          select: { currency: true },
-        });
-        const currency = org?.currency || 'PLN';
+        // Notes: use explicit notes field, fall back to description if notes not mapped
+        const notesValue = getValue('notes') || (!fieldIndex['notes'] && description ? description : null);
+        const notes = notesValue || null;
 
         // Create payment
         const payment = await prisma.payment.create({
@@ -476,7 +738,7 @@ class CsvImportService {
             organizationId,
             amount,
             payment.id,
-            `Import CSV - wpłata z dnia ${dateStr}`
+            `Import CSV - wpłata z dnia ${dateStr} (dopasowano po: ${matchSource})`
           );
         }
 
@@ -499,21 +761,21 @@ class CsvImportService {
 
     const cleaned = dateStr.trim();
 
-    // Try DD/MM/YYYY or DD.MM.YYYY
+    // DD/MM/YYYY or DD.MM.YYYY
     const dmyMatch = cleaned.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);
     if (dmyMatch) {
       const d = new Date(`${dmyMatch[3]}-${dmyMatch[2].padStart(2, '0')}-${dmyMatch[1].padStart(2, '0')}`);
       if (!isNaN(d.getTime())) return d;
     }
 
-    // Try YYYY-MM-DD
+    // YYYY-MM-DD
     const ymdMatch = cleaned.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
     if (ymdMatch) {
       const d = new Date(cleaned);
       if (!isNaN(d.getTime())) return d;
     }
 
-    // Try DD-MM-YYYY
+    // DD-MM-YYYY
     const dmyDash = cleaned.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
     if (dmyDash) {
       const d = new Date(`${dmyDash[3]}-${dmyDash[2].padStart(2, '0')}-${dmyDash[1].padStart(2, '0')}`);
@@ -528,7 +790,9 @@ class CsvImportService {
   }
 
   private parsePaymentMethod(str: string): PaymentMethod | null {
-    const map: Record<string, PaymentMethod> = {
+    const upper = str.toUpperCase().trim();
+
+    const exactMap: Record<string, PaymentMethod> = {
       STRIPE: PaymentMethod.STRIPE,
       CASH: PaymentMethod.CASH,
       'GOTÓWKA': PaymentMethod.CASH,
@@ -536,10 +800,28 @@ class CsvImportService {
       BANK_TRANSFER: PaymentMethod.BANK_TRANSFER,
       PRZELEW: PaymentMethod.BANK_TRANSFER,
       TRANSFER: PaymentMethod.BANK_TRANSFER,
-      KARTA: PaymentMethod.CASH, // fallback
+      KARTA: PaymentMethod.CASH,
+      // Polish bank "Typ operacji" column values
+      UZNANIA: PaymentMethod.BANK_TRANSFER,      // credit (incoming transfer)
+      'UZNANIE': PaymentMethod.BANK_TRANSFER,
+      'OBCIĄŻENIA': PaymentMethod.BANK_TRANSFER, // debit (outgoing transfer)
+      OBCIAZENIA: PaymentMethod.BANK_TRANSFER,
+      'OBCIĄŻENIE': PaymentMethod.BANK_TRANSFER,
+      OBCIAZENIE: PaymentMethod.BANK_TRANSFER,
     };
 
-    return map[str.toUpperCase().trim()] || null;
+    if (exactMap[upper]) return exactMap[upper];
+
+    // Prefix / substring matching for verbose bank descriptions
+    // e.g. "770 Przelew krajowy; z rach.: ..." or "772 Przelew wewnętrzny; ..."
+    if (upper.includes('PRZELEW')) return PaymentMethod.BANK_TRANSFER;
+    if (upper.includes('TRANSFER')) return PaymentMethod.BANK_TRANSFER;
+    if (upper.includes('UZNANI')) return PaymentMethod.BANK_TRANSFER;
+    if (upper.includes('GOTÓWK') || upper.includes('GOTOWK') || upper.includes('CASH')) return PaymentMethod.CASH;
+    if (upper.includes('KARTA') || upper.includes('CARD')) return PaymentMethod.CASH;
+    if (upper.includes('STRIPE')) return PaymentMethod.STRIPE;
+
+    return null;
   }
 
   private parseStatus(str: string): PaymentStatus {

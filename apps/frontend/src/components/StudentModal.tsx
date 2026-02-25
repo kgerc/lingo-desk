@@ -50,7 +50,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
   const [formData, setFormData] = useState({
     firstName: student?.user.firstName || '',
     lastName: student?.user.lastName || '',
-    email: student?.user.email || '',
+    email: student?.user.email?.endsWith('@placeholder.local') ? '' : (student?.user.email || ''),
     phone: student?.user.phone || '',
     password: '',
     address: student?.user.profile?.address || '',
@@ -123,8 +123,8 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
     if (!formData.lastName.trim()) newErrors.lastName = 'Nazwisko jest wymagane';
     else if (formData.lastName.trim().length < 2) newErrors.lastName = 'Nazwisko musi mieć min. 2 znaki';
 
-    if (!formData.email.trim()) newErrors.email = 'Email jest wymagany';
-    else if (!EMAIL_REGEX.test(formData.email)) newErrors.email = 'Podaj poprawny adres email';
+    if (!isEdit && !formData.email.trim()) newErrors.email = 'Email jest wymagany';
+    else if (formData.email.trim() && !EMAIL_REGEX.test(formData.email)) newErrors.email = 'Podaj poprawny adres email';
 
     if (!isEdit && !formData.password) newErrors.password = 'Hasło jest wymagane';
     else if (!isEdit && formData.password && formData.password.length < 8) {
@@ -188,7 +188,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
         data: {
           firstName: formData.firstName,
           lastName: formData.lastName,
-          email: formData.email,
+          email: formData.email.trim() || undefined,
           phone: formData.phone || undefined,
           address: formData.address || undefined,
           languageLevel: formData.languageLevel,
@@ -365,12 +365,13 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email *
+                  Email {!isEdit && '*'}
                 </label>
                 <input
                   type="email"
                   name="email"
                   autoComplete="off"
+                  placeholder={isEdit ? 'Brak adresu email' : ''}
                   value={formData.email}
                   onChange={handleChange}
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { displayEmail } from '../utils/email';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import settlementService, { StudentWithBalance, SettlementPreview } from '../services/settlementService';
@@ -304,7 +305,9 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
                           <div className="text-sm font-medium text-gray-900">
                             {student.firstName} {student.lastName}
                           </div>
-                          <div className="text-sm text-gray-500">{student.email}</div>
+                          <div className="text-sm text-gray-500">
+                            {displayEmail(student.email) ?? <span className="italic text-gray-400">Brak adresu email</span>}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -371,7 +374,9 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
               <h2 className="text-xl font-bold text-gray-900">
                 Historia rozliczeń: {selectedStudent?.firstName} {selectedStudent?.lastName}
               </h2>
-              <p className="text-sm text-gray-500">{selectedStudent?.email}</p>
+              <p className="text-sm text-gray-500">
+                {displayEmail(selectedStudent?.email) ?? <span className="italic text-gray-400">Brak adresu email</span>}
+              </p>
             </div>
           </div>
         </div>

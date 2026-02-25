@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { displayEmail } from '../utils/email';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import attendanceService, { AttendanceStatus } from '../services/attendanceService';
@@ -164,7 +165,7 @@ const AttendanceSection: React.FC<AttendanceSectionProps> = ({ lesson }) => {
                 <p className="font-medium text-gray-900">
                   {lesson.student.user.firstName} {lesson.student.user.lastName}
                 </p>
-                <p className="text-sm text-gray-600">{lesson.student.user.email}</p>
+                <p className="text-sm text-gray-600">{displayEmail(lesson.student.user.email) ?? <span className="italic text-gray-400">Brak adresu email</span>}</p>
               </div>
             </div>
 
