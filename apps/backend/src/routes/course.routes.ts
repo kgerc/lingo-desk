@@ -44,6 +44,13 @@ router.put(
   courseController.updateCourse.bind(courseController)
 );
 
+// GET /api/courses/:id/delete-impact - Get impact summary before deleting
+router.get(
+  '/:id/delete-impact',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  courseController.getDeleteImpact.bind(courseController)
+);
+
 // GET /api/courses/:id/lessons - Get course lessons with edit status
 router.get(
   '/:id/lessons',

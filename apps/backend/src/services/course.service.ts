@@ -786,6 +786,44 @@ class CourseService {
     return course;
   }
 
+  async getDeleteImpact(id: string, organizationId: string) {
+    const course = await prisma.course.findFirst({
+      where: { id, organizationId },
+    });
+
+    if (!course) {
+      throw new Error('Course not found');
+    }
+
+    const now = new Date();
+
+    const [activeEnrollments, futureLessons, pastLessons] = await Promise.all([
+      prisma.studentEnrollment.findMany({
+        where: { courseId: id, status: 'ACTIVE' },
+        select: {
+          student: {
+            select: {
+              user: { select: { firstName: true, lastName: true } },
+            },
+          },
+        },
+      }),
+      prisma.lesson.count({
+        where: { courseId: id, scheduledAt: { gte: now }, status: { in: ['SCHEDULED', 'CONFIRMED'] } },
+      }),
+      prisma.lesson.count({
+        where: { courseId: id, scheduledAt: { lt: now } },
+      }),
+    ]);
+
+    return {
+      activeEnrollments: activeEnrollments.length,
+      enrolledStudents: activeEnrollments.map(e => `${e.student.user.firstName} ${e.student.user.lastName}`),
+      futureLessons,
+      pastLessons,
+    };
+  }
+
   async deleteCourse(id: string, organizationId: string) {
     // Verify course exists
     const course = await prisma.course.findFirst({
@@ -841,14 +879,14 @@ class CourseService {
       throw new Error('Course not found');
     }
 
-    // Cancel all future lessons
-    await prisma.lesson.updateMany({
+    const now = new Date();
+
+    // Hard-delete future lessons (not yet held) — cascades to attendance, substitutions, calendar events
+    await prisma.lesson.deleteMany({
       where: {
         courseId: id,
-        scheduledAt: { gte: new Date() },
-        status: { in: ['SCHEDULED', 'CONFIRMED'] },
+        scheduledAt: { gte: now },
       },
-      data: { status: 'CANCELLED' },
     });
 
     // Unenroll all active students

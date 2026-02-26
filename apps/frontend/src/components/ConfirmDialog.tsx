@@ -10,6 +10,9 @@ interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'warning' | 'info';
+  /** Optional structured impact items shown as a bullet list below the message */
+  details?: { label: string; value: string | number; highlight?: boolean }[];
+  isLoading?: boolean;
 }
 
 const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -21,6 +24,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   confirmText = 'Potwierdź',
   cancelText = 'Anuluj',
   variant = 'warning',
+  details,
+  isLoading = false,
 }) => {
   if (!isOpen) return null;
 
@@ -74,9 +79,32 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
               {title}
             </h3>
-            <p className="text-sm text-gray-600 mb-6">
+            <p className="text-sm text-gray-600 mb-4">
               {message}
             </p>
+
+            {/* Impact details */}
+            {isLoading && (
+              <div className="mb-4 py-3 flex items-center gap-2 text-sm text-gray-500">
+                <svg className="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                Sprawdzanie powiązanych danych…
+              </div>
+            )}
+            {!isLoading && details && details.length > 0 && (
+              <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 divide-y divide-gray-200">
+                {details.map((item, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 text-sm">
+                    <span className="text-gray-600">{item.label}</span>
+                    <span className={item.highlight ? 'font-semibold text-red-600' : 'font-medium text-gray-900'}>
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex gap-3 justify-end">
@@ -88,7 +116,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               </button>
               <button
                 onClick={handleConfirm}
-                className={`px-4 py-2 text-sm font-medium text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${style.confirmButton}`}
+                disabled={isLoading}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${style.confirmButton}`}
               >
                 {confirmText}
               </button>

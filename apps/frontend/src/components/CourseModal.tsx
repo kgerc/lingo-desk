@@ -124,6 +124,9 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
   // Selected students for enrollment
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
+  // Auto-name: true when INDIVIDUAL + create/copy mode → name is generated from selected student
+  const isAutoName = !isEdit && formData.courseType === 'INDIVIDUAL';
+
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Calculate errors per tab
@@ -326,7 +329,15 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
       const checked = (e.target as HTMLInputElement).checked;
       setFormData((prev) => ({ ...prev, [name]: checked }));
     } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
+      setFormData((prev) => {
+        const updated = { ...prev, [name]: value };
+        // When switching course type in create mode, reset name and student selection
+        if (name === 'courseType' && !isEdit) {
+          updated.name = '';
+          setSelectedStudentIds([]);
+        }
+        return updated;
+      });
     }
 
     if (errors[name]) {
@@ -381,10 +392,11 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
 
   const addManualItem = () => {
     const defaultDuration = parseInt(formData.defaultDurationMinutes) || 60;
+    const deliveryMode = (formData.deliveryMode === 'BOTH' ? 'IN_PERSON' : formData.deliveryMode) as 'IN_PERSON' | 'ONLINE';
     setManualItems(prev => [...prev, {
       scheduledAt: '',
       durationMinutes: defaultDuration,
-      deliveryMode: 'IN_PERSON',
+      deliveryMode,
     }]);
   };
 
@@ -400,12 +412,31 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
 
   const toggleStudentSelection = (studentId: string) => {
     setSelectedStudentIds(prev => {
-      const next = prev.includes(studentId)
-        ? prev.filter(id => id !== studentId)
-        : [...prev, studentId];
+      let next: string[];
+
+      if (isAutoName) {
+        // INDIVIDUAL: single-select — clicking same student deselects, clicking another replaces
+        next = prev.includes(studentId) ? [] : [studentId];
+      } else {
+        next = prev.includes(studentId)
+          ? prev.filter(id => id !== studentId)
+          : [...prev, studentId];
+      }
 
       if (next.length > 0 && errors.students) {
         setErrors(e => ({ ...e, students: '' }));
+      }
+
+      // Update auto-generated course name for INDIVIDUAL
+      if (isAutoName) {
+        const selected = students.find(s => s.id === next[0]);
+        const autoName = selected
+          ? `Kurs indywidualny ${selected.user.firstName} ${selected.user.lastName}`
+          : '';
+        setFormData(f => ({ ...f, name: autoName }));
+        if (autoName && errors.name) {
+          setErrors(e => ({ ...e, name: '' }));
+        }
       }
 
       return next;
@@ -416,7 +447,9 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = 'Nazwa kursu jest wymagana';
+      newErrors.name = isAutoName
+        ? 'Wybierz ucznia — nazwa kursu zostanie wygenerowana automatycznie'
+        : 'Nazwa kursu jest wymagana';
     }
 
     if (!formData.teacherId) {
@@ -441,7 +474,9 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
     }
 
     if (!isEdit && scheduleMode !== 'none' && selectedStudentIds.length === 0) {
-      newErrors.students = 'Wybierz co najmniej jednego ucznia, aby utworzyć harmonogram lekcji';
+      newErrors.students = isAutoName
+        ? 'Wybierz ucznia, aby utworzyć harmonogram lekcji'
+        : 'Wybierz co najmniej jednego ucznia, aby utworzyć harmonogram lekcji';
     }
 
     if (scheduleMode === 'recurring') {
@@ -531,10 +566,13 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
         studentIds: selectedStudentIds.length > 0 ? selectedStudentIds : undefined,
       };
 
+      // Resolve delivery mode for lessons — backend doesn't support 'BOTH', fallback to IN_PERSON
+      const lessonDeliveryMode = (formData.deliveryMode === 'BOTH' ? 'IN_PERSON' : formData.deliveryMode) as 'IN_PERSON' | 'ONLINE';
+
       if (scheduleMode === 'manual' && manualItems.length > 0) {
-        scheduleData.schedule = { items: manualItems };
+        scheduleData.schedule = { items: manualItems.map(item => ({ ...item, deliveryMode: lessonDeliveryMode })) };
       } else if (scheduleMode === 'recurring') {
-        scheduleData.schedule = { pattern: recurringPattern };
+        scheduleData.schedule = { pattern: { ...recurringPattern, deliveryMode: lessonDeliveryMode } };
       }
 
       await createMutation.mutateAsync(scheduleData);
@@ -632,22 +670,45 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
                 <h3 className="text-lg font-semibold text-gray-900">Podstawowe informacje</h3>
 
                 {/* Course Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nazwa kursu *
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                      errors.name ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="np. Angielski B1 - środa 18:00"
-                  />
-                  {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
-                </div>
+                {!isAutoName && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nazwa kursu *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                        errors.name ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="np. Angielski B1 - środa 18:00"
+                    />
+                    {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+                  </div>
+                )}
+                {isAutoName && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nazwa kursu *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                        errors.name ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Zostanie wygenerowana automatycznie po wybraniu ucznia"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Nazwa generowana automatycznie — możesz ją zmienić.
+                    </p>
+                    {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+                  </div>
+                )}
 
                 {/* Course Type */}
                 <div>
@@ -912,10 +973,14 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
           {activeTab === 'students' && !isEdit && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Wybierz uczniów do kursu</h3>
-                <span className="text-sm text-gray-500">
-                  Wybrano: {selectedStudentIds.length}
-                </span>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {isAutoName ? 'Wybierz ucznia' : 'Wybierz uczniów do kursu'}
+                </h3>
+                {!isAutoName && (
+                  <span className="text-sm text-gray-500">
+                    Wybrano: {selectedStudentIds.length}
+                  </span>
+                )}
               </div>
 
               {errors.students && (
@@ -926,7 +991,9 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
               )}
 
               <div className="text-sm text-gray-500 mb-4">
-                Wybrani uczniowie zostaną automatycznie zapisani do kursu i będą mieli tworzone lekcje zgodnie z harmonogramem.
+                {isAutoName
+                  ? 'Wybierz ucznia — nazwa kursu zostanie wygenerowana automatycznie.'
+                  : 'Wybrani uczniowie zostaną automatycznie zapisani do kursu i będą mieli tworzone lekcje zgodnie z harmonogramem.'}
               </div>
 
               <div className="border rounded-lg divide-y max-h-96 overflow-y-auto">
@@ -941,10 +1008,11 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
                       className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
                     >
                       <input
-                        type="checkbox"
+                        type={isAutoName ? 'radio' : 'checkbox'}
+                        name={isAutoName ? 'individualStudent' : undefined}
                         checked={selectedStudentIds.includes(student.id)}
                         onChange={() => toggleStudentSelection(student.id)}
-                        className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                        className="h-4 w-4 text-primary border-gray-300 focus:ring-primary"
                       />
                       <div className="flex-1">
                         <div className="font-medium">
@@ -1045,14 +1113,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
                             />
                             <span className="text-sm text-gray-500">min</span>
                           </div>
-                          <select
-                            value={item.deliveryMode}
-                            onChange={(e) => updateManualItem(index, 'deliveryMode', e.target.value)}
-                            className="px-3 py-2 border border-gray-300 rounded-lg"
-                          >
-                            <option value="IN_PERSON">Stacjonarnie</option>
-                            <option value="ONLINE">Online</option>
-                          </select>
                           <button
                             type="button"
                             onClick={() => removeManualItem(index)}
@@ -1151,19 +1211,6 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
                       )}
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Tryb zajęć
-                      </label>
-                      <select
-                        value={recurringPattern.deliveryMode}
-                        onChange={(e) => handlePatternChange('deliveryMode', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      >
-                        <option value="IN_PERSON">Stacjonarnie</option>
-                        <option value="ONLINE">Online</option>
-                      </select>
-                    </div>
                   </div>
 
                   {/* Days of week with individual times */}

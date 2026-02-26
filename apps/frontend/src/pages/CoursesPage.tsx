@@ -34,6 +34,13 @@ const CoursesPage: React.FC = () => {
     queryFn: () => courseService.getCourses({ search: searchTerm }),
   });
 
+  // Fetch delete impact when dialog is open
+  const { data: deleteImpact, isLoading: isImpactLoading } = useQuery({
+    queryKey: ['course-delete-impact', confirmDialog.courseId],
+    queryFn: () => courseService.getDeleteImpact(confirmDialog.courseId!),
+    enabled: confirmDialog.isOpen && !!confirmDialog.courseId,
+  });
+
   // Bulk delete mutation
   const bulkDeleteMutation = useMutation({
     mutationFn: (ids: string[]) => courseService.bulkDeleteCourses(ids),
@@ -71,7 +78,7 @@ const CoursesPage: React.FC = () => {
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => courseService.deleteCourse(id),
+    mutationFn: ({ id, force }: { id: string; force: boolean }) => courseService.deleteCourse(id, force),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['courses'] });
       toast.success('Kurs został pomyślnie usunięty');
@@ -92,7 +99,8 @@ const CoursesPage: React.FC = () => {
 
   const confirmDelete = async () => {
     if (confirmDialog.courseId) {
-      await deleteMutation.mutateAsync(confirmDialog.courseId);
+      const hasImpact = deleteImpact && (deleteImpact.activeEnrollments > 0 || deleteImpact.futureLessons > 0);
+      await deleteMutation.mutateAsync({ id: confirmDialog.courseId, force: !!hasImpact });
     }
   };
 
@@ -467,16 +475,47 @@ const CoursesPage: React.FC = () => {
       )}
 
       {/* Confirm Delete Dialog */}
-      <ConfirmDialog
-        isOpen={confirmDialog.isOpen}
-        onClose={() => setConfirmDialog({ isOpen: false, courseId: null })}
-        onConfirm={confirmDelete}
-        title="Usuń kurs"
-        message="Czy na pewno chcesz usunąć ten kurs? Ta operacja jest nieodwracalna."
-        confirmText="Usuń"
-        cancelText="Anuluj"
-        variant="danger"
-      />
+      {(() => {
+        const hasImpact = deleteImpact && (deleteImpact.activeEnrollments > 0 || deleteImpact.futureLessons > 0);
+        const details = deleteImpact ? [
+          ...(deleteImpact.activeEnrollments > 0 ? [{
+            label: 'Aktywne zapisy uczniów',
+            value: deleteImpact.enrolledStudents.length > 0
+              ? `${deleteImpact.activeEnrollments} (${deleteImpact.enrolledStudents.join(', ')})`
+              : deleteImpact.activeEnrollments,
+            highlight: true,
+          }] : []),
+          ...(deleteImpact.futureLessons > 0 ? [{
+            label: 'Zaplanowane przyszłe lekcje',
+            value: deleteImpact.futureLessons,
+            highlight: true,
+          }] : []),
+          ...(deleteImpact.pastLessons > 0 ? [{
+            label: 'Historyczne lekcje (zostaną zachowane)',
+            value: deleteImpact.pastLessons,
+            highlight: false,
+          }] : []),
+        ] : undefined;
+
+        return (
+          <ConfirmDialog
+            isOpen={confirmDialog.isOpen}
+            onClose={() => setConfirmDialog({ isOpen: false, courseId: null })}
+            onConfirm={confirmDelete}
+            title="Usuń kurs"
+            message={
+              hasImpact
+                ? 'Ten kurs ma powiązane dane. Usunięcie spowoduje anulowanie zaplanowanych lekcji i wypisanie uczniów. Ta operacja jest nieodwracalna.'
+                : 'Czy na pewno chcesz usunąć ten kurs? Ta operacja jest nieodwracalna.'
+            }
+            confirmText={hasImpact ? 'Usuń mimo to' : 'Usuń'}
+            cancelText="Anuluj"
+            variant="danger"
+            details={details}
+            isLoading={isImpactLoading}
+          />
+        );
+      })()}
 
       {/* Confirm Bulk Delete Dialog */}
       <ConfirmDialog

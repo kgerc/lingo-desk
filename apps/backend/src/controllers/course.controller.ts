@@ -196,10 +196,23 @@ class CourseController {
     }
   }
 
+  async getDeleteImpact(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const impact = await courseService.getDeleteImpact(id as string, req.user!.organizationId);
+      res.json(impact);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deleteCourse(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const result = await courseService.deleteCourse(id as string, req.user!.organizationId);
+      const force = req.query.force === 'true';
+      const result = force
+        ? await courseService.deleteCourseWithCascade(id as string, req.user!.organizationId)
+        : await courseService.deleteCourse(id as string, req.user!.organizationId);
       res.json(result);
     } catch (error) {
       next(error);

@@ -200,8 +200,18 @@ export const courseService = {
     return response.data.data as Course;
   },
 
-  async deleteCourse(id: string) {
-    const response = await api.delete(`/courses/${id}`);
+  async getDeleteImpact(id: string) {
+    const response = await api.get(`/courses/${id}/delete-impact`) as any;
+    return response.data as {
+      activeEnrollments: number;
+      enrolledStudents: string[];
+      futureLessons: number;
+      pastLessons: number;
+    };
+  },
+
+  async deleteCourse(id: string, force = false) {
+    const response = await api.delete(`/courses/${id}${force ? '?force=true' : ''}`);
     return response.data;
   },
 
