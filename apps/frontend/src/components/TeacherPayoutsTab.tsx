@@ -316,13 +316,17 @@ export default function TeacherPayoutsTab() {
     return badges[status] || status;
   };
 
-  const getQualificationReasonLabel = (reason: string) => {
+  const getQualificationReasonLabel = (reason: string, payoutPercent?: number | null) => {
     const labels: Record<string, string> = {
       COMPLETED: 'Ukończona',
       CONFIRMED: 'Potwierdzona',
       LATE_CANCELLATION: 'Późna anulacja',
     };
-    return labels[reason] || reason;
+    const base = labels[reason] || reason;
+    if (reason === 'LATE_CANCELLATION' && payoutPercent != null && payoutPercent < 100) {
+      return `${base} • ${payoutPercent}% stawki`;
+    }
+    return base;
   };
 
   const getLessonStatusBadge = (lesson: LessonForDay) => {
@@ -943,7 +947,7 @@ export default function TeacherPayoutsTab() {
                                     })} •{' '}
                                     {lesson.durationMinutes} min
                                     {lesson.qualificationReason && (
-                                      <> • {getQualificationReasonLabel(lesson.qualificationReason)}</>
+                                      <> • {getQualificationReasonLabel(lesson.qualificationReason, lesson.payoutPercent)}</>
                                     )}
                                   </div>
                                 </div>
@@ -1070,7 +1074,7 @@ export default function TeacherPayoutsTab() {
                                       <div className="text-xs text-gray-500">
                                         {new Date(lesson.scheduledAt).toLocaleDateString('pl-PL')} •{' '}
                                         {lesson.durationMinutes} min •{' '}
-                                        {getQualificationReasonLabel(lesson.qualificationReason)}
+                                        {getQualificationReasonLabel(lesson.qualificationReason, lesson.payoutPercent)}
                                       </div>
                                     </div>
                                     <div className="text-right">

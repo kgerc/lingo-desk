@@ -18,6 +18,7 @@ export interface QualifiedLesson {
   amount: number;
   currency: string;
   qualificationReason: QualificationReason;
+  payoutPercent: number; // 100 = full payout, e.g. 80 = 80% of rate (for late cancellations)
 }
 
 export interface PayoutPreview {
@@ -52,19 +53,28 @@ class PayoutService {
    * Qualification rules:
    * 1. Lesson is COMPLETED
    * 2. Lesson is CONFIRMED
-   * 3. Lesson was CANCELLED but later than LATE_CANCELLATION_LIMIT_HOURS before scheduled time
+   * 3. Lesson was CANCELLED but cancelled within the configured hours threshold before scheduled time
+   *    - If teacher has cancellationPayoutEnabled: use teacher's cancellationPayoutHours threshold + cancellationPayoutPercent
+   *    - Otherwise (backward compat): use LATE_CANCELLATION_LIMIT_HOURS constant at 100%
    */
-  private isLessonQualified(lesson: {
-    status: LessonStatus;
-    scheduledAt: Date;
-    cancelledAt: Date | null;
-  }): { qualified: boolean; reason: QualificationReason | null } {
+  private isLessonQualified(
+    lesson: {
+      status: LessonStatus;
+      scheduledAt: Date;
+      cancelledAt: Date | null;
+    },
+    teacherCancellationSettings: {
+      cancellationPayoutEnabled: boolean;
+      cancellationPayoutHours: number | null;
+      cancellationPayoutPercent: number | null;
+    }
+  ): { qualified: boolean; reason: QualificationReason | null; payoutPercent: number } {
     if (lesson.status === LessonStatus.COMPLETED) {
-      return { qualified: true, reason: 'COMPLETED' };
+      return { qualified: true, reason: 'COMPLETED', payoutPercent: 100 };
     }
 
     if (lesson.status === LessonStatus.CONFIRMED) {
-      return { qualified: true, reason: 'CONFIRMED' };
+      return { qualified: true, reason: 'CONFIRMED', payoutPercent: 100 };
     }
 
     if (lesson.status === LessonStatus.CANCELLED && lesson.cancelledAt) {
@@ -72,19 +82,29 @@ class PayoutService {
       const cancelledTime = new Date(lesson.cancelledAt).getTime();
       const hoursBeforeLesson = (scheduledTime - cancelledTime) / (1000 * 60 * 60);
 
-      if (hoursBeforeLesson < LATE_CANCELLATION_LIMIT_HOURS) {
-        return { qualified: true, reason: 'LATE_CANCELLATION' };
+      if (teacherCancellationSettings.cancellationPayoutEnabled) {
+        // Use teacher-configured threshold and percent
+        const threshold = teacherCancellationSettings.cancellationPayoutHours ?? LATE_CANCELLATION_LIMIT_HOURS;
+        const percent = teacherCancellationSettings.cancellationPayoutPercent ?? 100;
+        if (hoursBeforeLesson < threshold) {
+          return { qualified: true, reason: 'LATE_CANCELLATION', payoutPercent: percent };
+        }
+      } else {
+        // Backward compat: use hardcoded 24h limit at 100%
+        if (hoursBeforeLesson < LATE_CANCELLATION_LIMIT_HOURS) {
+          return { qualified: true, reason: 'LATE_CANCELLATION', payoutPercent: 100 };
+        }
       }
     }
 
-    return { qualified: false, reason: null };
+    return { qualified: false, reason: null, payoutPercent: 100 };
   }
 
   /**
    * Calculate payout amount for a lesson
    */
-  private calculateLessonAmount(durationMinutes: number, hourlyRate: number): number {
-    return (durationMinutes / 60) * hourlyRate;
+  private calculateLessonAmount(durationMinutes: number, hourlyRate: number, multiplier = 1.0): number {
+    return (durationMinutes / 60) * hourlyRate * multiplier;
   }
 
   /**
@@ -117,6 +137,11 @@ class PayoutService {
     }
 
     const hourlyRate = Number(teacher.hourlyRate);
+    const teacherCancellationSettings = {
+      cancellationPayoutEnabled: teacher.cancellationPayoutEnabled,
+      cancellationPayoutHours: teacher.cancellationPayoutHours,
+      cancellationPayoutPercent: teacher.cancellationPayoutPercent,
+    };
 
     // Get all lessons in the period for this teacher
     const lessons = await prisma.lesson.findMany({
@@ -152,7 +177,7 @@ class PayoutService {
     const qualifiedLessons: QualifiedLesson[] = [];
 
     for (const lesson of lessons) {
-      const { qualified, reason } = this.isLessonQualified(lesson);
+      const { qualified, reason, payoutPercent } = this.isLessonQualified(lesson, teacherCancellationSettings);
 
       if (qualified && reason) {
         // Check if lesson is already in a payout
@@ -163,7 +188,8 @@ class PayoutService {
         });
 
         if (!existingPayoutLesson) {
-          const amount = this.calculateLessonAmount(lesson.durationMinutes, hourlyRate);
+          const multiplier = payoutPercent / 100;
+          const amount = this.calculateLessonAmount(lesson.durationMinutes, hourlyRate, multiplier);
 
           qualifiedLessons.push({
             id: lesson.id,
@@ -177,6 +203,7 @@ class PayoutService {
             amount,
             currency: lesson.currency,
             qualificationReason: reason,
+            payoutPercent,
           });
         }
       }
@@ -289,6 +316,7 @@ class PayoutService {
             amount: lesson.amount,
             currency: lesson.currency,
             qualificationReason: lesson.qualificationReason,
+            payoutPercent: lesson.payoutPercent === 100 ? null : lesson.payoutPercent,
             studentName: lesson.studentName,
             lessonTitle: lesson.title,
           },
@@ -556,6 +584,11 @@ class PayoutService {
     }
 
     const hourlyRate = Number(teacher.hourlyRate);
+    const teacherCancellationSettings = {
+      cancellationPayoutEnabled: teacher.cancellationPayoutEnabled,
+      cancellationPayoutHours: teacher.cancellationPayoutHours,
+      cancellationPayoutPercent: teacher.cancellationPayoutPercent,
+    };
 
     const lessons = await prisma.lesson.findMany({
       where: {
@@ -595,9 +628,10 @@ class PayoutService {
     });
 
     return lessons.map((lesson) => {
-      const { qualified, reason } = this.isLessonQualified(lesson);
+      const { qualified, reason, payoutPercent } = this.isLessonQualified(lesson, teacherCancellationSettings);
       const payoutLesson = lesson.payoutLessons[0];
-      const amount = this.calculateLessonAmount(lesson.durationMinutes, hourlyRate);
+      const multiplier = payoutPercent / 100;
+      const amount = this.calculateLessonAmount(lesson.durationMinutes, hourlyRate, multiplier);
 
       return {
         id: lesson.id,
@@ -612,6 +646,7 @@ class PayoutService {
         currency: lesson.currency,
         qualifiesForPayout: qualified,
         qualificationReason: reason,
+        payoutPercent: qualified && reason === 'LATE_CANCELLATION' ? payoutPercent : null,
         payout: payoutLesson
           ? {
               id: payoutLesson.payout.id,
@@ -636,6 +671,11 @@ class PayoutService {
     if (!teacher) throw new Error('Teacher not found');
 
     const hourlyRate = Number(teacher.hourlyRate);
+    const teacherCancellationSettings = {
+      cancellationPayoutEnabled: teacher.cancellationPayoutEnabled,
+      cancellationPayoutHours: teacher.cancellationPayoutHours,
+      cancellationPayoutPercent: teacher.cancellationPayoutPercent,
+    };
 
     const lessons = await prisma.lesson.findMany({
       where: {
@@ -651,9 +691,10 @@ class PayoutService {
     });
 
     return lessons.map((lesson) => {
-      const { qualified, reason } = this.isLessonQualified(lesson);
+      const { qualified, reason, payoutPercent } = this.isLessonQualified(lesson, teacherCancellationSettings);
       const payoutLesson = lesson.payoutLessons[0];
-      const amount = this.calculateLessonAmount(lesson.durationMinutes, hourlyRate);
+      const multiplier = payoutPercent / 100;
+      const amount = this.calculateLessonAmount(lesson.durationMinutes, hourlyRate, multiplier);
 
       return {
         id: lesson.id,
@@ -668,6 +709,7 @@ class PayoutService {
         currency: lesson.currency,
         qualifiesForPayout: qualified,
         qualificationReason: reason,
+        payoutPercent: qualified && reason === 'LATE_CANCELLATION' ? payoutPercent : null,
         payout: payoutLesson
           ? {
               id: payoutLesson.payout.id,

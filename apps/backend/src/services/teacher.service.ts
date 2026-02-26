@@ -29,6 +29,9 @@ interface UpdateTeacherData {
   bio?: string;
   isAvailableForBooking?: boolean;
   isActive?: boolean;
+  cancellationPayoutEnabled?: boolean;
+  cancellationPayoutHours?: number | null;
+  cancellationPayoutPercent?: number | null;
 }
 
 export class TeacherService {
@@ -265,6 +268,9 @@ export class TeacherService {
           languages: data.languages,
           bio: data.bio,
           isAvailableForBooking: data.isAvailableForBooking,
+          cancellationPayoutEnabled: data.cancellationPayoutEnabled,
+          cancellationPayoutHours: data.cancellationPayoutHours,
+          cancellationPayoutPercent: data.cancellationPayoutPercent,
         },
         include: {
           user: {

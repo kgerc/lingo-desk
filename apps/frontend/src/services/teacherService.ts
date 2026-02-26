@@ -9,6 +9,9 @@ export interface Teacher {
   languages: string[];
   bio?: string;
   isAvailableForBooking: boolean;
+  cancellationPayoutEnabled: boolean;
+  cancellationPayoutHours?: number | null;
+  cancellationPayoutPercent?: number | null;
   user: {
     id: string;
     email: string;
@@ -50,6 +53,9 @@ export interface UpdateTeacherData {
   bio?: string;
   isAvailableForBooking?: boolean;
   isActive?: boolean;
+  cancellationPayoutEnabled?: boolean;
+  cancellationPayoutHours?: number | null;
+  cancellationPayoutPercent?: number | null;
 }
 
 export const teacherService = {

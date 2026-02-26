@@ -33,6 +33,9 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
     contractType: teacher?.contractType || '',
     specializations: teacher?.specializations.join(', ') || '',
     languages: teacher?.languages.join(', ') || '',
+    cancellationPayoutEnabled: teacher?.cancellationPayoutEnabled ?? false,
+    cancellationPayoutHours: teacher?.cancellationPayoutHours ?? null as number | null,
+    cancellationPayoutPercent: teacher?.cancellationPayoutPercent ?? null as number | null,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -77,6 +80,16 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
     if (!formData.hourlyRate || formData.hourlyRate <= 0) {
       newErrors.hourlyRate = 'Stawka musi być większa niż 0';
     }
+    if (formData.cancellationPayoutEnabled) {
+      if (!formData.cancellationPayoutHours || formData.cancellationPayoutHours <= 0) {
+        newErrors.cancellationPayoutHours = 'Próg godzin jest wymagany i musi być > 0';
+      }
+      if (formData.cancellationPayoutPercent === null || formData.cancellationPayoutPercent === undefined) {
+        newErrors.cancellationPayoutPercent = 'Procent wypłaty jest wymagany';
+      } else if (formData.cancellationPayoutPercent < 0 || formData.cancellationPayoutPercent > 100) {
+        newErrors.cancellationPayoutPercent = 'Procent musi być od 0 do 100';
+      }
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -106,6 +119,9 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
           contractType: formData.contractType ? formData.contractType as 'B2B' | 'EMPLOYMENT' | 'CIVIL' : undefined,
           specializations: specializationsArray,
           languages: languagesArray,
+          cancellationPayoutEnabled: formData.cancellationPayoutEnabled,
+          cancellationPayoutHours: formData.cancellationPayoutEnabled ? formData.cancellationPayoutHours : null,
+          cancellationPayoutPercent: formData.cancellationPayoutEnabled ? formData.cancellationPayoutPercent : null,
         },
       });
     } else {
@@ -122,9 +138,14 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
+    const newValue = type === 'checkbox'
+      ? (e.target as HTMLInputElement).checked
+      : type === 'number'
+        ? (value === '' ? null : parseFloat(value))
+        : value;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 : value,
+      [name]: newValue,
     }));
     if (errors[name]) {
       setErrors((prev) => {
@@ -333,6 +354,83 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Cancellation payout settings */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Ustawienia odwołań</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Wypłata przy odwołaniu lekcji</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Lektor otrzymuje część stawki gdy lekcja zostanie odwołana w krótkim czasie przed jej rozpoczęciem
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    name="cancellationPayoutEnabled"
+                    checked={formData.cancellationPayoutEnabled}
+                    onChange={handleChange}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+              </div>
+
+              {formData.cancellationPayoutEnabled && (
+                <div className="grid grid-cols-2 gap-4 pl-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Próg godzin przed lekcją *
+                    </label>
+                    <input
+                      type="number"
+                      name="cancellationPayoutHours"
+                      value={formData.cancellationPayoutHours ?? ''}
+                      onChange={handleChange}
+                      min="1"
+                      step="1"
+                      placeholder="np. 24"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                        errors.cancellationPayoutHours ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Jeśli odwołanie nastąpi w tym czasie, lektor dostaje wypłatę</p>
+                    {errors.cancellationPayoutHours && (
+                      <p className="mt-1 text-sm text-red-600">{errors.cancellationPayoutHours}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      % stawki do wypłaty *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        name="cancellationPayoutPercent"
+                        value={formData.cancellationPayoutPercent ?? ''}
+                        onChange={handleChange}
+                        min="0"
+                        max="100"
+                        step="1"
+                        placeholder="np. 80"
+                        className={`w-full px-3 py-2 pr-8 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                          errors.cancellationPayoutPercent ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">0–100% normalnej stawki godzinowej</p>
+                    {errors.cancellationPayoutPercent && (
+                      <p className="mt-1 text-sm text-red-600">{errors.cancellationPayoutPercent}</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

@@ -46,6 +46,9 @@ const updateTeacherSchema = z.object({
   bio: optionalString('Biografia'),
   isAvailableForBooking: optionalBoolean('Dostępny do rezerwacji'),
   isActive: optionalBoolean('Aktywny'),
+  cancellationPayoutEnabled: z.boolean().optional(),
+  cancellationPayoutHours: z.number().int().positive({ message: 'Próg godzin musi być liczbą dodatnią' }).nullable().optional(),
+  cancellationPayoutPercent: z.number().int().min(0, { message: 'Procent musi być od 0 do 100' }).max(100, { message: 'Procent musi być od 0 do 100' }).nullable().optional(),
 });
 
 export class TeacherController {

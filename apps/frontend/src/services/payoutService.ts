@@ -15,6 +15,7 @@ export interface QualifiedLesson {
   amount: number;
   currency: string;
   qualificationReason: QualificationReason;
+  payoutPercent: number; // 100 = full payout, e.g. 80 = 80% of rate
 }
 
 export interface PayoutPreview {
@@ -38,6 +39,7 @@ export interface TeacherPayoutLesson {
   amount: number;
   currency: string;
   qualificationReason: string;
+  payoutPercent: number | null; // null = 100%, otherwise partial % (e.g. 80)
   studentName: string;
   lessonTitle: string;
   createdAt: string;
@@ -93,6 +95,7 @@ export interface LessonForDay {
   currency: string;
   qualifiesForPayout: boolean;
   qualificationReason: QualificationReason | null;
+  payoutPercent: number | null; // null or 100 = full payout, e.g. 80 = 80% of rate
   payout: {
     id: string;
     status: TeacherPayoutStatus;

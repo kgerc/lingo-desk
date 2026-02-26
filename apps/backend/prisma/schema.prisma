@@ -256,6 +256,10 @@ model Teacher {
   languages              String[]
   bio                    String?
   isAvailableForBooking  Boolean      @default(true) @map("is_available_for_booking")
+  // Cancellation payout settings
+  cancellationPayoutEnabled  Boolean  @default(false) @map("cancellation_payout_enabled")
+  cancellationPayoutHours    Int?     @map("cancellation_payout_hours")
+  cancellationPayoutPercent  Int?     @map("cancellation_payout_percent")
   createdAt              DateTime     @default(now()) @map("created_at")
   updatedAt              DateTime     @updatedAt @map("updated_at")
 
@@ -796,6 +800,7 @@ model TeacherPayoutLesson {
   amount              Decimal       @db.Decimal(10, 2)
   currency            String        @default("PLN")
   qualificationReason String        @map("qualification_reason") // COMPLETED, CONFIRMED, LATE_CANCELLATION
+  payoutPercent       Int?          @map("payout_percent") // null = 100%, otherwise partial % (e.g. 80)
   studentName         String        @map("student_name")
   lessonTitle         String        @map("lesson_title")
   createdAt           DateTime      @default(now()) @map("created_at")
