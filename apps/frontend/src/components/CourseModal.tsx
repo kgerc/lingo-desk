@@ -436,8 +436,8 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
       newErrors.pricePerLesson = 'Podaj cenę za lekcję';
     }
 
-    if (formData.maxStudents && parseInt(formData.maxStudents) <= 0) {
-      newErrors.maxStudents = 'Maksymalna liczba uczestników musi być większa od 0';
+    if (formData.courseType === 'GROUP' && formData.maxStudents && parseInt(formData.maxStudents) < 2) {
+      newErrors.maxStudents = 'Maksymalna liczba uczestników dla kursu grupowego musi wynosić co najmniej 2';
     }
 
     if (!isEdit && scheduleMode !== 'none' && selectedStudentIds.length === 0) {
@@ -519,7 +519,7 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
       description: formData.description || undefined,
       startDate: resolvedStartDate,
       endDate: resolvedEndDate,
-      maxStudents: formData.maxStudents ? parseInt(formData.maxStudents) : undefined,
+      maxStudents: formData.courseType === 'INDIVIDUAL' ? 1 : (formData.maxStudents ? parseInt(formData.maxStudents) : undefined),
       isActive: formData.isActive,
     };
 
@@ -825,25 +825,27 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Maksymalna liczba uczestników
-                    </label>
-                    <input
-                      type="number"
-                      name="maxStudents"
-                      value={formData.maxStudents}
-                      onChange={handleChange}
-                      min="1"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                        errors.maxStudents ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="np. 10"
-                    />
-                    {errors.maxStudents && (
-                      <p className="mt-1 text-sm text-red-600">{errors.maxStudents}</p>
-                    )}
-                  </div>
+                  {formData.courseType === 'GROUP' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Maksymalna liczba uczestników
+                      </label>
+                      <input
+                        type="number"
+                        name="maxStudents"
+                        value={formData.maxStudents}
+                        onChange={handleChange}
+                        min="2"
+                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                          errors.maxStudents ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        placeholder="np. 10"
+                      />
+                      {errors.maxStudents && (
+                        <p className="mt-1 text-sm text-red-600">{errors.maxStudents}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Price & Currency */}

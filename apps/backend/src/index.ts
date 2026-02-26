@@ -36,6 +36,7 @@ import courseApplicationRoutes from './routes/courseApplication.routes';
 import scheduler from './utils/scheduler';
 import { initializeStorage } from './utils/supabase';
 import { startExchangeRateJob } from './jobs/exchange-rate.job';
+import { startPurgeArchivedStudentsJob } from './jobs/purge-archived-students.job';
 
 // Load environment variables
 dotenv.config();
@@ -155,6 +156,7 @@ app.listen(PORT, async () => {
     scheduler.start();
     // Start exchange rate updates
     startExchangeRateJob();
+    startPurgeArchivedStudentsJob();
   }
 });
 

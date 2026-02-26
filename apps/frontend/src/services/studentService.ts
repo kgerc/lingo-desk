@@ -19,6 +19,8 @@ export interface Student {
   cancellationLimitCount?: number | null;
   cancellationLimitPeriod?: string | null;
   internalNotes?: string | null;
+  archivedAt?: string | null;
+  daysUntilDeletion?: number | null;
   enrollmentDate: string;
   user: {
     id: string;
@@ -114,6 +116,21 @@ export const studentService = {
   async bulkDeleteStudents(ids: string[]) {
     const response = await api.delete('/students/bulk', { data: { ids } });
     return response.data as { deleted: number; failed: number; errors: { id: string; error: string }[] };
+  },
+
+  async getArchivedStudents() {
+    const response = await api.get('/students/archived') as any;
+    return response.data.data as Student[];
+  },
+
+  async restoreStudent(id: string) {
+    const response = await api.post(`/students/${id}/restore`);
+    return response.data;
+  },
+
+  async purgeStudent(id: string) {
+    const response = await api.delete(`/students/${id}/purge`);
+    return response.data;
   },
 
   async getStats() {

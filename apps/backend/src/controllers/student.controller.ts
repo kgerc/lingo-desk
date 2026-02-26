@@ -241,6 +241,44 @@ export class StudentController {
     }
   }
 
+  async getArchivedStudents(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.organizationId) {
+        return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Organization ID not found' } });
+      }
+      const students = await studentService.getArchivedStudents(req.user.organizationId);
+      return res.json({ data: students });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async restoreStudent(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.organizationId) {
+        return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Organization ID not found' } });
+      }
+      const { id } = req.params;
+      const result = await studentService.restoreStudent(id, req.user.organizationId);
+      return res.json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async purgeStudent(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.organizationId) {
+        return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Organization ID not found' } });
+      }
+      const { id } = req.params;
+      const result = await studentService.purgeStudent(id, req.user.organizationId);
+      return res.json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   async getStats(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       if (!req.user?.organizationId) {

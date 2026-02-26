@@ -159,8 +159,12 @@ export class StudentService {
   }) {
     const where: any = { organizationId };
 
+    // Always filter out archived (soft-deleted) students by default
+    where.user = { isActive: filters?.isActive ?? true };
+
     if (filters?.search) {
       where.user = {
+        ...where.user,
         OR: [
           { firstName: { contains: filters.search, mode: 'insensitive' } },
           { lastName: { contains: filters.search, mode: 'insensitive' } },
@@ -430,13 +434,112 @@ export class StudentService {
       throw new Error('Student not found');
     }
 
-    // Soft delete: deactivate user instead of hard delete
-    await prisma.user.update({
-      where: { id: student.userId },
-      data: { isActive: false },
+    // Soft delete: archive student (can be restored within 30 days)
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: student.userId },
+        data: { isActive: false },
+      }),
+      prisma.student.update({
+        where: { id },
+        data: { archivedAt: new Date() },
+      }),
+    ]);
+
+    return { success: true, message: 'Student archived' };
+  }
+
+  async restoreStudent(id: string, organizationId: string) {
+    const student = await prisma.student.findFirst({
+      where: { id, organizationId, archivedAt: { not: null } },
     });
 
-    return { success: true, message: 'Student deactivated' };
+    if (!student) {
+      throw new Error('Archived student not found');
+    }
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: student.userId },
+        data: { isActive: true },
+      }),
+      prisma.student.update({
+        where: { id },
+        data: { archivedAt: null },
+      }),
+    ]);
+
+    return { success: true, message: 'Student restored' };
+  }
+
+  async purgeStudent(id: string, organizationId: string) {
+    const student = await prisma.student.findFirst({
+      where: { id, organizationId, archivedAt: { not: null } },
+    });
+
+    if (!student) {
+      throw new Error('Archived student not found');
+    }
+
+    // Hard delete user – Student is cascade-deleted
+    await prisma.user.delete({ where: { id: student.userId } });
+
+    return { success: true, message: 'Student permanently deleted' };
+  }
+
+  async purgeExpiredStudents(): Promise<{ purged: number }> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+
+    const expired = await prisma.student.findMany({
+      where: { archivedAt: { lte: cutoff } },
+      select: { userId: true },
+    });
+
+    if (expired.length === 0) return { purged: 0 };
+
+    const userIds = expired.map((s) => s.userId);
+    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+
+    return { purged: expired.length };
+  }
+
+  async getArchivedStudents(organizationId: string) {
+    const students = await prisma.student.findMany({
+      where: {
+        organizationId,
+        archivedAt: { not: null },
+        user: { isActive: false },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            avatarUrl: true,
+            isActive: true,
+            createdAt: true,
+          },
+        },
+        budget: true,
+        enrollments: {
+          where: { status: 'ACTIVE' },
+          include: { course: { select: { id: true, name: true } } },
+        },
+      },
+      orderBy: { archivedAt: 'desc' },
+    });
+
+    const now = Date.now();
+    return students.map((s) => ({
+      ...s,
+      daysUntilDeletion: s.archivedAt
+        ? Math.max(0, 30 - Math.floor((now - s.archivedAt.getTime()) / 86_400_000))
+        : null,
+    }));
   }
 
   async getStudentStats(organizationId: string) {

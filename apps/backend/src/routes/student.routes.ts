@@ -20,6 +20,13 @@ router.get(
   studentController.getStudents.bind(studentController)
 );
 
+// GET /api/students/archived - List archived students (must be before /:id)
+router.get(
+  '/archived',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  studentController.getArchivedStudents.bind(studentController)
+);
+
 // GET /api/students/enrollment/:enrollmentId/budget - Get enrollment budget
 router.get(
   '/enrollment/:enrollmentId/budget',
@@ -53,6 +60,13 @@ router.post(
 // PUT /api/students/:id - Update student
 router.put('/:id', studentController.updateStudent.bind(studentController));
 
+// POST /api/students/:id/restore - Restore archived student
+router.post(
+  '/:id/restore',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  studentController.restoreStudent.bind(studentController)
+);
+
 // DELETE /api/students/bulk - Bulk delete students
 router.delete(
   '/bulk',
@@ -60,7 +74,14 @@ router.delete(
   studentController.bulkDelete.bind(studentController)
 );
 
-// DELETE /api/students/:id - Delete student
+// DELETE /api/students/:id/purge - Permanently delete archived student (ADMIN only)
+router.delete(
+  '/:id/purge',
+  authorize(UserRole.ADMIN),
+  studentController.purgeStudent.bind(studentController)
+);
+
+// DELETE /api/students/:id - Archive student (soft delete)
 router.delete(
   '/:id',
   authorize(UserRole.ADMIN, UserRole.MANAGER),

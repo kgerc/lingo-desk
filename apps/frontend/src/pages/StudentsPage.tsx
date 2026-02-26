@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { studentService, Student } from '../services/studentService';
-import { Plus, Search, Mail, Phone, MoreVertical, Upload, X, Calculator, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Search, Mail, Phone, MoreVertical, Upload, X, Calculator, Trash2, Loader2, Archive, ArchiveRestore, AlertTriangle } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import StudentModal from '../components/StudentModal';
 import ImportStudentsModal from '../components/ImportStudentsModal';
@@ -23,10 +23,13 @@ const StudentsPage: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isCancellationsModalOpen, setIsCancellationsModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; studentId: string | null }>({ isOpen: false, studentId: null });
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [restoreDialog, setRestoreDialog] = useState<{ isOpen: boolean; studentId: string | null }>({ isOpen: false, studentId: null });
+  const [purgeDialog, setPurgeDialog] = useState<{ isOpen: boolean; studentId: string | null }>({ isOpen: false, studentId: null });
   const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   // Check if user has access to settlements (ADMIN, MANAGER, HR)
@@ -37,10 +40,17 @@ const StudentsPage: React.FC = () => {
     navigate(`/payments?tab=settlements&studentId=${student.id}`);
   };
 
-  // Fetch students
+  // Fetch active students
   const { data: students = [], isLoading } = useQuery({
     queryKey: ['students', searchTerm],
     queryFn: () => studentService.getStudents({ search: searchTerm }),
+  });
+
+  // Fetch archived students
+  const { data: archivedStudents = [], isLoading: isLoadingArchived } = useQuery({
+    queryKey: ['students', 'archived'],
+    queryFn: () => studentService.getArchivedStudents(),
+    enabled: activeTab === 'archived',
   });
 
   // Bulk delete mutation
@@ -77,15 +87,40 @@ const StudentsPage: React.FC = () => {
     }
   };
 
-  // Delete mutation
+  // Archive mutation (soft delete)
   const deleteMutation = useMutation({
     mutationFn: (id: string) => studentService.deleteStudent(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
-      toast.success('Uczeń został pomyślnie usunięty');
+      toast.success('Uczeń przeniesiony do archiwum');
     },
     onError: () => {
-      toast.error('Nie udało się usunąć ucznia');
+      toast.error('Nie udało się zarchiwizować ucznia');
+    },
+  });
+
+  // Restore mutation
+  const restoreMutation = useMutation({
+    mutationFn: (id: string) => studentService.restoreStudent(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['students', 'archived'] });
+      toast.success('Uczeń przywrócony');
+    },
+    onError: () => {
+      toast.error('Nie udało się przywrócić ucznia');
+    },
+  });
+
+  // Purge mutation (hard delete)
+  const purgeMutation = useMutation({
+    mutationFn: (id: string) => studentService.purgeStudent(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students', 'archived'] });
+      toast.success('Uczeń trwale usunięty');
+    },
+    onError: () => {
+      toast.error('Nie udało się trwale usunąć ucznia');
     },
   });
 
@@ -166,19 +201,46 @@ const StudentsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="bg-white rounded-lg shadow p-6 border border-gray-200 mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Szukaj ucznia po imieniu, nazwisku lub emailu..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-          />
-        </div>
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+            activeTab === 'active'
+              ? 'bg-white border border-b-white border-gray-200 -mb-px text-secondary'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Aktywni ({students.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('archived')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+            activeTab === 'archived'
+              ? 'bg-white border border-b-white border-gray-200 -mb-px text-secondary'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Archive className="h-3.5 w-3.5" />
+          Archiwum {archivedStudents.length > 0 && `(${archivedStudents.length})`}
+        </button>
       </div>
+
+      {/* Search (active tab only) */}
+      {activeTab === 'active' && (
+        <div className="bg-white rounded-lg shadow p-6 border border-gray-200 mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Szukaj ucznia po imieniu, nazwisku lub emailu..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
@@ -189,14 +251,14 @@ const StudentsPage: React.FC = () => {
           <button
             onClick={() => setBulkConfirmOpen(true)}
             disabled={bulkDeleteMutation.isPending}
-            className="flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors"
           >
             {bulkDeleteMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Trash2 className="h-4 w-4" />
+              <Archive className="h-4 w-4" />
             )}
-            Usuń zaznaczonych
+            Archiwizuj zaznaczonych
           </button>
           <button
             onClick={() => setSelectedIds(new Set())}
@@ -207,8 +269,8 @@ const StudentsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Students Table */}
-      <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+      {/* Students Table (active) */}
+      {activeTab === 'active' && <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
         {isLoading ? (
           <LoadingSpinner message="Ładowanie uczniów..." />
         ) : students.length === 0 ? (
@@ -364,7 +426,7 @@ const StudentsPage: React.FC = () => {
                             onClick: () => handleShowCancellations(student),
                           },
                           {
-                            label: 'Usuń ucznia',
+                            label: 'Archiwizuj ucznia',
                             onClick: () => handleDelete(student.id),
                             variant: 'danger',
                           },
@@ -378,7 +440,90 @@ const StudentsPage: React.FC = () => {
             </table>
           </div>
         )}
-      </div>
+      </div>}
+
+      {/* Archive Table */}
+      {activeTab === 'archived' && (
+        <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+          {isLoadingArchived ? (
+            <LoadingSpinner message="Ładowanie archiwum..." />
+          ) : archivedStudents.length === 0 ? (
+            <div className="p-12 text-center text-gray-500">
+              <Archive className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+              <p>Archiwum jest puste.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uczeń</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data archiwizacji</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trwałe usunięcie za</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Akcje</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {archivedStudents.map((student) => {
+                    const days = student.daysUntilDeletion ?? 0;
+                    const urgent = days <= 7;
+                    return (
+                      <tr key={student.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
+                              {student.user.firstName[0]}{student.user.lastName[0]}
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {student.user.firstName} {student.user.lastName}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {displayEmail(student.user.email) ?? <span className="italic text-gray-400">Brak adresu email</span>}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {student.archivedAt ? new Date(student.archivedAt).toLocaleDateString('pl-PL') : '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 text-sm font-medium ${urgent ? 'text-red-600' : 'text-amber-600'}`}>
+                            {urgent && <AlertTriangle className="h-3.5 w-3.5" />}
+                            {days === 0 ? 'Dziś' : `${days} ${days === 1 ? 'dzień' : 'dni'}`}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => setRestoreDialog({ isOpen: true, studentId: student.id })}
+                              disabled={restoreMutation.isPending}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50"
+                            >
+                              <ArchiveRestore className="h-4 w-4" />
+                              Przywróć
+                            </button>
+                            {user?.role === 'ADMIN' && (
+                              <button
+                                onClick={() => setPurgeDialog({ isOpen: true, studentId: student.id })}
+                                disabled={purgeMutation.isPending}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Usuń permanentnie
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modal */}
       {isModalOpen && (
@@ -400,26 +545,54 @@ const StudentsPage: React.FC = () => {
         />
       )}
 
-      {/* Confirm Delete Dialog */}
+      {/* Confirm Archive Dialog */}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         onClose={() => setConfirmDialog({ isOpen: false, studentId: null })}
         onConfirm={confirmDelete}
-        title="Usuń ucznia"
-        message="Czy na pewno chcesz usunąć tego ucznia? Ta operacja jest nieodwracalna."
-        confirmText="Usuń"
+        title="Archiwizuj ucznia"
+        message="Uczeń zostanie przeniesiony do archiwum. Możesz go przywrócić w ciągu 30 dni, po tym czasie zostanie trwale usunięty."
+        confirmText="Archiwizuj"
         cancelText="Anuluj"
         variant="danger"
       />
 
-      {/* Confirm Bulk Delete Dialog */}
+      {/* Confirm Bulk Archive Dialog */}
       <ConfirmDialog
         isOpen={bulkConfirmOpen}
         onClose={() => setBulkConfirmOpen(false)}
         onConfirm={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
-        title="Usuń zaznaczonych uczniów"
-        message={`Czy na pewno chcesz usunąć ${selectedIds.size} zaznaczonych uczniów? Ta operacja jest nieodwracalna.`}
-        confirmText="Usuń"
+        title="Archiwizuj zaznaczonych uczniów"
+        message={`${selectedIds.size} zaznaczonych uczniów zostanie przeniesionych do archiwum. Możesz ich przywrócić w ciągu 30 dni.`}
+        confirmText="Archiwizuj"
+        cancelText="Anuluj"
+        variant="danger"
+      />
+
+      {/* Restore Dialog */}
+      <ConfirmDialog
+        isOpen={restoreDialog.isOpen}
+        onClose={() => setRestoreDialog({ isOpen: false, studentId: null })}
+        onConfirm={() => {
+          if (restoreDialog.studentId) restoreMutation.mutate(restoreDialog.studentId);
+        }}
+        title="Przywróć ucznia"
+        message="Uczeń zostanie przywrócony i będzie widoczny na liście aktywnych uczniów."
+        confirmText="Przywróć"
+        cancelText="Anuluj"
+        variant="info"
+      />
+
+      {/* Purge Dialog */}
+      <ConfirmDialog
+        isOpen={purgeDialog.isOpen}
+        onClose={() => setPurgeDialog({ isOpen: false, studentId: null })}
+        onConfirm={() => {
+          if (purgeDialog.studentId) purgeMutation.mutate(purgeDialog.studentId);
+        }}
+        title="Trwałe usunięcie ucznia"
+        message="Uczeń zostanie nieodwracalnie usunięty wraz z całą historią. Tej operacji nie można cofnąć."
+        confirmText="Usuń permanentnie"
         cancelText="Anuluj"
         variant="danger"
       />
