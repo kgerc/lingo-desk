@@ -24,6 +24,7 @@ const ReportsPage = lazy(() => import('./pages/ReportsPage'))
 const MailingsPage = lazy(() => import('./pages/MailingsPage'))
 const UsersPage = lazy(() => import('./pages/UsersPage'))
 const CourseApplicationsPage = lazy(() => import('./pages/CourseApplicationsPage'))
+const ClassroomsPage = lazy(() => import('./pages/ClassroomsPage'))
 const PublicApplicationForm = lazy(() => import('./pages/PublicApplicationForm'))
 
 // Wrapper to handle Suspense inside Layout
@@ -313,6 +314,23 @@ function App() {
               useAuthStore.getState().user?.role === 'ADMIN' || useAuthStore.getState().user?.role === 'MANAGER' ? (
                 <Layout>
                   <LazyPage><SettingsPage /></LazyPage>
+                </Layout>
+              ) : (
+                <Navigate to="/dashboard" />
+              )
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/classrooms"
+          element={
+            isAuthenticated ? (
+              useAuthStore.getState().user?.role === 'ADMIN' || useAuthStore.getState().user?.role === 'MANAGER' ? (
+                <Layout>
+                  <LazyPage><ClassroomsPage /></LazyPage>
                 </Layout>
               ) : (
                 <Navigate to="/dashboard" />

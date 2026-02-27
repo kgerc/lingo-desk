@@ -7,6 +7,7 @@ import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
 import { courseService } from '../services/courseService';
 import substitutionService from '../services/substitutionService';
+import classroomService from '../services/classroomService';
 import { X, Users as UsersIcon, Clock, ClipboardList, Info, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import AttendanceSection from './AttendanceSection';
 import { handleApiError } from '../lib/errorUtils';
@@ -109,6 +110,13 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
 
+  // Fetch classrooms for IN_PERSON mode
+  const { data: classrooms = [] } = useQuery({
+    queryKey: ['classrooms', 'active'],
+    queryFn: () => classroomService.getClassrooms({ isActive: true }),
+    staleTime: 5 * 60 * 1000,
+    enabled: formData.deliveryMode === 'IN_PERSON',
+  });
 
   // When course is selected, auto-populate students from that course
   useEffect(() => {
@@ -386,6 +394,25 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       return;
     }
 
+    // Check classroom conflict if a classroom is selected
+    if (formData.deliveryMode === 'IN_PERSON' && formData.classroomId && formData.scheduledAt && formData.durationMinutes) {
+      try {
+        const conflict = await classroomService.checkConflict({
+          classroomId: formData.classroomId,
+          scheduledAt: new Date(formData.scheduledAt).toISOString(),
+          durationMinutes: Number(formData.durationMinutes),
+          excludeLessonId: isEdit ? lesson?.id : undefined,
+        });
+        if (conflict.hasConflict) {
+          const selectedClassroom = classrooms.find(c => c.id === formData.classroomId);
+          toast.error(`Sala "${selectedClassroom?.name || ''}" jest już zajęta w tym terminie`);
+          return;
+        }
+      } catch {
+        // Non-blocking — proceed if conflict check fails
+      }
+    }
+
     const lessonData: CreateLessonData = {
       courseId: formData.courseId || undefined,
       enrollmentId: undefined,
@@ -650,6 +677,28 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                         {errors.meetingUrl && (
                           <p className="mt-1 text-sm text-red-600">{errors.meetingUrl}</p>
                         )}
+                      </div>
+                    )}
+
+                    {formData.deliveryMode === 'IN_PERSON' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Sala (opcjonalnie)
+                        </label>
+                        <select
+                          name="classroomId"
+                          value={formData.classroomId}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          <option value="">Brak / nie wybrano</option>
+                          {classrooms.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.location?.name ? `${c.location.name} — ` : ''}{c.name}
+                              {c.capacity ? ` (${c.capacity} os.)` : ''}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     )}
                   </div>

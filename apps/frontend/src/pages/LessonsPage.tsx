@@ -588,9 +588,17 @@ const LessonsPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               {getDeliveryModeIcon(lesson.deliveryMode)}
-              <span className="text-sm text-gray-900">
-                {lesson.deliveryMode === 'ONLINE' ? 'Online' : 'Stacjonarne'}
-              </span>
+              <div>
+                <div className="text-sm text-gray-900">
+                  {lesson.deliveryMode === 'ONLINE' ? 'Online' : 'Stacjonarne'}
+                </div>
+                {lesson.deliveryMode === 'IN_PERSON' && lesson.classroom && (
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <MapPin className="h-3 w-3" />
+                    {lesson.classroom.name}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex flex-col gap-1 items-start">
               {getStatusBadge(lesson.status)}

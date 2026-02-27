@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, Info } from 'lucide-react';
 
 interface ConfirmDialogProps {
@@ -58,11 +59,11 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const style = variantStyles[variant];
   const Icon = style.icon;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
 
@@ -125,7 +126,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

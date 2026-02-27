@@ -24,6 +24,7 @@ import {
   Mail,
   UserCog,
   ClipboardList,
+  Building2,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -71,6 +72,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           // { name: 'Grupy', href: '/groups', icon: Users2 }, // Hidden temporarily
           { name: 'Materiały', href: '/materials', icon: FileText },
           { name: 'Grafik', href: '/lessons', icon: Clock },
+          { name: 'Sale', href: '/classrooms', icon: Building2 },
           { name: 'Zgłoszenia', href: '/applications', icon: ClipboardList },
           { name: 'Rozliczenia', href: '/payments', icon: CreditCard },
           { name: 'Dłużnicy', href: '/debtors', icon: AlertCircle },
