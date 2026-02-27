@@ -83,11 +83,23 @@ export interface UpdateStudentData {
 }
 
 export const studentService = {
-  async getStudents(filters?: { search?: string; languageLevel?: string; isActive?: boolean }) {
+  async getStudents(filters?: {
+    search?: string;
+    languageLevel?: string;
+    isActive?: boolean;
+    balanceMin?: number;
+    balanceMax?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) {
     const params = new URLSearchParams();
     if (filters?.search) params.append('search', filters.search);
     if (filters?.languageLevel) params.append('languageLevel', filters.languageLevel);
     if (filters?.isActive !== undefined) params.append('isActive', String(filters.isActive));
+    if (filters?.balanceMin !== undefined) params.append('balanceMin', String(filters.balanceMin));
+    if (filters?.balanceMax !== undefined) params.append('balanceMax', String(filters.balanceMax));
+    if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
 
     const response = await api.get(`/students?${params.toString()}`) as any;
     return response.data.data as Student[];

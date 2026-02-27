@@ -110,7 +110,7 @@ export class StudentController {
         });
       }
 
-      const { search, languageLevel, isActive } = req.query;
+      const { search, languageLevel, isActive, balanceMin, balanceMax, sortBy, sortOrder } = req.query;
 
       const students = await studentService.getStudentsWithVisibility(
         req.user.organizationId,
@@ -119,6 +119,10 @@ export class StudentController {
           search: search as string,
           languageLevel: languageLevel as LanguageLevel,
           isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+          balanceMin: balanceMin ? Number(balanceMin) : undefined,
+          balanceMax: balanceMax ? Number(balanceMax) : undefined,
+          sortBy: sortBy as 'studentNumber' | 'firstName' | 'languageLevel' | 'balance' | undefined,
+          sortOrder: sortOrder as 'asc' | 'desc' | undefined,
         }
       );
 

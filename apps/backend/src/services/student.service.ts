@@ -156,6 +156,10 @@ export class StudentService {
     search?: string;
     languageLevel?: LanguageLevel;
     isActive?: boolean;
+    balanceMin?: number;
+    balanceMax?: number;
+    sortBy?: 'studentNumber' | 'firstName' | 'languageLevel' | 'balance';
+    sortOrder?: 'asc' | 'desc';
   }) {
     const where: any = { organizationId };
 
@@ -184,7 +188,18 @@ export class StudentService {
       };
     }
 
-    const students = await prisma.student.findMany({
+    const sortOrder = filters?.sortOrder ?? 'desc';
+    let orderBy: any = { studentNumber: 'desc' };
+    if (filters?.sortBy === 'firstName') {
+      orderBy = { user: { firstName: sortOrder } };
+    } else if (filters?.sortBy === 'languageLevel') {
+      orderBy = { languageLevel: sortOrder };
+    } else if (filters?.sortBy === 'studentNumber') {
+      orderBy = { studentNumber: sortOrder };
+    }
+    // 'balance' sorting handled in JS after fetch
+
+    let students = await prisma.student.findMany({
       where,
       include: {
         user: {
@@ -212,10 +227,27 @@ export class StudentService {
           },
         },
       },
-      orderBy: {
-        studentNumber: 'desc',
-      },
+      orderBy,
     });
+
+    // Filter by balance range (JS — budget is a relation, can't filter in Prisma directly)
+    if (filters?.balanceMin !== undefined || filters?.balanceMax !== undefined) {
+      students = students.filter((s) => {
+        const bal = Number(s.budget?.currentBalance ?? 0);
+        if (filters.balanceMin !== undefined && bal < filters.balanceMin) return false;
+        if (filters.balanceMax !== undefined && bal > filters.balanceMax) return false;
+        return true;
+      });
+    }
+
+    // Sort by balance in JS
+    if (filters?.sortBy === 'balance') {
+      students = students.sort((a, b) => {
+        const ba = Number(a.budget?.currentBalance ?? 0);
+        const bb = Number(b.budget?.currentBalance ?? 0);
+        return sortOrder === 'asc' ? ba - bb : bb - ba;
+      });
+    }
 
     return students;
   }
@@ -875,7 +907,15 @@ export class StudentService {
   async getStudentsWithVisibility(
     organizationId: string,
     userRole: UserRole,
-    filters?: { search?: string; languageLevel?: LanguageLevel; isActive?: boolean }
+    filters?: {
+      search?: string;
+      languageLevel?: LanguageLevel;
+      isActive?: boolean;
+      balanceMin?: number;
+      balanceMax?: number;
+      sortBy?: 'studentNumber' | 'firstName' | 'languageLevel' | 'balance';
+      sortOrder?: 'asc' | 'desc';
+    }
   ) {
     const students = await this.getStudents(organizationId, filters);
 
