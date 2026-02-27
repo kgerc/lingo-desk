@@ -10,7 +10,14 @@ export interface OrganizationSettingsData {
   [key: string]: any;
 }
 
-export interface OrganizationSettings {
+export interface PaymentReminderSettings {
+  paymentReminderEnabled: boolean;
+  paymentReminderDaysBefore: number[];
+  paymentReminderDaysAfter: number[];
+  paymentReminderMinIntervalHours: number;
+}
+
+export interface OrganizationSettings extends PaymentReminderSettings {
   id: string;
   organizationId: string;
   lessonReminderHours: number;
@@ -117,6 +124,11 @@ const organizationService = {
 
   async switchOrganization(organizationId: string): Promise<UserOrganization> {
     const response = await api.post('/organizations/switch', { organizationId }) as any;
+    return response.data.data;
+  },
+
+  async getOrganizationSettings(): Promise<OrganizationSettings | null> {
+    const response = await api.get('/organizations/settings') as any;
     return response.data.data;
   },
 

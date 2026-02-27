@@ -18,7 +18,7 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
   const [formData, setFormData] = useState<CreatePaymentData>({
     studentId: payment?.studentId || '',
     enrollmentId: payment?.enrollmentId || '',
-    amount: payment?.amount || 0,
+    amount: payment?.amount ? Number(payment.amount) : 0,
     currency: payment?.currency || 'PLN',
     status: payment?.status || 'PENDING',
     paymentMethod: payment?.paymentMethod || 'CASH',
@@ -74,7 +74,7 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
 
     if (isEditMode) {
       updateMutation.mutate({
-        amount: formData.amount,
+        amount: Number(formData.amount),
         currency: formData.currency,
         status: formData.status,
         paymentMethod: formData.paymentMethod,

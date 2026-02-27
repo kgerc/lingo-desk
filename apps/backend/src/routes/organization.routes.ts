@@ -42,6 +42,13 @@ router.delete(
   organizationController.removeUserFromOrganization.bind(organizationController)
 );
 
+// Get organization settings (ADMIN or MANAGER only)
+router.get(
+  '/settings',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  organizationController.getOrganizationSettings.bind(organizationController)
+);
+
 // Update organization settings (ADMIN or MANAGER only)
 router.put(
   '/settings',

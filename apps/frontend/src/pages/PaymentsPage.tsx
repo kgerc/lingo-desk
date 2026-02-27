@@ -4,14 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import paymentService, { Payment } from '../services/paymentService';
-import { Plus, Search, Trash2, Edit, DollarSign, Clock, CheckCircle, XCircle, Upload, Calculator, CreditCard, Bell } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, DollarSign, Clock, CheckCircle, XCircle, Upload, Calculator, CreditCard, Bell, Settings } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal';
 import ImportPaymentsModal from '../components/ImportPaymentsModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import SettlementsTab from '../components/SettlementsTab';
+import PaymentSettingsTab from '../components/PaymentSettingsTab';
 
-type TabType = 'payments' | 'settlements';
+type TabType = 'payments' | 'settlements' | 'settings';
 
 export default function PaymentsPage() {
   const queryClient = useQueryClient();
@@ -178,6 +179,7 @@ export default function PaymentsPage() {
   const tabs = [
     { id: 'settlements' as TabType, name: 'Rozliczenia', icon: Calculator },
     { id: 'payments' as TabType, name: 'Wpłaty', icon: CreditCard },
+    { id: 'settings' as TabType, name: 'Ustawienia', icon: Settings },
   ];
 
   return (
@@ -472,6 +474,10 @@ export default function PaymentsPage() {
           preselectedCourseId={preselectedCourseId}
           onCourseSelected={() => setPreselectedCourseId(undefined)}
         />
+      )}
+
+      {activeTab === 'settings' && (
+        <PaymentSettingsTab />
       )}
 
       {/* Payment Modal */}

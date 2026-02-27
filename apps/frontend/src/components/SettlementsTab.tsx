@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import settlementService, { StudentWithBalance, SettlementPreview } from '../services/settlementService';
 import { courseService } from '../services/courseService';
-import { Search, Calculator, Calendar, TrendingUp, TrendingDown, Minus, ChevronRight, ArrowLeft, Save, Trash2, Eye, History } from 'lucide-react';
+import paymentService from '../services/paymentService';
+import { Search, Calculator, Calendar, TrendingUp, TrendingDown, Minus, ChevronRight, ArrowLeft, Save, Trash2, Eye, History, Bell } from 'lucide-react';
 import LoadingSpinner from './LoadingSpinner';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -28,6 +29,7 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
   const [notes, setNotes] = useState<string>('');
   const [preview, setPreview] = useState<SettlementPreview | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; settlementId: string | null }>({ isOpen: false, settlementId: null });
+  const [reminderDialog, setReminderDialog] = useState<{ isOpen: boolean; paymentId: string | null }>({ isOpen: false, paymentId: null });
 
   // Fetch students with balance
   const { data: students = [], isLoading: isLoadingStudents } = useQuery({
@@ -142,6 +144,37 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
       toast.error(error.response?.data?.message || 'Błąd podczas usuwania rozliczenia');
     },
   });
+
+  // Send payment reminder mutation
+  const sendReminderMutation = useMutation({
+    mutationFn: (paymentId: string) => paymentService.sendReminder(paymentId),
+    onSuccess: () => {
+      toast.success('Przypomnienie o płatności zostało wysłane');
+      setReminderDialog({ isOpen: false, paymentId: null });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Nie udało się wysłać przypomnienia');
+    },
+  });
+
+  const handleSendReminderClick = (paymentId: string) => {
+    setReminderDialog({ isOpen: true, paymentId });
+  };
+
+  const confirmSendReminder = async () => {
+    if (!reminderDialog.paymentId) return;
+    try {
+      const status = await paymentService.getReminderStatus(reminderDialog.paymentId);
+      if (!status.canSend) {
+        toast.error(status.reason || 'Nie można wysłać przypomnienia');
+        setReminderDialog({ isOpen: false, paymentId: null });
+        return;
+      }
+    } catch {
+      // If status check fails, attempt to send anyway
+    }
+    sendReminderMutation.mutate(reminderDialog.paymentId);
+  };
 
   const handleSelectStudent = (student: StudentWithBalance) => {
     setSelectedStudent(student);
@@ -635,8 +668,20 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
                             {new Date(payment.date).toLocaleDateString('pl-PL')}
                           </div>
                         </div>
-                        <div className="text-sm font-semibold text-red-600">
-                          {formatCurrency(payment.amount, payment.currency)}
+                        <div className="flex items-center gap-3">
+                          {payment.status === 'PENDING' && (
+                            <button
+                              onClick={() => handleSendReminderClick(payment.id)}
+                              disabled={sendReminderMutation.isPending}
+                              title="Wyślij przypomnienie o płatności"
+                              className="text-amber-500 hover:text-amber-600 disabled:opacity-40 transition-colors"
+                            >
+                              <Bell className="w-4 h-4" />
+                            </button>
+                          )}
+                          <div className="text-sm font-semibold text-red-600">
+                            {formatCurrency(payment.amount, payment.currency)}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -702,6 +747,18 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
           )}
         </div>
       </div>
+
+      {/* Confirm Send Reminder Dialog */}
+      <ConfirmDialog
+        isOpen={reminderDialog.isOpen}
+        onClose={() => setReminderDialog({ isOpen: false, paymentId: null })}
+        onConfirm={confirmSendReminder}
+        title="Wyślij przypomnienie"
+        message={`Czy na pewno chcesz wysłać przypomnienie o płatności do ${selectedStudent ? `${selectedStudent.firstName} ${selectedStudent.lastName}` : 'ucznia'}?`}
+        confirmText={sendReminderMutation.isPending ? 'Wysyłanie...' : 'Wyślij'}
+        cancelText="Anuluj"
+        variant="warning"
+      />
     </div>
   );
 }

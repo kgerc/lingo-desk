@@ -26,7 +26,8 @@
       "Bash(npm run build:frontend:*)",
       "Bash(npm run build:backend:*)",
       "Bash(npx prisma db push:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

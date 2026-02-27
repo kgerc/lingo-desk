@@ -140,6 +140,20 @@ class OrganizationController {
     }
   }
 
+  async getOrganizationSettings(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizationId = req.user!.organizationId;
+      const organization = await organizationService.getOrganizationById(organizationId);
+
+      res.json({
+        success: true,
+        data: organization.settings ?? null,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async updateOrganizationSettings(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const organizationId = req.user!.organizationId;

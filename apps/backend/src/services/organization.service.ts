@@ -26,6 +26,10 @@ export interface UpdateOrganizationSettingsData {
   lessonReminderHours?: number;
   budgetAlertThresholdHours?: number;
   autoGenerateLessonsEnabled?: boolean;
+  paymentReminderEnabled?: boolean;
+  paymentReminderDaysBefore?: number[];
+  paymentReminderDaysAfter?: number[];
+  paymentReminderMinIntervalHours?: number;
   settings?: Record<string, any>;
 }
 
