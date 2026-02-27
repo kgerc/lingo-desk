@@ -110,6 +110,24 @@ export interface PaymentReminder {
 // CSV Import types
 export type SystemFieldKey = 'date' | 'counterparty' | 'description' | 'bankAccount' | 'amount' | 'paymentMethod' | 'status' | 'notes';
 
+export interface UnmatchedPayment {
+  row: number;
+  date: string;
+  counterparty: string;
+  description: string;
+  bankAccount: string;
+  amount: number;
+  paymentMethod: string;
+  rawData: string;
+}
+
+export interface ImportResult {
+  success: number;
+  failed: number;
+  errors: Array<{ row: number; error: string; data: string }>;
+  unmatched: UnmatchedPayment[];
+}
+
 export interface ColumnMapping {
   csvColumn: string;
   csvColumnIndex: number;
@@ -128,11 +146,11 @@ export interface CsvAnalysisResult {
 
 export const SYSTEM_FIELDS: Array<{ key: SystemFieldKey; label: string; required: boolean }> = [
   { key: 'date', label: 'Data płatności', required: true },
-  { key: 'counterparty', label: 'Kontrahent', required: false },
+  { key: 'counterparty', label: 'Kontrahent', required: true },
   { key: 'description', label: 'Opis transakcji', required: false },
-  { key: 'bankAccount', label: 'Numer konta', required: false },
+  { key: 'bankAccount', label: 'Numer konta', required: true },
   { key: 'amount', label: 'Kwota', required: true },
-  { key: 'paymentMethod', label: 'Metoda płatności', required: true },
+  { key: 'paymentMethod', label: 'Metoda płatności', required: false },
   { key: 'status', label: 'Status', required: false },
   { key: 'notes', label: 'Notatki', required: false },
 ];
@@ -220,17 +238,20 @@ const paymentService = {
     csvData: string,
     mapping: ColumnMapping[],
     separator: string
-  ): Promise<{
-    success: number;
-    failed: number;
-    errors: Array<{ row: number; error: string; data: string }>;
-  }> {
+  ): Promise<ImportResult> {
     const response = await api.post('/payments/import/execute', {
       csvData,
       mapping,
       separator,
     }) as any;
     return response.data.data;
+  },
+
+  /**
+   * Assign a single unmatched CSV payment to a specific student
+   */
+  async assignUnmatchedPayment(unmatched: UnmatchedPayment, studentId: string): Promise<void> {
+    await api.post('/payments/import/assign-unmatched', { unmatched, studentId });
   },
 
   /**

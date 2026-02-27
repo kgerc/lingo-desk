@@ -22,6 +22,7 @@ router.post('/import', paymentController.importPayments);
 // Smart CSV import (analyze + execute)
 router.post('/import/analyze', paymentController.analyzeCsvImport);
 router.post('/import/execute', paymentController.executeCsvImport);
+router.post('/import/assign-unmatched', paymentController.assignUnmatchedPayment);
 
 // CRUD operations
 router.get('/', paymentController.getPayments);

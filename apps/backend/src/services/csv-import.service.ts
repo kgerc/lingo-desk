@@ -1,8 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { parse } from 'csv-parse/sync';
-import { LanguageLevel, PaymentMethod, PaymentStatus, UserRole } from '@prisma/client';
-import { randomUUID } from 'crypto';
-import bcrypt from 'bcrypt';
+import { PaymentMethod, PaymentStatus } from '@prisma/client';
 import prisma from '../utils/prisma';
 import balanceService from './balance.service';
 
@@ -10,11 +8,11 @@ import balanceService from './balance.service';
 // NOTE: 'email' removed - students are matched by name or bank account number
 export const SYSTEM_FIELDS = [
   { key: 'date', label: 'Data płatności', required: true },
-  { key: 'counterparty', label: 'Kontrahent', required: false },
+  { key: 'counterparty', label: 'Kontrahent', required: true },
   { key: 'description', label: 'Opis transakcji', required: false },
-  { key: 'bankAccount', label: 'Numer konta', required: false },
+  { key: 'bankAccount', label: 'Numer konta', required: true },
   { key: 'amount', label: 'Kwota', required: true },
-  { key: 'paymentMethod', label: 'Metoda płatności', required: true },
+  { key: 'paymentMethod', label: 'Metoda płatności', required: false },
   { key: 'status', label: 'Status', required: false },
   { key: 'notes', label: 'Notatki', required: false },
 ] as const;
@@ -44,10 +42,22 @@ export interface ImportExecuteData {
   organizationId: string;
 }
 
+export interface UnmatchedPayment {
+  row: number;
+  date: string;
+  counterparty: string;
+  description: string;
+  bankAccount: string;
+  amount: number;
+  paymentMethod: string;
+  rawData: string;
+}
+
 export interface ImportResult {
   success: number;
   failed: number;
   errors: Array<{ row: number; error: string; data: string }>;
+  unmatched: UnmatchedPayment[];
 }
 
 /**
@@ -441,91 +451,31 @@ function parseNameFromKontrahent(kontrahent: string): { firstName: string; lastN
 }
 
 /**
- * Try to find an existing student. If not found, create a minimal stub student
- * from data available in the CSV row (name from kontrahent, optional bank account).
- * Returns { id, created: boolean }.
+ * Try to find an existing student by bank account (primary), then by name in kontrahent/opis.
+ * Returns { id, matchSource } if found, or null if not found (no auto-creation).
  */
-async function findOrCreateStudentFromImport(
+async function findStudentFromImport(
   counterparty: string,
   description: string,
   bankAccount: string,
   organizationId: string,
-): Promise<{ id: string; created: boolean; matchSource: string } | null> {
-  // --- 1. Try to find existing student ---
-  if (counterparty) {
-    const s = await findStudentByNameInText(counterparty, organizationId);
-    if (s) return { id: s.id, created: false, matchSource: 'kontrahent' };
-  }
-  if (description) {
-    const s = await findStudentByNameInText(description, organizationId);
-    if (s) return { id: s.id, created: false, matchSource: 'opis transakcji' };
-  }
+): Promise<{ id: string; matchSource: string } | null> {
+  // 1. Match by bank account number first (most reliable)
   if (bankAccount) {
     const s = await findStudentByBankAccount(bankAccount, organizationId);
-    if (s) return { id: s.id, created: false, matchSource: 'numer konta' };
+    if (s) return { id: s.id, matchSource: 'numer konta' };
   }
-
-  // --- 2. Parse name from kontrahent ---
-  const parsed = parseNameFromKontrahent(counterparty) || parseNameFromKontrahent(description);
-  if (!parsed) return null; // Cannot create stub without at least a name
-
-  const { firstName, lastName } = parsed;
-
-  // --- 3. Generate next student number ---
-  const lastStudent = await prisma.student.findFirst({
-    where: { organizationId },
-    orderBy: { studentNumber: 'desc' },
-  });
-  const studentNumber = lastStudent
-    ? String(parseInt(lastStudent.studentNumber) + 1).padStart(6, '0')
-    : '000001';
-
-  // --- 4. Create stub user + student + budget in a transaction ---
-  const placeholderEmail = `import-${randomUUID()}@placeholder.local`;
-  const passwordHash = await bcrypt.hash(randomUUID(), 10); // non-guessable, no login possible
-
-  const internalNotes = [
-    `Uczeń utworzony automatycznie podczas importu CSV (${new Date().toISOString().slice(0, 10)}).`,
-    `Źródło: ${counterparty || description}`,
-    bankAccount ? `Numer konta: ${bankAccount}` : null,
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  const student = await prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({
-      data: {
-        email: placeholderEmail,
-        passwordHash,
-        firstName,
-        lastName,
-        role: UserRole.STUDENT,
-        organizationId,
-        isActive: true,
-      },
-    });
-
-    await tx.userProfile.create({ data: { userId: user.id } });
-
-    const newStudent = await tx.student.create({
-      data: {
-        userId: user.id,
-        organizationId,
-        studentNumber,
-        languageLevel: LanguageLevel.A1, // default; can be updated later
-        bankAccountNumber: bankAccount || null,
-        internalNotes,
-      },
-    });
-
-    await tx.studentBudget.create({
-      data: { studentId: newStudent.id, organizationId },
-    });
-
-    return newStudent;
-  });
-
-  return { id: student.id, created: true, matchSource: `nowy uczeń (${firstName} ${lastName})` };
+  // 2. Match by name in counterparty field
+  if (counterparty) {
+    const s = await findStudentByNameInText(counterparty, organizationId);
+    if (s) return { id: s.id, matchSource: 'kontrahent' };
+  }
+  // 3. Match by name in description
+  if (description) {
+    const s = await findStudentByNameInText(description, organizationId);
+    if (s) return { id: s.id, matchSource: 'opis transakcji' };
+  }
+  return null;
 }
 
 class CsvImportService {
@@ -595,6 +545,7 @@ class CsvImportService {
       success: 0,
       failed: 0,
       errors: [],
+      unmatched: [],
     };
 
     // Build field index map
@@ -606,7 +557,7 @@ class CsvImportService {
     }
 
     // Validate required fields are mapped
-    const requiredFields: SystemFieldKey[] = ['date', 'amount', 'paymentMethod'];
+    const requiredFields: SystemFieldKey[] = ['date', 'counterparty', 'bankAccount', 'amount'];
     for (const field of requiredFields) {
       if (fieldIndex[field] === undefined) {
         const label = SYSTEM_FIELDS.find((f) => f.key === field)?.label || field;
@@ -651,12 +602,15 @@ class CsvImportService {
           continue;
         }
 
-        // --- Student lookup / auto-create ---
+        // --- Student lookup ---
         const counterparty = getValue('counterparty');
         const description = getValue('description');
         const bankAccount = getValue('bankAccount');
 
-        const studentResult = await findOrCreateStudentFromImport(
+        const amountStrEarly = getValue('amount');
+        const amountEarly = parseFloat(amountStrEarly.replace(',', '.').replace(/[^\d.-]/g, ''));
+
+        const studentResult = await findStudentFromImport(
           counterparty,
           description,
           bankAccount,
@@ -664,18 +618,16 @@ class CsvImportService {
         );
 
         if (!studentResult) {
-          const tried: string[] = [];
-          if (counterparty) tried.push(`kontrahent: "${counterparty}"`);
-          if (description) tried.push(`opis: "${description}"`);
-          if (bankAccount) tried.push(`konto: "${bankAccount}"`);
-
-          results.failed++;
-          results.errors.push({
+          // Collect as unmatched — can be manually assigned from the UI
+          results.unmatched.push({
             row: rowNum,
-            error: tried.length
-              ? `Nie znaleziono ucznia i nie można go utworzyć (${tried.join('; ')})`
-              : 'Brak danych do identyfikacji ucznia (kontrahent / opis / numer konta)',
-            data: rowText,
+            date: getValue('date'),
+            counterparty,
+            description,
+            bankAccount,
+            amount: isNaN(amountEarly) ? 0 : amountEarly,
+            paymentMethod: getValue('paymentMethod') || 'BANK_TRANSFER',
+            rawData: rowText,
           });
           continue;
         }
@@ -696,18 +648,9 @@ class CsvImportService {
           continue;
         }
 
-        // Parse payment method
+        // Parse payment method (defaults to BANK_TRANSFER when not mapped or unrecognized)
         const methodStr = getValue('paymentMethod');
-        const paymentMethod = this.parsePaymentMethod(methodStr);
-        if (!paymentMethod) {
-          results.failed++;
-          results.errors.push({
-            row: rowNum,
-            error: `Nieprawidłowa metoda płatności: "${methodStr}"`,
-            data: rowText,
-          });
-          continue;
-        }
+        const paymentMethod = this.parsePaymentMethod(methodStr) || PaymentMethod.BANK_TRANSFER;
 
         // Parse status (optional, defaults to COMPLETED)
         const statusStr = getValue('status');
@@ -822,6 +765,47 @@ class CsvImportService {
     if (upper.includes('STRIPE')) return PaymentMethod.STRIPE;
 
     return null;
+  }
+
+  /**
+   * Import a single previously-unmatched payment by assigning it to a specific student.
+   */
+  async importUnmatchedPayment(
+    unmatched: UnmatchedPayment,
+    studentId: string,
+    organizationId: string,
+  ): Promise<void> {
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { currency: true },
+    });
+    const currency = org?.currency || 'PLN';
+
+    const paidAt = this.parseDate(unmatched.date);
+    if (!paidAt) throw new Error(`Nieprawidłowy format daty: "${unmatched.date}"`);
+
+    const paymentMethod = this.parsePaymentMethod(unmatched.paymentMethod) || PaymentMethod.BANK_TRANSFER;
+
+    const payment = await prisma.payment.create({
+      data: {
+        organizationId,
+        studentId,
+        amount: unmatched.amount,
+        currency,
+        status: PaymentStatus.COMPLETED,
+        paymentMethod,
+        paidAt,
+        notes: unmatched.description || null,
+      },
+    });
+
+    await balanceService.addDeposit(
+      studentId,
+      organizationId,
+      unmatched.amount,
+      payment.id,
+      `Import CSV (ręczne przypisanie) - wpłata z dnia ${unmatched.date}`
+    );
   }
 
   private parseStatus(str: string): PaymentStatus {

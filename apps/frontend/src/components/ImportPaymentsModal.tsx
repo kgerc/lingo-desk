@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   X, Upload, FileText, AlertCircle, CheckCircle2,
-  Download, ArrowRight, ArrowLeft, Columns, Eye, Loader2,
+  Download, ArrowRight, ArrowLeft, Columns, Eye, Loader2, UserX, Check,
 } from 'lucide-react';
 import paymentService, {
-  ColumnMapping, CsvAnalysisResult, SYSTEM_FIELDS, SystemFieldKey,
+  ColumnMapping, CsvAnalysisResult, ImportResult, SYSTEM_FIELDS, SystemFieldKey, UnmatchedPayment,
 } from '../services/paymentService';
+import { studentService, Student } from '../services/studentService';
 import toast from 'react-hot-toast';
 
 /** Count Polish diacritic characters in a string (higher = better decode quality). */
@@ -76,11 +77,7 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({ onClose }) =>
   const [mapping, setMapping] = useState<ColumnMapping[]>([]);
 
   // Results state
-  const [importResults, setImportResults] = useState<{
-    success: number;
-    failed: number;
-    errors: Array<{ row: number; error: string; data: string }>;
-  } | null>(null);
+  const [importResults, setImportResults] = useState<ImportResult | null>(null);
 
   // Analyze mutation
   const analyzeMutation = useMutation({
@@ -105,8 +102,11 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({ onClose }) =>
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payment-stats'] });
 
-      if (data.failed === 0) {
+      const unmatched = data.unmatched?.length ?? 0;
+      if (data.failed === 0 && unmatched === 0) {
         toast.success(`Import zakończony pomyślnie: ${data.success} transakcji`);
+      } else if (unmatched > 0) {
+        toast.success(`Import zakończony: ${data.success} sukces, ${unmatched} niedopasowanych`);
       } else {
         toast.success(`Import zakończony: ${data.success} sukces, ${data.failed} błędów`);
       }
@@ -650,55 +650,152 @@ const PreviewStep: React.FC<PreviewStepProps> = ({ analysis, mapping }) => {
 // ── Step 4: Results ─────────────────────────────────────────────
 
 interface ResultsStepProps {
-  results: {
-    success: number;
-    failed: number;
-    errors: Array<{ row: number; error: string; data: string }>;
-  };
+  results: ImportResult;
 }
 
-const ResultsStep: React.FC<ResultsStepProps> = ({ results }) => (
-  <div className="space-y-4">
-    <div className="grid grid-cols-2 gap-4">
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 text-green-600" />
-          <div>
-            <p className="text-sm font-medium text-green-900">Pomyślnie zaimportowano</p>
-            <p className="text-2xl font-bold text-green-700">{results.success}</p>
-          </div>
-        </div>
-      </div>
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <div className="flex items-center gap-2">
-          <AlertCircle className="h-5 w-5 text-red-600" />
-          <div>
-            <p className="text-sm font-medium text-red-900">Błędy</p>
-            <p className="text-2xl font-bold text-red-700">{results.failed}</p>
-          </div>
-        </div>
-      </div>
-    </div>
+const ResultsStep: React.FC<ResultsStepProps> = ({ results }) => {
+  const queryClient = useQueryClient();
 
-    {results.errors.length > 0 && (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-h-64 overflow-y-auto">
-        <h4 className="font-semibold text-red-900 mb-2">Szczegóły błędów:</h4>
-        <div className="space-y-2">
-          {results.errors.map((error, index) => (
-            <div key={index} className="text-sm">
-              <p className="font-medium text-red-800">Wiersz {error.row}:</p>
-              <p className="text-red-700">{error.error}</p>
-              {error.data && (
-                <p className="text-red-600 text-xs font-mono bg-red-100 p-1 rounded mt-1">
-                  {error.data}
-                </p>
-              )}
+  // Student assignments for unmatched payments: row → studentId
+  const [assignments, setAssignments] = useState<Record<number, string>>({});
+  // Which rows have been successfully imported
+  const [assigned, setAssigned] = useState<Set<number>>(new Set());
+
+  const { data: students = [] } = useQuery<Student[]>({
+    queryKey: ['students'],
+    queryFn: () => studentService.getStudents({ isActive: true }),
+    enabled: results.unmatched.length > 0,
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: ({ unmatched, studentId }: { unmatched: UnmatchedPayment; studentId: string }) =>
+      paymentService.assignUnmatchedPayment(unmatched, studentId),
+    onSuccess: (_data, variables) => {
+      setAssigned((prev) => new Set([...prev, variables.unmatched.row]));
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-stats'] });
+      toast.success('Płatność przypisana pomyślnie');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Błąd podczas przypisywania płatności');
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-green-600" />
+            <div>
+              <p className="text-sm font-medium text-green-900">Pomyślnie zaimportowano</p>
+              <p className="text-2xl font-bold text-green-700">{results.success}</p>
             </div>
-          ))}
+          </div>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-red-600" />
+            <div>
+              <p className="text-sm font-medium text-red-900">Błędy</p>
+              <p className="text-2xl font-bold text-red-700">{results.failed}</p>
+            </div>
+          </div>
         </div>
       </div>
-    )}
-  </div>
-);
+
+      {results.errors.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-h-48 overflow-y-auto">
+          <h4 className="font-semibold text-red-900 mb-2">Szczegóły błędów:</h4>
+          <div className="space-y-2">
+            {results.errors.map((error, index) => (
+              <div key={index} className="text-sm">
+                <p className="font-medium text-red-800">Wiersz {error.row}:</p>
+                <p className="text-red-700">{error.error}</p>
+                {error.data && (
+                  <p className="text-red-600 text-xs font-mono bg-red-100 p-1 rounded mt-1">
+                    {error.data}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {results.unmatched.length > 0 && (
+        <div className="border border-orange-200 rounded-lg overflow-hidden">
+          <div className="bg-orange-50 px-4 py-3 flex items-center gap-2">
+            <UserX className="h-4 w-4 text-orange-600" />
+            <h4 className="font-semibold text-orange-900 text-sm">
+              Niedopasowane ({results.unmatched.filter((u) => !assigned.has(u.row)).length})
+            </h4>
+            <p className="text-xs text-orange-700 ml-1">
+              — nie znaleziono ucznia, przypisz ręcznie
+            </p>
+          </div>
+          <div className="divide-y divide-orange-100 max-h-72 overflow-y-auto">
+            {results.unmatched.map((u) => {
+              const isAssigned = assigned.has(u.row);
+              return (
+                <div
+                  key={u.row}
+                  className={`px-4 py-3 flex items-center gap-3 ${isAssigned ? 'bg-green-50 opacity-60' : 'bg-white'}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {u.counterparty || u.description || '—'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {u.date} · {u.amount.toFixed(2)} PLN
+                      {u.bankAccount && <> · <span className="font-mono">{u.bankAccount}</span></>}
+                    </p>
+                  </div>
+                  {isAssigned ? (
+                    <div className="flex items-center gap-1 text-green-600 text-sm">
+                      <Check className="h-4 w-4" />
+                      Przypisano
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <select
+                        value={assignments[u.row] || ''}
+                        onChange={(e) =>
+                          setAssignments((prev) => ({ ...prev, [u.row]: e.target.value }))
+                        }
+                        className="text-sm border border-gray-300 rounded-md px-2 py-1.5 min-w-[180px]"
+                      >
+                        <option value="">— Wybierz ucznia —</option>
+                        {students.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.user.firstName} {s.user.lastName}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        disabled={!assignments[u.row] || assignMutation.isPending}
+                        onClick={() =>
+                          assignMutation.mutate({ unmatched: u, studentId: assignments[u.row] })
+                        }
+                        className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-sm rounded-md hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {assignMutation.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
+                        Przypisz
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default ImportPaymentsModal;

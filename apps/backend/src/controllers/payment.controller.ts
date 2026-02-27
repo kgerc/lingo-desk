@@ -455,6 +455,37 @@ class PaymentController {
       });
     }
   }
+
+  /**
+   * Assign a single unmatched CSV payment to a student
+   * POST /api/payments/import/assign-unmatched
+   */
+  async assignUnmatchedPayment(req: AuthRequest, res: Response) {
+    try {
+      const organizationId = req.user!.organizationId;
+      const { unmatched, studentId } = req.body;
+
+      if (!unmatched || !studentId) {
+        return res.status(400).json({
+          success: false,
+          message: 'unmatched i studentId są wymagane',
+        });
+      }
+
+      await csvImportService.importUnmatchedPayment(unmatched, studentId, organizationId);
+
+      return res.json({
+        success: true,
+        message: 'Płatność przypisana pomyślnie',
+      });
+    } catch (error: any) {
+      console.error('Error assigning unmatched payment:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Nie udało się przypisać płatności',
+      });
+    }
+  }
 }
 
 export default new PaymentController();
