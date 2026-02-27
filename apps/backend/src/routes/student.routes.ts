@@ -33,6 +33,9 @@ router.get(
   studentController.getEnrollmentBudget.bind(studentController)
 );
 
+// GET /api/students/me - Get current student's own profile (for STUDENT role)
+router.get('/me', studentController.getMe.bind(studentController));
+
 // GET /api/students/:id - Get student by ID
 router.get('/:id', studentController.getStudentById.bind(studentController));
 

@@ -134,6 +134,30 @@ export class StudentController {
     }
   }
 
+  async getMe(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.organizationId || !req.user?.id) {
+        return res.status(401).json({
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Organization ID not found',
+          },
+        });
+      }
+
+      const student = await studentService.getStudentByUserId(
+        req.user.id,
+        req.user.organizationId
+      );
+
+      return res.json({
+        data: student,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   async getStudentById(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       if (!req.user?.organizationId) {
@@ -149,7 +173,8 @@ export class StudentController {
       const student = await studentService.getStudentByIdWithVisibility(
         id as string,
         req.user.organizationId,
-        req.user.role
+        req.user.role,
+        req.user.id
       );
 
       return res.json({

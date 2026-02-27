@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { lessonService } from '../services/lessonService';
 import { studentService } from '../services/studentService';
-import { BookOpen, Calendar, Clock, TrendingUp } from 'lucide-react';
+import { BookOpen, Calendar, Clock, TrendingUp, MessageSquare } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
@@ -11,20 +11,20 @@ import { pl } from 'date-fns/locale';
 const StudentDashboard: React.FC = () => {
   const user = useAuthStore((state) => state.user);
 
-  // Fetch student data
+  // Fetch student data (uses /me endpoint to look up by userId)
   const { data: studentData, isLoading: isLoadingStudent } = useQuery({
     queryKey: ['currentStudent', user?.id],
-    queryFn: () => studentService.getStudentById(user?.id || ''),
+    queryFn: () => studentService.getMe(),
     enabled: !!user?.id,
   });
 
-  // Fetch student's lessons
+  // Fetch student's lessons using the student record ID
   const { data: lessons = [], isLoading: isLoadingLessons } = useQuery({
-    queryKey: ['studentLessons'],
+    queryKey: ['studentLessons', studentData?.id],
     queryFn: () => lessonService.getLessons({
-      studentId: user?.id,
+      studentId: studentData?.id,
     }),
-    enabled: !!user?.id,
+    enabled: !!studentData?.id,
   });
 
   if (isLoadingStudent || isLoadingLessons) {
@@ -140,7 +140,7 @@ const StudentDashboard: React.FC = () => {
       </div>
 
       {/* Active Courses */}
-      <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <div className="bg-white rounded-lg shadow p-6 border border-gray-200 mb-8">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
           Moje kursy
         </h2>
@@ -177,6 +177,18 @@ const StudentDashboard: React.FC = () => {
           <p className="text-gray-500 text-center py-8">
             Nie jesteś zapisany na żaden kurs
           </p>
+        )}
+      </div>
+      {/* Notatki od szkoły */}
+      <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
+        <div className="flex items-center gap-2 mb-4">
+          <MessageSquare className="h-5 w-5 text-secondary" />
+          <h2 className="text-xl font-semibold text-gray-900">Notatki od szkoły</h2>
+        </div>
+        {studentData?.internalNotes ? (
+          <p className="text-gray-700 whitespace-pre-wrap">{studentData.internalNotes}</p>
+        ) : (
+          <p className="text-gray-500 text-center py-4">Brak notatek od szkoły</p>
         )}
       </div>
     </div>

@@ -28,7 +28,8 @@
       "Bash(npx prisma db push:*)",
       "Bash(node -e:*)",
       "Bash(echo \"EXIT:$?\")",
-      "Bash(xargs grep -l \"getLessons\\\\|courseService\\\\|getStudents\")"
+      "Bash(xargs grep -l \"getLessons\\\\|courseService\\\\|getStudents\")",
+      "Bash(xargs grep -l \"StudentDashboard\\\\|role.*STUDENT\")"
     ]
   }
 }

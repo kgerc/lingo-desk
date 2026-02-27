@@ -946,9 +946,70 @@ export class StudentService {
   }
 
   /**
+   * Get student record by userId (for the student viewing their own profile)
+   */
+  async getStudentByUserId(userId: string, organizationId: string) {
+    const student = await prisma.student.findFirst({
+      where: {
+        userId,
+        organizationId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            avatarUrl: true,
+            isActive: true,
+            createdAt: true,
+            profile: true,
+          },
+        },
+        budget: true,
+        enrollments: {
+          include: {
+            course: true,
+            package: true,
+            subscription: true,
+          },
+        },
+        lessons: {
+          take: 10,
+          orderBy: { scheduledAt: 'desc' },
+          include: {
+            teacher: {
+              include: {
+                user: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        payments: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!student) {
+      throw new Error('Student not found');
+    }
+
+    return student;
+  }
+
+  /**
    * Get single student with visibility filtering based on user role
    */
-  async getStudentByIdWithVisibility(id: string, organizationId: string, userRole: UserRole) {
+  async getStudentByIdWithVisibility(id: string, organizationId: string, userRole: UserRole, requestingUserId?: string) {
     const student = await this.getStudentById(id, organizationId);
 
     // ADMIN sees everything
@@ -962,7 +1023,13 @@ export class StudentService {
       return this.filterStudentForManager(student, visibility.student);
     }
 
-    // Other roles (TEACHER etc.) - strip internalNotes
+    // STUDENT viewing their own profile — include internalNotes
+    if (userRole === UserRole.STUDENT && requestingUserId && (student as any).userId === requestingUserId) {
+      const { internalNotes, ...rest } = student as any;
+      return { ...rest, internalNotes };
+    }
+
+    // Other roles / student viewing someone else — strip internalNotes
     const { internalNotes: _notes, ...studentWithoutNotes } = student as any;
     return studentWithoutNotes;
   }

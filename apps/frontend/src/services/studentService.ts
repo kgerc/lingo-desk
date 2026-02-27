@@ -105,6 +105,11 @@ export const studentService = {
     return response.data.data as Student[];
   },
 
+  async getMe() {
+    const response = await api.get('/students/me') as any;
+    return response.data.data as Student;
+  },
+
   async getStudentById(id: string) {
     const response = await api.get(`/students/${id}`) as any;
     return response.data.data as Student;
