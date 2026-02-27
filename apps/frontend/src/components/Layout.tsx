@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useSidebarStore } from '../stores/sidebarStore';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -33,7 +33,6 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuthStore();
   const { isCollapsed, toggleSidebar } = useSidebarStore();
-  const queryClient = useQueryClient();
   const location = useLocation();
 
   // Fetch unread alerts count (with auto-generation for admin/manager)
@@ -307,7 +306,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
 
               <button
-                onClick={() => { queryClient.clear(); logout(); }}
+                onClick={() => { logout(); }}
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Wyloguj"
               >
