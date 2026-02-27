@@ -27,7 +27,8 @@
       "Bash(npm run build:backend:*)",
       "Bash(npx prisma db push:*)",
       "Bash(node -e:*)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(xargs grep -l \"getLessons\\\\|courseService\\\\|getStudents\")"
     ]
   }
 }

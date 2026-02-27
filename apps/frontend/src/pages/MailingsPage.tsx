@@ -7,6 +7,7 @@ import { courseService } from '../services/courseService';
 import { lessonService } from '../services/lessonService';
 import mailingService from '../services/mailingService';
 import type { MailType } from '../services/mailingService';
+import SearchableSelect from '../components/SearchableSelect';
 
 const ALLOWED_FILE_TYPES = [
   'application/pdf',
@@ -783,20 +784,17 @@ Zespół szkoły`,
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Kurs
                   </label>
-                  <select
+                  <SearchableSelect
                     value={formData.courseId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, courseId: e.target.value, lessonId: '' })
+                    onChange={(val) =>
+                      setFormData({ ...formData, courseId: val, lessonId: '' })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  >
-                    <option value="">Wybierz kurs...</option>
-                    {courses.map((course) => (
-                      <option key={course.id} value={course.id}>
-                        {course.name} ({course.language} {course.level}) — {course.teacher.user.firstName} {course.teacher.user.lastName}
-                      </option>
-                    ))}
-                  </select>
+                    options={courses.map((course) => ({
+                      value: course.id,
+                      label: `${course.name} (${course.language} ${course.level}) — ${course.teacher.user.firstName} ${course.teacher.user.lastName}`,
+                    }))}
+                    placeholder="Wybierz kurs..."
+                  />
                 </div>
 
                 {/* Lesson selection (only for lesson recipient type) */}
@@ -805,20 +803,17 @@ Zespół szkoły`,
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Lekcja
                     </label>
-                    <select
+                    <SearchableSelect
                       value={formData.lessonId}
-                      onChange={(e) =>
-                        setFormData({ ...formData, lessonId: e.target.value })
+                      onChange={(val) =>
+                        setFormData({ ...formData, lessonId: val })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    >
-                      <option value="">Wybierz lekcję...</option>
-                      {lessons.map((lesson) => (
-                        <option key={lesson.id} value={lesson.id}>
-                          {lesson.title} — {new Date(lesson.scheduledAt).toLocaleString('pl-PL')} ({lesson.student.user.firstName} {lesson.student.user.lastName})
-                        </option>
-                      ))}
-                    </select>
+                      options={lessons.map((lesson) => ({
+                        value: lesson.id,
+                        label: `${lesson.title} — ${new Date(lesson.scheduledAt).toLocaleString('pl-PL')} (${lesson.student.user.firstName} ${lesson.student.user.lastName})`,
+                      }))}
+                      placeholder="Wybierz lekcję..."
+                    />
                   </div>
                 )}
               </div>
