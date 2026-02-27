@@ -1,8 +1,9 @@
-import { PrismaClient, NotificationType, LessonDeliveryMode, LessonStatus, RecurringFrequency } from '@prisma/client';
+import { PrismaClient, NotificationType, LessonDeliveryMode, LessonStatus, RecurringFrequency, AlertPriority, AlertType } from '@prisma/client';
 import emailService from './email.service';
 import googleCalendarService from './google-calendar.service';
 import balanceService from './balance.service';
 import { getHolidayName } from '../utils/polish-holidays';
+import { alertService } from './alert.service';
 
 const prisma = new PrismaClient();
 
@@ -250,6 +251,35 @@ class LessonService {
     this.sendLessonCreatedNotifications(lesson).catch(err =>
       console.error('Failed to send lesson creation notifications:', err)
     );
+
+    // Fire-and-forget: Create alerts for teacher and student about new lesson
+    const lessonDate = new Date(lesson.scheduledAt).toLocaleDateString('pl-PL', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+    const teacherUserId = lesson.teacher?.user?.id;
+    const studentUserId = lesson.student?.user?.id;
+    if (teacherUserId) {
+      alertService.createLessonAlert({
+        userId: teacherUserId,
+        organizationId,
+        priority: AlertPriority.NORMAL,
+        type: AlertType.INFO,
+        title: 'Nowa lekcja zaplanowana',
+        message: `Zaplanowano nową lekcję "${lesson.title}" z ${lesson.student.user.firstName} ${lesson.student.user.lastName} na ${lessonDate}.`,
+        metadata: { lessonId: lesson.id },
+      }).catch(err => console.error('Failed to create lesson alert for teacher:', err));
+    }
+    if (studentUserId) {
+      alertService.createLessonAlert({
+        userId: studentUserId,
+        organizationId,
+        priority: AlertPriority.NORMAL,
+        type: AlertType.INFO,
+        title: 'Nowa lekcja zaplanowana',
+        message: `Zaplanowano nową lekcję "${lesson.title}" z lektorem ${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName} na ${lessonDate}.`,
+        metadata: { lessonId: lesson.id },
+      }).catch(err => console.error('Failed to create lesson alert for student:', err));
+    }
 
     return lesson;
   }
@@ -718,6 +748,35 @@ class LessonService {
       this.sendCancellationEmails(lesson, data.cancellationReason).catch(err =>
         console.error('Failed to send lesson cancellation emails:', err)
       );
+
+      // Create alerts for teacher and student about cancellation
+      const cancelDate = new Date(lesson.scheduledAt).toLocaleDateString('pl-PL', {
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+      const teacherUserId = lesson.teacher?.user?.id;
+      const studentUserId = lesson.student?.user?.id;
+      if (teacherUserId) {
+        alertService.createLessonAlert({
+          userId: teacherUserId,
+          organizationId,
+          priority: AlertPriority.HIGH,
+          type: AlertType.WARNING,
+          title: 'Lekcja odwołana',
+          message: `Lekcja "${lesson.title}" z ${lesson.student.user.firstName} ${lesson.student.user.lastName} zaplanowana na ${cancelDate} została odwołana.`,
+          metadata: { lessonId: lesson.id },
+        }).catch(err => console.error('Failed to create cancellation alert for teacher:', err));
+      }
+      if (studentUserId) {
+        alertService.createLessonAlert({
+          userId: studentUserId,
+          organizationId,
+          priority: AlertPriority.HIGH,
+          type: AlertType.WARNING,
+          title: 'Lekcja odwołana',
+          message: `Twoja lekcja "${lesson.title}" z lektorem ${lesson.teacher.user.firstName} ${lesson.teacher.user.lastName} zaplanowana na ${cancelDate} została odwołana.`,
+          metadata: { lessonId: lesson.id },
+        }).catch(err => console.error('Failed to create cancellation alert for student:', err));
+      }
     }
 
     // Fire-and-forget: Send rescheduling notifications if lesson time was changed

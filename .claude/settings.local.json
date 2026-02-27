@@ -29,7 +29,8 @@
       "Bash(node -e:*)",
       "Bash(echo \"EXIT:$?\")",
       "Bash(xargs grep -l \"getLessons\\\\|courseService\\\\|getStudents\")",
-      "Bash(xargs grep -l \"StudentDashboard\\\\|role.*STUDENT\")"
+      "Bash(xargs grep -l \"StudentDashboard\\\\|role.*STUDENT\")",
+      "Bash(xargs grep -l \"alertService\")"
     ]
   }
 }

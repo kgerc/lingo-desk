@@ -1,10 +1,12 @@
 import api from '../lib/api';
 
 export type AlertType = 'ERROR' | 'WARNING' | 'INFO' | 'SUCCESS';
+export type AlertPriority = 'CRITICAL' | 'HIGH' | 'NORMAL';
 
 export interface Alert {
   id: string;
   type: AlertType;
+  priority: AlertPriority;
   title: string;
   message: string;
   isRead: boolean;
@@ -32,11 +34,13 @@ const alertService = {
     page?: number;
     limit?: number;
     isRead?: boolean;
+    priority?: AlertPriority;
   }): Promise<AlertsResponse> {
     const params = new URLSearchParams();
     if (options?.page) params.append('page', options.page.toString());
     if (options?.limit) params.append('limit', options.limit.toString());
     if (options?.isRead !== undefined) params.append('isRead', options.isRead.toString());
+    if (options?.priority) params.append('priority', options.priority);
 
     const response = await api.get(`/alerts?${params.toString()}`) as any;
     return response.data.data;

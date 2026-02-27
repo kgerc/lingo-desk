@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useSidebarStore } from '../stores/sidebarStore';
-import NotificationBell from './NotificationBell';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import alertService from '../services/alertService';
 import {
@@ -36,12 +35,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { isCollapsed, toggleSidebar } = useSidebarStore();
   const location = useLocation();
 
-  // Fetch unread alerts count (with auto-generation)
+  // Fetch unread alerts count (with auto-generation for admin/manager)
   const { data: unreadCount } = useQuery({
     queryKey: ['unreadCount'],
     queryFn: async () => {
-      // First generate system alerts, then get unread count
-      await alertService.generateSystemAlerts();
+      // Generate system alerts only for admin/manager (org-wide alerts)
+      if (user?.role === 'ADMIN' || user?.role === 'MANAGER') {
+        await alertService.generateSystemAlerts();
+      }
       return await alertService.getUnreadCount();
     },
     refetchInterval: 60000, // Refetch every minute
@@ -80,6 +81,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       case 'TEACHER':
         return [
           ...commonItems,
+          { name: 'Alerty', href: '/alerts', icon: Bell, badge: unreadCount || 0 },
           { name: 'Mój grafik', href: '/teacher/schedule', icon: Calendar },
           { name: 'Moje lekcje', href: '/lessons', icon: BookOpen },
           { name: 'Uczniowie', href: '/students', icon: Users },
@@ -88,6 +90,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       case 'STUDENT':
         return [
           ...commonItems,
+          { name: 'Alerty', href: '/alerts', icon: Bell, badge: unreadCount || 0 },
           { name: 'Moje lekcje', href: '/lessons', icon: Clock },
           { name: 'Moje kursy', href: '/courses', icon: BookOpen },
           { name: 'Grafik', href: '/calendar', icon: Calendar },
@@ -279,9 +282,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex-1"></div>
 
           <div className="flex items-center gap-4">
-            {/* Notifications */}
-            <NotificationBell />
-            <div className="h-9 w-px bg-gray-200" />
             {/* 🔽 Organization Switcher */}
             <OrganizationSwitcher />
 

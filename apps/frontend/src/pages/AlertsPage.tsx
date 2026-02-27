@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import alertService, { Alert } from '../services/alertService';
+import alertService, { Alert, AlertPriority } from '../services/alertService';
 import { Bell, CheckCheck, AlertTriangle, Info, XCircle, CheckCircle, ChevronLeft, ChevronRight, Calendar, User, BookOpen } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
+import { useAuthStore } from '../stores/authStore';
 
 interface LessonDetail {
   id: string;
@@ -20,31 +21,43 @@ interface StudentDetail {
 
 const AlertsPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
   const [page, setPage] = useState(1);
   const [filterRead, setFilterRead] = useState<boolean | undefined>(undefined);
+  const [filterPriority, setFilterPriority] = useState<AlertPriority | undefined>(undefined);
   const limit = 20;
 
-  // Fetch alerts (with auto-generation)
+  const isAdminOrManager = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+
+  // Fetch alerts (with auto-generation for admin/manager)
   const { data: alertsData, isLoading } = useQuery({
     queryKey: ['alerts', page],
     queryFn: async () => {
-      await alertService.generateSystemAlerts();
+      if (isAdminOrManager) {
+        await alertService.generateSystemAlerts();
+      }
       return await alertService.getAlerts({ page, limit });
     },
   });
 
   const filteredAlerts = useMemo(() => {
     const allAlerts = alertsData?.alerts || [];
-    if (filterRead === undefined) return allAlerts;
-    return allAlerts.filter(alert => alert.isRead === filterRead);
-  }, [alertsData, filterRead]);
+    return allAlerts.filter(alert => {
+      if (filterRead !== undefined && alert.isRead !== filterRead) return false;
+      if (filterPriority !== undefined && alert.priority !== filterPriority) return false;
+      return true;
+    });
+  }, [alertsData, filterRead, filterPriority]);
 
   const counts = useMemo(() => {
     const all = alertsData?.alerts || [];
     return {
       all: all.length,
       unread: all.filter(a => !a.isRead).length,
-      read: all.filter(a => a.isRead).length
+      read: all.filter(a => a.isRead).length,
+      critical: all.filter(a => a.priority === 'CRITICAL').length,
+      high: all.filter(a => a.priority === 'HIGH').length,
+      normal: all.filter(a => a.priority === 'NORMAL').length,
     };
   }, [alertsData]);
 
@@ -104,6 +117,25 @@ const AlertsPage: React.FC = () => {
     }
   };
 
+  const getPriorityBadge = (priority: AlertPriority) => {
+    switch (priority) {
+      case 'CRITICAL':
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800">
+            Krytyczny
+          </span>
+        );
+      case 'HIGH':
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-800">
+            Wysoki
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
   const formatLessonDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pl-PL', {
       day: '2-digit',
@@ -144,10 +176,12 @@ const AlertsPage: React.FC = () => {
                   <Calendar className="h-3 w-3" />
                   <span>{formatLessonDate(lesson.scheduledAt)}</span>
                 </div>
-                <div className="flex items-center gap-1 sm:col-span-2">
-                  <User className="h-3 w-3" />
-                  <span>Uczeń: {lesson.studentName}</span>
-                </div>
+                {isAdminOrManager && (
+                  <div className="flex items-center gap-1 sm:col-span-2">
+                    <User className="h-3 w-3" />
+                    <span>Uczeń: {lesson.studentName}</span>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -160,8 +194,8 @@ const AlertsPage: React.FC = () => {
       );
     }
 
-    // Render student details for student-related alerts
-    if (metadata.students && Array.isArray(metadata.students)) {
+    // Render student details for student-related alerts (admin/manager only)
+    if (isAdminOrManager && metadata.students && Array.isArray(metadata.students)) {
       const students = metadata.students as StudentDetail[];
       const displayStudents = students.slice(0, 8); // Show max 8 students
       const remainingCount = students.length - displayStudents.length;
@@ -230,9 +264,10 @@ const AlertsPage: React.FC = () => {
         </button>
       </div>
 
-{/* Filter Tabs - teraz zmieniają tylko lokalny stan filterRead */}
-      <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-        <div className="flex gap-2">
+      {/* Filter Tabs */}
+      <div className="bg-white rounded-lg shadow border border-gray-200 p-4 space-y-3">
+        {/* Read status filter */}
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setFilterRead(undefined)}
             className={`px-4 py-2 rounded-lg transition-colors ${
@@ -258,11 +293,46 @@ const AlertsPage: React.FC = () => {
             Przeczytane ({counts.read})
           </button>
         </div>
+        {/* Priority filter */}
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setFilterPriority(undefined)}
+            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+              filterPriority === undefined ? 'bg-secondary text-white' : 'bg-gray-100 text-gray-700'
+            }`}
+          >
+            Wszystkie priorytety
+          </button>
+          <button
+            onClick={() => setFilterPriority('CRITICAL')}
+            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+              filterPriority === 'CRITICAL' ? 'bg-red-600 text-white' : 'bg-red-100 text-red-800'
+            }`}
+          >
+            Krytyczne ({counts.critical})
+          </button>
+          <button
+            onClick={() => setFilterPriority('HIGH')}
+            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+              filterPriority === 'HIGH' ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-800'
+            }`}
+          >
+            Wysokie ({counts.high})
+          </button>
+          <button
+            onClick={() => setFilterPriority('NORMAL')}
+            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+              filterPriority === 'NORMAL' ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700'
+            }`}
+          >
+            Normalne ({counts.normal})
+          </button>
+        </div>
       </div>
 
       {/* Alerts List */}
       <div className="space-y-3">
-        {alerts.length === 0 ? (
+        {filteredAlerts.length === 0 ? (
           <div className="bg-white rounded-lg shadow border border-gray-200 p-12 text-center">
             <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-500">Brak alertów do wyświetlenia</p>
@@ -279,8 +349,9 @@ const AlertsPage: React.FC = () => {
                 <div className="flex items-start gap-3 flex-1">
                   <div className="mt-1">{getAlertIcon(alert.type)}</div>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h3 className="font-semibold text-gray-900">{alert.title}</h3>
+                      {getPriorityBadge(alert.priority)}
                       {!alert.isRead && (
                         <span className="inline-block w-2 h-2 bg-primary rounded-full"></span>
                       )}

@@ -1025,17 +1025,18 @@ model UserOrganization {
 // ============================================
 
 model Alert {
-  id             String    @id @default(uuid())
-  organizationId String    @map("organization_id")
-  userId         String?   @map("user_id") // Null means alert for all users in org
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  userId         String?       @map("user_id") // Null means alert for all users in org
   type           AlertType
+  priority       AlertPriority @default(NORMAL)
   title          String
   message        String
-  isRead         Boolean   @default(false) @map("is_read")
-  readAt         DateTime? @map("read_at")
-  metadata       Json?     // Additional data (e.g., lessonId, studentId)
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  isRead         Boolean       @default(false) @map("is_read")
+  readAt         DateTime?     @map("read_at")
+  metadata       Json?         // Additional data (e.g., lessonId, studentId)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1052,6 +1053,12 @@ enum AlertType {
   WARNING
   INFO
   SUCCESS
+}
+
+enum AlertPriority {
+  CRITICAL
+  HIGH
+  NORMAL
 }
 
 enum BalanceTransactionType {

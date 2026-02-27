@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { alertService } from '../services/alert.service';
+import { AlertPriority, UserRole } from '@prisma/client';
 
 class AlertController {
   async getAlerts(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -13,11 +14,15 @@ class AlertController {
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
       const isRead = req.query.isRead === 'true' ? true : req.query.isRead === 'false' ? false : undefined;
+      const priorityValues = Object.values(AlertPriority) as string[];
+      const priority = priorityValues.includes(req.query.priority as string)
+        ? (req.query.priority as AlertPriority)
+        : undefined;
 
       const result = await alertService.getAlerts(
         req.user.organizationId,
         req.user.id,
-        { page, limit, isRead }
+        { page, limit, isRead, priority, userRole: req.user.role as UserRole }
       );
 
       res.json({ data: result });
@@ -33,7 +38,7 @@ class AlertController {
         return;
       }
 
-      const count = await alertService.getUnreadCount(req.user.organizationId, req.user.id);
+      const count = await alertService.getUnreadCount(req.user.organizationId, req.user.id, req.user.role as UserRole);
 
       res.json({ data: { count } });
     } catch (error) {
@@ -64,7 +69,7 @@ class AlertController {
         return;
       }
 
-      await alertService.markAllAsRead(req.user.organizationId, req.user.id);
+      await alertService.markAllAsRead(req.user.organizationId, req.user.id, req.user.role as UserRole);
 
       res.json({ data: { success: true } });
     } catch (error) {

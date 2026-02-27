@@ -1,5 +1,11 @@
 import prisma from '../utils/prisma';
-import { AlertType } from '@prisma/client';
+import { AlertType, AlertPriority, UserRole } from '@prisma/client';
+
+const priorityOrder: Record<AlertPriority, number> = {
+  CRITICAL: 0,
+  HIGH: 1,
+  NORMAL: 2,
+};
 
 class AlertService {
   /**
@@ -12,22 +18,35 @@ class AlertService {
       page?: number;
       limit?: number;
       isRead?: boolean;
+      priority?: AlertPriority;
+      userRole?: UserRole;
     }
   ) {
     const page = options?.page || 1;
     const limit = options?.limit || 20;
     const skip = (page - 1) * limit;
 
+    // STUDENT and TEACHER see only their own alerts (userId match only, no org-wide)
+    const isRestrictedRole = options?.userRole === UserRole.STUDENT || options?.userRole === UserRole.TEACHER;
+
     const where: any = {
       organizationId,
-      OR: [
-        { userId: null }, // Alerts for all users
-        { userId: userId }, // Alerts for specific user
-      ],
+      ...(isRestrictedRole
+        ? { userId } // Only personal alerts
+        : {
+            OR: [
+              { userId: null }, // Alerts for all users in org
+              { userId: userId }, // Alerts for specific user
+            ],
+          }),
     };
 
     if (options?.isRead !== undefined) {
       where.isRead = options.isRead;
+    }
+
+    if (options?.priority !== undefined) {
+      where.priority = options.priority;
     }
 
     const [alerts, total] = await Promise.all([
@@ -39,6 +58,12 @@ class AlertService {
       }),
       prisma.alert.count({ where }),
     ]);
+
+    // Sort: CRITICAL → HIGH → NORMAL, then by date desc
+    alerts.sort((a, b) => {
+      const diff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      return diff !== 0 ? diff : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
     return {
       alerts,
@@ -54,15 +79,21 @@ class AlertService {
   /**
    * Get count of unread alerts
    */
-  async getUnreadCount(organizationId: string, userId?: string): Promise<number> {
+  async getUnreadCount(organizationId: string, userId?: string, userRole?: UserRole): Promise<number> {
+    const isRestrictedRole = userRole === UserRole.STUDENT || userRole === UserRole.TEACHER;
+
     return await prisma.alert.count({
       where: {
         organizationId,
         isRead: false,
-        OR: [
-          { userId: null }, // Alerts for all users
-          { userId: userId }, // Alerts for specific user
-        ],
+        ...(isRestrictedRole
+          ? { userId }
+          : {
+              OR: [
+                { userId: null },
+                { userId: userId },
+              ],
+            }),
       },
     });
   }
@@ -91,14 +122,20 @@ class AlertService {
   /**
    * Mark all alerts as read for a user/organization
    */
-  async markAllAsRead(organizationId: string, userId?: string) {
+  async markAllAsRead(organizationId: string, userId?: string, userRole?: UserRole) {
+    const isRestrictedRole = userRole === UserRole.STUDENT || userRole === UserRole.TEACHER;
+
     const where: any = {
       organizationId,
       isRead: false,
-      OR: [
-        { userId: null },
-        { userId: userId },
-      ],
+      ...(isRestrictedRole
+        ? { userId }
+        : {
+            OR: [
+              { userId: null },
+              { userId: userId },
+            ],
+          }),
     };
 
     return await prisma.alert.updateMany({
@@ -117,12 +154,33 @@ class AlertService {
     organizationId: string;
     userId?: string;
     type: AlertType;
+    priority?: AlertPriority;
     title: string;
     message: string;
     metadata?: any;
   }) {
     return await prisma.alert.create({
-      data,
+      data: {
+        ...data,
+        priority: data.priority ?? AlertPriority.NORMAL,
+      },
+    });
+  }
+
+  /**
+   * Create a lesson-related alert for a specific user (teacher or student)
+   */
+  async createLessonAlert(params: {
+    userId: string;
+    organizationId: string;
+    priority: AlertPriority;
+    type: AlertType;
+    title: string;
+    message: string;
+    metadata?: any;
+  }) {
+    return await prisma.alert.create({
+      data: params,
     });
   }
 
@@ -171,6 +229,7 @@ class AlertService {
         const alert = await this.createAlert({
           organizationId,
           type: 'WARNING',
+          priority: AlertPriority.HIGH,
           title: `Niepotwierdzone lekcje (${upcomingUnconfirmedLessons.length})`,
           message: `Masz ${upcomingUnconfirmedLessons.length} lekcji w ciągu najbliższych 24h, które nie zostały potwierdzone przez lektora.`,
           metadata: {
@@ -228,6 +287,7 @@ class AlertService {
         const alert = await this.createAlert({
           organizationId,
           type: 'ERROR',
+          priority: AlertPriority.CRITICAL,
           title: `Niezamknięte lekcje (${overdueLessons.length})`,
           message: `Masz ${overdueLessons.length} przeszłych lekcji, które nie zostały oznaczone jako zakończone lub anulowane.`,
           metadata: {
@@ -276,6 +336,7 @@ class AlertService {
         const alert = await this.createAlert({
           organizationId,
           type: 'WARNING',
+          priority: AlertPriority.NORMAL,
           title: `Uczniowie bez zaplanowanego grafiku (${studentsWithoutEnrollments.length})`,
           message: `${studentsWithoutEnrollments.length} aktywnych uczniów nie ma żadnych aktywnych zapisów na kursy.`,
           metadata: {
@@ -297,3 +358,4 @@ class AlertService {
 }
 
 export const alertService = new AlertService();
+export default alertService;
