@@ -539,6 +539,10 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
         resolvedStartDate = dates[0]?.split('T')[0] ?? '';
         resolvedEndDate = dates[dates.length - 1]?.split('T')[0] ?? undefined;
       }
+      // Fallback: if no schedule was provided, use today as start date
+      if (!resolvedStartDate) {
+        resolvedStartDate = new Date().toISOString().split('T')[0];
+      }
     }
 
     const data: any = {

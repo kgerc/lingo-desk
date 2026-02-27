@@ -29,7 +29,7 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
     email: teacher?.user.email || '',
     phone: teacher?.user.phone || '',
     password: '',
-    hourlyRate: teacher?.hourlyRate || 100,
+    hourlyRate: teacher?.hourlyRate ? parseFloat(String(teacher.hourlyRate)) : 100,
     contractType: teacher?.contractType || '',
     specializations: teacher?.specializations.join(', ') || '',
     languages: teacher?.languages.join(', ') || '',
@@ -138,10 +138,11 @@ const TeacherModal: React.FC<TeacherModalProps> = ({ teacher, onClose, onSuccess
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
+    const isIntegerField = ['cancellationPayoutHours', 'cancellationPayoutPercent'].includes(name);
     const newValue = type === 'checkbox'
       ? (e.target as HTMLInputElement).checked
       : type === 'number'
-        ? (value === '' ? null : parseFloat(value))
+        ? (value === '' ? null : isIntegerField ? parseInt(value, 10) : parseFloat(value))
         : value;
     setFormData((prev) => ({
       ...prev,

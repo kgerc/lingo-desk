@@ -245,16 +245,17 @@ export class TeacherService {
 
     const result = await prisma.$transaction(async (tx) => {
       // Update user data
-      if (data.firstName || data.lastName || data.phone || data.email || data.isActive !== undefined) {
+      const userUpdateData: Record<string, any> = {};
+      if (data.firstName !== undefined) userUpdateData.firstName = data.firstName;
+      if (data.lastName !== undefined) userUpdateData.lastName = data.lastName;
+      if (data.phone !== undefined) userUpdateData.phone = data.phone;
+      if (data.email !== undefined) userUpdateData.email = data.email;
+      if (data.isActive !== undefined) userUpdateData.isActive = data.isActive;
+
+      if (Object.keys(userUpdateData).length > 0) {
         await tx.user.update({
           where: { id: teacher.userId },
-          data: {
-            firstName: data.firstName,
-            lastName: data.lastName,
-            phone: data.phone,
-            email: data.email,
-            isActive: data.isActive,
-          },
+          data: userUpdateData,
         });
       }
 
