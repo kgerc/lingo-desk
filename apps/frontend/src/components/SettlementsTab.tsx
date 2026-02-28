@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import settlementService, { StudentWithBalance, SettlementPreview } from '../services/settlementService';
 import { courseService } from '../services/courseService';
 import paymentService from '../services/paymentService';
-import { Search, Calculator, Calendar, TrendingUp, TrendingDown, Minus, ChevronRight, ArrowLeft, Save, Trash2, Eye, History, Bell } from 'lucide-react';
+import { Search, Calculator, Calendar, TrendingUp, TrendingDown, Minus, ChevronRight, ArrowLeft, Save, Trash2, Eye, History, Bell, AlertTriangle, Info, CheckCircle, Hourglass } from 'lucide-react';
 import LoadingSpinner from './LoadingSpinner';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -57,6 +57,14 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
     queryKey: ['student-settlements', selectedStudent?.id],
     queryFn: () => settlementService.getStudentSettlements(selectedStudent!.id),
     enabled: !!selectedStudent && viewMode === 'history',
+  });
+
+  // Fetch balance forecast
+  const { data: forecast, isLoading: isLoadingForecast } = useQuery({
+    queryKey: ['balance-forecast', selectedStudent?.id],
+    queryFn: () => settlementService.getBalanceForecast(selectedStudent!.id),
+    enabled: !!selectedStudent && viewMode === 'settlement',
+    staleTime: 60_000,
   });
 
   // Auto-select student when preselectedStudentId is provided
@@ -551,6 +559,96 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
               <p className="mt-4 text-sm text-gray-500">
                 Ostatnie rozliczenie: {new Date(settlementInfo.lastSettlementDate).toLocaleDateString('pl-PL')}
               </p>
+            )}
+          </div>
+
+          {/* Balance Forecast */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Prognoza salda</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute right-0 top-6 z-10 hidden group-hover:block w-64 bg-gray-800 text-white text-xs rounded-lg p-3 shadow-lg">
+                  Prognoza pokazuje kiedy saldo ucznia się wyczerpie na podstawie zaplanowanych lekcji (SCHEDULED / CONFIRMED). Anulowane lekcje nie są uwzględniane.
+                </div>
+              </div>
+            </div>
+
+            {isLoadingForecast ? (
+              <LoadingSpinner />
+            ) : !forecast ? null : forecast.currentBalance < 0 ? (
+              <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-red-700">Saldo jest już ujemne</p>
+                  <p className="text-xs text-red-600 mt-1">
+                    Uczeń jest zadłużony na {Math.abs(forecast.currentBalance).toFixed(2)} {forecast.currency}
+                  </p>
+                </div>
+              </div>
+            ) : forecast.upcomingLessonsCount === 0 ? (
+              <div className="flex items-start gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <Hourglass className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Brak zaplanowanych lekcji</p>
+                  <p className="text-xs text-gray-400 mt-1">Prognoza dostępna po zaplanowaniu lekcji</p>
+                </div>
+              </div>
+            ) : forecast.depletionDate === null ? (
+              <div className="flex items-start gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-green-700">Saldo wystarczy na wszystkie lekcje</p>
+                  <p className="text-xs text-green-600 mt-1">
+                    Po {forecast.upcomingLessonsCount} zaplanowanych lekcjach pozostanie{' '}
+                    <span className="font-semibold">{forecast.forecastedBalance.toFixed(2)} {forecast.currency}</span>
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-800">
+                      Saldo wyczerpie się{' '}
+                      {new Date(forecast.depletionDate).toLocaleDateString('pl-PL', {
+                        day: 'numeric', month: 'long', year: 'numeric',
+                      })}
+                    </p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      {forecast.lessonsUntilDepletion === 0
+                        ? 'Już pierwsza zaplanowana lekcja przekroczy saldo'
+                        : `Saldo starczy na ${forecast.lessonsUntilDepletion} z ${forecast.upcomingLessonsCount} zaplanowanych lekcji`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Upcoming lessons mini-list (first 5) */}
+                <div className="space-y-1">
+                  {forecast.upcomingLessons.slice(0, 5).map((lesson) => (
+                    <div key={lesson.id} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-100 last:border-0">
+                      <div className="min-w-0">
+                        <span className="text-gray-700 truncate block">{lesson.title}</span>
+                        <span className="text-gray-400">
+                          {new Date(lesson.scheduledAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
+                        </span>
+                      </div>
+                      <div className="text-right ml-2 flex-shrink-0">
+                        <span className="text-red-500">−{lesson.pricePerLesson.toFixed(2)}</span>
+                        <span className={`block font-medium ${lesson.balanceAfter < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                          = {lesson.balanceAfter.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {forecast.upcomingLessonsCount > 5 && (
+                    <p className="text-xs text-gray-400 pt-1 text-center">
+                      + {forecast.upcomingLessonsCount - 5} więcej lekcji
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
           </div>
 

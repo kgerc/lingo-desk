@@ -1,4 +1,4 @@
-import { PaymentStatus } from '@prisma/client';
+import { LessonStatus, PaymentStatus } from '@prisma/client';
 import prisma from '../utils/prisma';
 
 export interface SettlementPreview {
@@ -30,6 +30,25 @@ export interface SettlementPreview {
   periodBalance: number; // totalPaymentsReceived - totalPaymentsDue
   balanceAfter: number;
   currency: string;
+}
+
+export interface BalanceForecastLesson {
+  id: string;
+  title: string;
+  scheduledAt: Date;
+  pricePerLesson: number;
+  currency: string;
+  balanceAfter: number; // running balance after this lesson is charged
+}
+
+export interface BalanceForecast {
+  currentBalance: number;
+  currency: string;
+  upcomingLessonsCount: number;
+  lessonsUntilDepletion: number | null; // null = balance never runs out
+  depletionDate: Date | null;           // null = balance never runs out
+  forecastedBalance: number;            // balance after all upcoming lessons
+  upcomingLessons: BalanceForecastLesson[];
 }
 
 export interface CreateSettlementData {
@@ -422,6 +441,93 @@ class SettlementService {
     );
 
     return studentsWithPendingCounts;
+  }
+
+  /**
+   * Forecast when the student's balance will run out based on upcoming lessons
+   */
+  async getBalanceForecast(studentId: string, organizationId: string): Promise<BalanceForecast> {
+    const now = new Date();
+
+    // Get current balance
+    const budget = await prisma.studentBudget.findFirst({
+      where: { studentId, organizationId },
+      select: { currentBalance: true, currency: true },
+    });
+
+    const currentBalance = budget ? Number(budget.currentBalance) : 0;
+    const currency = budget?.currency || 'PLN';
+
+    // Get upcoming lessons (SCHEDULED or CONFIRMED, not CANCELLED/COMPLETED)
+    // Include teacherRate and enrollment→course to resolve pricePerLesson when not set directly on lesson
+    const upcomingLessons = await prisma.lesson.findMany({
+      where: {
+        studentId,
+        organizationId,
+        scheduledAt: { gte: now },
+        status: { in: [LessonStatus.SCHEDULED, LessonStatus.CONFIRMED] },
+      },
+      select: {
+        id: true,
+        title: true,
+        scheduledAt: true,
+        pricePerLesson: true,
+        teacherRate: true,
+        currency: true,
+        enrollment: {
+          select: {
+            course: {
+              select: { pricePerLesson: true },
+            },
+          },
+        },
+      },
+      orderBy: { scheduledAt: 'asc' },
+    });
+
+    // Simulate balance depletion across upcoming lessons
+    let runningBalance = currentBalance;
+    let lessonsUntilDepletion: number | null = null;
+    let depletionDate: Date | null = null;
+
+    const forecastLessons: BalanceForecastLesson[] = upcomingLessons.map((lesson, index) => {
+      // Resolve price: lesson.pricePerLesson → lesson.teacherRate → course.pricePerLesson → 0
+      // (mirrors the same fallback chain used in lesson.service.ts when creating payments)
+      const price =
+        lesson.pricePerLesson !== null && lesson.pricePerLesson !== undefined
+          ? Number(lesson.pricePerLesson)
+          : lesson.teacherRate !== null && lesson.teacherRate !== undefined
+            ? Number(lesson.teacherRate)
+            : lesson.enrollment?.course?.pricePerLesson !== null && lesson.enrollment?.course?.pricePerLesson !== undefined
+              ? Number(lesson.enrollment.course.pricePerLesson)
+              : 0;
+
+      runningBalance -= price;
+
+      if (depletionDate === null && runningBalance < 0) {
+        lessonsUntilDepletion = index; // lessons before this one were fine
+        depletionDate = lesson.scheduledAt;
+      }
+
+      return {
+        id: lesson.id,
+        title: lesson.title,
+        scheduledAt: lesson.scheduledAt,
+        pricePerLesson: price,
+        currency: lesson.currency,
+        balanceAfter: runningBalance,
+      };
+    });
+
+    return {
+      currentBalance,
+      currency,
+      upcomingLessonsCount: upcomingLessons.length,
+      lessonsUntilDepletion,
+      depletionDate,
+      forecastedBalance: runningBalance,
+      upcomingLessons: forecastLessons,
+    };
   }
 
   /**

@@ -72,6 +72,25 @@ export interface StudentSettlementInfo {
   currentBalance: number;
 }
 
+export interface BalanceForecastLesson {
+  id: string;
+  title: string;
+  scheduledAt: string;
+  pricePerLesson: number;
+  currency: string;
+  balanceAfter: number;
+}
+
+export interface BalanceForecast {
+  currentBalance: number;
+  currency: string;
+  upcomingLessonsCount: number;
+  lessonsUntilDepletion: number | null;
+  depletionDate: string | null;
+  forecastedBalance: number;
+  upcomingLessons: BalanceForecastLesson[];
+}
+
 export interface CreateSettlementData {
   studentId: string;
   periodStart: string;
@@ -127,6 +146,12 @@ const settlementService = {
   // Delete settlement (only most recent)
   deleteSettlement: async (id: string): Promise<void> => {
     await api.delete(`/settlements/${id}`);
+  },
+
+  // Get balance forecast based on upcoming lessons
+  getBalanceForecast: async (studentId: string): Promise<BalanceForecast> => {
+    const response = await api.get(`/settlements/student/${studentId}/forecast`);
+    return response.data;
   },
 };
 

@@ -30,7 +30,9 @@
       "Bash(echo \"EXIT:$?\")",
       "Bash(xargs grep -l \"getLessons\\\\|courseService\\\\|getStudents\")",
       "Bash(xargs grep -l \"StudentDashboard\\\\|role.*STUDENT\")",
-      "Bash(xargs grep -l \"alertService\")"
+      "Bash(xargs grep -l \"alertService\")",
+      "Bash(xargs grep -l \"balance\\\\|budget\\\\|settlement\")",
+      "Bash(npx prisma:*)"
     ]
   }
 }

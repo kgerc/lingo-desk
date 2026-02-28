@@ -2,6 +2,7 @@ import express from 'express';
 import {
   getStudentsWithBalance,
   getLastSettlementDate,
+  getBalanceForecast,
   previewSettlement,
   createSettlement,
   getStudentSettlements,
@@ -20,6 +21,9 @@ router.get('/students', authorize(UserRole.ADMIN, UserRole.MANAGER), getStudents
 
 // Get last settlement date for a student
 router.get('/student/:studentId/info', authorize(UserRole.ADMIN, UserRole.MANAGER), getLastSettlementDate);
+
+// Get balance forecast for a student
+router.get('/student/:studentId/forecast', authorize(UserRole.ADMIN, UserRole.MANAGER), getBalanceForecast);
 
 // Get all settlements for a student
 router.get('/student/:studentId', authorize(UserRole.ADMIN, UserRole.MANAGER), getStudentSettlements);

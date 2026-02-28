@@ -169,6 +169,26 @@ export const getSettlementById = async (req: AuthRequest, res: Response) => {
 };
 
 /**
+ * Get balance forecast for a student based on upcoming lessons
+ */
+export const getBalanceForecast = async (req: AuthRequest, res: Response) => {
+  try {
+    const organizationId = req.user?.organizationId;
+    if (!organizationId) {
+      return res.status(401).json({ message: messages.system.unauthorized });
+    }
+
+    const { studentId } = req.params;
+
+    const forecast = await settlementService.getBalanceForecast(studentId, organizationId);
+    return res.status(200).json(forecast);
+  } catch (error) {
+    console.error('Error getting balance forecast:', error);
+    return res.status(500).json({ message: 'Nie udało się pobrać prognozy salda' });
+  }
+};
+
+/**
  * Delete settlement (only most recent)
  */
 export const deleteSettlement = async (req: AuthRequest, res: Response) => {
