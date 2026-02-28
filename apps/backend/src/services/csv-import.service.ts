@@ -397,58 +397,6 @@ async function findStudentByBankAccount(
   return null;
 }
 
-/**
- * Parse first name and last name from a kontrahent (counterparty) string.
- * Polish bank exports look like: "ANNA KOWALSKA UL LIPOWA 3 M 12 01-234 WARSZAWA"
- * Strategy: take the leading ALL-CAPS word tokens (max 3) before the first
- * address-indicator token (UL, AL, PL, OS, NR, M, etc.) or a digit token.
- * Returns { firstName, lastName } or null if we cannot extract at least 2 tokens.
- */
-function parseNameFromKontrahent(kontrahent: string): { firstName: string; lastName: string } | null {
-  if (!kontrahent.trim()) return null;
-
-  // Address-indicator words (common in Polish addresses) – stop before these
-  const ADDRESS_STOP = new Set(['UL', 'AL', 'PL', 'OS', 'NR', 'M', 'BLOK', 'BL', 'BLDG', 'APT', 'FLAT']);
-
-  const tokens = kontrahent
-    .trim()
-    .split(/\s+/)
-    .map((t) => t.toUpperCase().replace(/[^A-ZĄĆĘŁŃÓŚŹŻÜ-]/g, ''))
-    .filter(Boolean);
-
-  const nameTokens: string[] = [];
-
-  for (const token of tokens) {
-    // Stop at address indicator words
-    if (ADDRESS_STOP.has(token)) break;
-    // Stop at tokens containing digits (house numbers, postcodes)
-    if (/\d/.test(token)) break;
-    // Stop after 3 name tokens (edge case: "Jan Maria Kowalski" → still take 3)
-    if (nameTokens.length >= 3) break;
-    // Must be at least 2 chars to be a real name token
-    if (token.length >= 2) {
-      nameTokens.push(token);
-    }
-  }
-
-  if (nameTokens.length < 2) return null;
-
-  // Capitalize each token: KOWALSKA → Kowalska
-  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-
-  if (nameTokens.length === 2) {
-    return { firstName: capitalize(nameTokens[0]), lastName: capitalize(nameTokens[1]) };
-  }
-
-  // 3 tokens – use first as firstName, last two joined as lastName (or just last)
-  return {
-    firstName: capitalize(nameTokens[0]),
-    lastName: nameTokens
-      .slice(1)
-      .map(capitalize)
-      .join(' '),
-  };
-}
 
 /**
  * Try to find an existing student by bank account (primary), then by name in kontrahent/opis.
