@@ -365,6 +365,7 @@ model Course {
   locationId             String?            @map("location_id")
   classroomId            String?            @map("classroom_id")
   maxStudents            Int?               @map("max_students")
+  onlineMeetingUrl       String?            @map("online_meeting_url")
   currentStudentsCount   Int                @default(0) @map("current_students_count")
   createdAt              DateTime           @default(now()) @map("created_at")
   updatedAt              DateTime           @updatedAt @map("updated_at")

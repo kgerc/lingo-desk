@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { courseService, Course } from '../services/courseService';
-import { Plus, Search, Users, BookOpen, Calendar, MapPin, Wifi, Home, MoreVertical, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Search, Users, BookOpen, Calendar, MapPin, Wifi, Home, MoreVertical, Trash2, Loader2, ExternalLink } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import CourseModal from '../components/CourseModal';
 import EnrollStudentModal from '../components/EnrollStudentModal';
@@ -367,6 +367,18 @@ const CoursesPage: React.FC = () => {
                         <span className="text-sm text-gray-900">
                           {getDeliveryModeLabel(course.deliveryMode)}
                         </span>
+                        {course.onlineMeetingUrl && (
+                          <a
+                            href={course.onlineMeetingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Dołącz do spotkania"
+                            onClick={(e) => e.stopPropagation()}
+                            className="ml-1 text-blue-600 hover:text-blue-800"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">

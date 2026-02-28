@@ -122,6 +122,7 @@ export interface CreateCourseData {
   startDate: Date;
   endDate?: Date;
   maxStudents?: number;
+  onlineMeetingUrl?: string;
   locationId?: string;
   classroomId?: string;
   isActive: boolean;
@@ -143,6 +144,7 @@ export interface UpdateCourseData {
   startDate?: Date;
   endDate?: Date;
   maxStudents?: number;
+  onlineMeetingUrl?: string;
   locationId?: string;
   classroomId?: string;
   isActive?: boolean;
@@ -206,6 +208,13 @@ export interface CourseFilters {
 class CourseService {
   async createCourse(data: CreateCourseData) {
     const { organizationId, teacherId, ...courseData } = data;
+
+    // Enforce maxStudents = 1 for INDIVIDUAL courses
+    if (courseData.courseType === 'INDIVIDUAL') {
+      courseData.maxStudents = 1;
+    } else if (courseData.courseType === 'GROUP' && courseData.maxStudents !== undefined && courseData.maxStudents < 2) {
+      throw new Error('Kurs grupowy musi mieć co najmniej 2 miejsca');
+    }
 
     // Verify teacher exists and belongs to organization
     const teacher = await prisma.teacher.findFirst({
@@ -729,16 +738,33 @@ class CourseService {
   async updateCourse(id: string, organizationId: string, data: UpdateCourseData) {
     const { teacherId, ...updateData } = data;
 
+    // Enforce maxStudents = 1 for INDIVIDUAL courses
+    const resolvedCourseType = updateData.courseType;
+    if (resolvedCourseType === 'INDIVIDUAL') {
+      updateData.maxStudents = 1;
+    } else if (resolvedCourseType === 'GROUP' && updateData.maxStudents !== undefined && updateData.maxStudents < 2) {
+      throw new Error('Kurs grupowy musi mieć co najmniej 2 miejsca');
+    }
+
     // Verify course exists
     const existingCourse = await prisma.course.findFirst({
-      where: {
-        id,
-        organizationId,
-      },
+      where: { id, organizationId },
     });
 
     if (!existingCourse) {
       throw new Error('Course not found');
+    }
+
+    // Validate maxStudents is not lower than current active enrollment count
+    if (updateData.maxStudents !== undefined) {
+      const activeCount = await prisma.studentEnrollment.count({
+        where: { courseId: id, status: 'ACTIVE' },
+      });
+      if (updateData.maxStudents < activeCount) {
+        throw new Error(
+          `Nie można ustawić limitu ${updateData.maxStudents} — kurs ma już ${activeCount} aktywnych uczniów`
+        );
+      }
     }
 
     // Verify teacher exists if provided

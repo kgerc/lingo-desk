@@ -6,7 +6,7 @@ import { courseService, Course, CreateCourseWithScheduleData, ScheduleItem, Sche
 import { teacherService } from '../services/teacherService';
 import { studentService } from '../services/studentService';
 import organizationService from '../services/organizationService';
-import { X, Info, Calendar, Users, Plus, Trash2, Clock, AlertCircle, Settings, CalendarOff } from 'lucide-react';
+import { X, Info, Calendar, Users, Plus, Trash2, Clock, AlertCircle, Settings, CalendarOff, Link2 } from 'lucide-react';
 import { handleApiError } from '../lib/errorUtils';
 import { isPolishHoliday, getHolidayName } from '../utils/polish-holidays';
 
@@ -33,6 +33,7 @@ const FIELD_TO_TAB_MAP: Record<string, TabType> = {
   deliveryMode: 'details',
   defaultDurationMinutes: 'details',
   maxStudents: 'details',
+  onlineMeetingUrl: 'details',
   pricePerLesson: 'details',
   currency: 'details',
   description: 'details',
@@ -102,6 +103,7 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
     description: course?.description || '',
     // Pozostałe pola:
     maxStudents: course?.maxStudents?.toString() || '',
+    onlineMeetingUrl: course?.onlineMeetingUrl || '',
     startDate: course?.startDate ? course.startDate.split('T')[0] : '',
     endDate: course?.endDate ? course.endDate.split('T')[0] : '',
     isActive: course?.isActive ?? true,
@@ -331,10 +333,20 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
     } else {
       setFormData((prev) => {
         const updated = { ...prev, [name]: value };
-        // When switching course type in create mode, reset name and student selection
-        if (name === 'courseType' && !isEdit) {
-          updated.name = '';
-          setSelectedStudentIds([]);
+        // When switching course type, reset relevant fields
+        if (name === 'courseType') {
+          if (!isEdit) {
+            updated.name = '';
+            setSelectedStudentIds([]);
+          }
+          // Reset maxStudents when switching to INDIVIDUAL
+          if (value === 'INDIVIDUAL') {
+            updated.maxStudents = '';
+          }
+        }
+        // Clear online meeting URL when switching to offline-only mode
+        if (name === 'deliveryMode' && value === 'IN_PERSON') {
+          updated.onlineMeetingUrl = '';
         }
         return updated;
       });
@@ -473,6 +485,14 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
       newErrors.maxStudents = 'Maksymalna liczba uczestników dla kursu grupowego musi wynosić co najmniej 2';
     }
 
+    if (formData.onlineMeetingUrl) {
+      try {
+        new URL(formData.onlineMeetingUrl);
+      } catch {
+        newErrors.onlineMeetingUrl = 'Podaj poprawny adres URL (np. https://meet.google.com/...)';
+      }
+    }
+
     if (!isEdit && scheduleMode !== 'none' && selectedStudentIds.length === 0) {
       newErrors.students = isAutoName
         ? 'Wybierz ucznia, aby utworzyć harmonogram lekcji'
@@ -559,6 +579,7 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
       startDate: resolvedStartDate,
       endDate: resolvedEndDate,
       maxStudents: formData.courseType === 'INDIVIDUAL' ? 1 : (formData.maxStudents ? parseInt(formData.maxStudents) : undefined),
+      onlineMeetingUrl: formData.onlineMeetingUrl || undefined,
       isActive: formData.isActive,
     };
 
@@ -912,6 +933,42 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
                     </div>
                   )}
                 </div>
+
+                {/* Online Meeting URL */}
+                {(formData.deliveryMode === 'ONLINE' || formData.deliveryMode === 'BOTH') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Link do kursu online
+                    </label>
+                    <div className="relative">
+                      <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="url"
+                        name="onlineMeetingUrl"
+                        value={formData.onlineMeetingUrl}
+                        onChange={handleChange}
+                        className={`w-full pl-9 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                          errors.onlineMeetingUrl ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        placeholder="https://meet.google.com/..."
+                      />
+                    </div>
+                    {errors.onlineMeetingUrl && (
+                      <p className="mt-1 text-sm text-red-600">{errors.onlineMeetingUrl}</p>
+                    )}
+                    {formData.onlineMeetingUrl && !errors.onlineMeetingUrl && (
+                      <a
+                        href={formData.onlineMeetingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        <Link2 className="h-3 w-3" />
+                        Otwórz link
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 {/* Price & Currency */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

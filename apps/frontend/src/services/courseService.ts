@@ -21,6 +21,7 @@ export interface Course {
   locationId?: string;
   classroomId?: string;
   maxStudents?: number;
+  onlineMeetingUrl?: string;
   currentStudentsCount: number;
   createdAt: string;
   updatedAt: string;
@@ -71,6 +72,7 @@ export interface CreateCourseData {
   startDate: string;
   endDate?: string;
   maxStudents?: number;
+  onlineMeetingUrl?: string;
   locationId?: string;
   classroomId?: string;
   isActive?: boolean;
@@ -92,6 +94,7 @@ export interface UpdateCourseData {
   startDate?: string;
   endDate?: string;
   maxStudents?: number;
+  onlineMeetingUrl?: string;
   locationId?: string;
   classroomId?: string;
   isActive?: boolean;
