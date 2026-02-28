@@ -225,4 +225,16 @@ export const studentService = {
       errors: Array<{ row: number; email: string; error: string }>;
     };
   },
+
+  async getStudentActivity(studentId: string, limit = 20): Promise<StudentActivityEntry[]> {
+    const response = await api.get(`/students/${studentId}/activity`, { params: { limit } }) as any;
+    return response.data.data;
+  },
 };
+
+export interface StudentActivityEntry {
+  id: string;
+  type: 'LOGIN';
+  date: string;
+  label: string;
+}

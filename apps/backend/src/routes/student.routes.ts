@@ -36,6 +36,13 @@ router.get(
 // GET /api/students/me - Get current student's own profile (for STUDENT role)
 router.get('/me', studentController.getMe.bind(studentController));
 
+// GET /api/students/:id/activity - Get student login activity history
+router.get(
+  '/:id/activity',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  studentController.getStudentActivity.bind(studentController)
+);
+
 // GET /api/students/:id - Get student by ID
 router.get('/:id', studentController.getStudentById.bind(studentController));
 

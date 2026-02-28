@@ -1033,6 +1033,29 @@ export class StudentService {
     const { internalNotes: _notes, ...studentWithoutNotes } = student as any;
     return studentWithoutNotes;
   }
+
+  async getStudentActivity(studentId: string, organizationId: string, limit = 20) {
+    // Verify student belongs to org
+    const student = await prisma.student.findFirst({
+      where: { id: studentId, organizationId },
+      select: { id: true },
+    });
+    if (!student) throw new Error('Student not found');
+
+    const loginHistory = await prisma.studentLoginHistory.findMany({
+      where: { studentId, organizationId },
+      orderBy: { loggedAt: 'desc' },
+      take: limit,
+      select: { id: true, loggedAt: true },
+    });
+
+    return loginHistory.map((entry) => ({
+      id: entry.id,
+      type: 'LOGIN' as const,
+      date: entry.loggedAt,
+      label: 'Logowanie',
+    }));
+  }
 }
 
 export default new StudentService();

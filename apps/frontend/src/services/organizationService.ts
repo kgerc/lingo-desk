@@ -24,6 +24,13 @@ export interface OrganizationSettings extends PaymentReminderSettings {
   budgetAlertThresholdHours: number;
   autoGenerateLessonsEnabled: boolean;
   settings?: OrganizationSettingsData;
+  regulationsContent?: string | null;
+  regulationsUpdatedAt?: string | null;
+}
+
+export interface OrganizationRegulations {
+  regulationsContent: string | null;
+  regulationsUpdatedAt: string | null;
 }
 
 export interface Organization {
@@ -175,6 +182,16 @@ const organizationService = {
 
   async updateDisabledHolidays(disabledHolidays: string[]): Promise<void> {
     await api.put('/organizations/holidays/disabled', { disabledHolidays });
+  },
+
+  async getRegulations(): Promise<OrganizationRegulations> {
+    const response = await api.get('/organizations/regulations') as any;
+    return response.data.data;
+  },
+
+  async updateRegulations(regulationsContent: string | null): Promise<OrganizationRegulations> {
+    const response = await api.put('/organizations/regulations', { regulationsContent }) as any;
+    return response.data.data;
   },
 };
 

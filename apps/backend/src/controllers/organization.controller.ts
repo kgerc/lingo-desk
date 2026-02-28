@@ -171,6 +171,33 @@ class OrganizationController {
     }
   }
 
+  async getRegulations(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizationId = req.user!.organizationId;
+      const regulations = await organizationService.getRegulations(organizationId);
+      res.json({ success: true, data: regulations });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateRegulations(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizationId = req.user!.organizationId;
+      const { regulationsContent } = req.body;
+      const userId = req.user!.id;
+
+      const regulations = await organizationService.updateRegulations(
+        organizationId,
+        regulationsContent ?? null,
+        userId
+      );
+      res.json({ success: true, data: regulations });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getVisibilitySettings(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const organizationId = req.user!.organizationId;

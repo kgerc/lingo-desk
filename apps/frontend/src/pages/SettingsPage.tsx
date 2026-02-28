@@ -1,13 +1,14 @@
 import React, { useState, useMemo } from 'react';
-import { Building2, Bell, Plug, LayoutDashboard, Eye } from 'lucide-react';
+import { Building2, Bell, Plug, LayoutDashboard, Eye, BookOpen } from 'lucide-react';
 import OrganizationSettingsPage from './OrganizationSettingsPage';
 import NotificationSettingsPage from './NotificationSettingsPage';
 import IntegrationsPage from './IntegrationsPage';
 import DashboardSettingsPage from './DashboardSettingsPage';
 import VisibilitySettingsPage from './VisibilitySettingsPage';
+import RegulationsPage from './RegulationsPage';
 import { useAuthStore } from '../stores/authStore';
 
-type TabType = 'organization' | 'dashboard' | 'notifications' | 'integrations' | 'visibility';
+type TabType = 'organization' | 'dashboard' | 'notifications' | 'integrations' | 'visibility' | 'regulations';
 
 const SettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('organization');
@@ -37,6 +38,13 @@ const SettingsPage: React.FC = () => {
         icon: Plug,
       },
     ];
+
+    // Regulations visible to all roles
+    baseTabs.push({
+      id: 'regulations' as TabType,
+      name: 'Regulamin',
+      icon: BookOpen,
+    });
 
     if (isAdmin) {
       baseTabs.push({
@@ -86,6 +94,7 @@ const SettingsPage: React.FC = () => {
         {activeTab === 'dashboard' && <DashboardSettingsPage />}
         {activeTab === 'notifications' && <NotificationSettingsPage />}
         {activeTab === 'integrations' && <IntegrationsPage />}
+        {activeTab === 'regulations' && <RegulationsPage />}
         {activeTab === 'visibility' && isAdmin && <VisibilitySettingsPage />}
       </div>
     </div>

@@ -98,6 +98,19 @@ router.put(
   organizationController.updateDisabledHolidays.bind(organizationController)
 );
 
+// Get school regulations (all authenticated org members)
+router.get(
+  '/regulations',
+  organizationController.getRegulations.bind(organizationController)
+);
+
+// Update school regulations (ADMIN or MANAGER only)
+router.put(
+  '/regulations',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  organizationController.updateRegulations.bind(organizationController)
+);
+
 // Get Polish holidays for a given year
 router.get(
   '/holidays',

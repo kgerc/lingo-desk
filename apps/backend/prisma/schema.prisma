@@ -187,6 +187,8 @@ model Organization {
   substitutions         Substitution[]
   teacherPayouts        TeacherPayout[]
   courseApplications    CourseApplication[]
+  studentDocuments      StudentDocument[]
+  studentLoginHistory   StudentLoginHistory[]
 
   @@map("organizations")
 }
@@ -316,6 +318,8 @@ model Student {
   budget            StudentBudget?
   attendances       LessonAttendance[]
   settlements       StudentSettlement[]
+  documents         StudentDocument[]
+  loginHistory      StudentLoginHistory[]
 
   @@unique([organizationId, studentNumber])
   @@index([organizationId])
@@ -902,9 +906,10 @@ model File {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  uploader       User             @relation(fields: [uploadedBy], references: [id])
-  courseMaterials CourseMaterial[]
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploader          User               @relation(fields: [uploadedBy], references: [id])
+  courseMaterials   CourseMaterial[]
+  studentDocuments  StudentDocument[]
 
   @@index([organizationId])
   @@index([relatedToType, relatedToId])
@@ -987,6 +992,8 @@ model OrganizationSettings {
   paymentReminderDaysBefore      Int[]   @default([7, 3, 1]) @map("payment_reminder_days_before") // Days before due date
   paymentReminderDaysAfter       Int[]   @default([1, 3, 7]) @map("payment_reminder_days_after") // Days after due date (overdue)
   paymentReminderMinIntervalHours Int    @default(24) @map("payment_reminder_min_interval_hours") // Min hours between reminders
+  regulationsContent         String?  @map("regulations_content")
+  regulationsUpdatedAt       DateTime? @map("regulations_updated_at")
   createdAt                  DateTime @default(now()) @map("created_at")
   updatedAt                  DateTime @updatedAt @map("updated_at")
 
@@ -1207,4 +1214,62 @@ model CourseApplication {
   @@index([status])
   @@index([email])
   @@map("course_applications")
+}
+
+// ============================================
+// STUDENT DOCUMENTS
+// ============================================
+
+enum StudentDocumentType {
+  CONTRACT
+  ATTACHMENT
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING
+  SENT
+  SIGNED
+  ARCHIVED
+}
+
+model StudentDocument {
+  id             String              @id @default(uuid())
+  organizationId String              @map("organization_id")
+  studentId      String              @map("student_id")
+  fileId         String?             @map("file_id")
+  name           String
+  type           StudentDocumentType @default(ATTACHMENT)
+  status         DocumentStatus      @default(PENDING)
+  notes          String?
+  sentAt         DateTime?           @map("sent_at")
+  signedAt       DateTime?           @map("signed_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  student        Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  file           File?               @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([studentId])
+  @@map("student_documents")
+}
+
+// ============================================
+// STUDENT LOGIN HISTORY
+// ============================================
+
+model StudentLoginHistory {
+  id             String   @id @default(uuid())
+  studentId      String   @map("student_id")
+  organizationId String   @map("organization_id")
+  loggedAt       DateTime @default(now()) @map("logged_at")
+
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([organizationId])
+  @@map("student_login_history")
 }

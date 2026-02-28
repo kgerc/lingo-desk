@@ -31,6 +31,8 @@ export interface UpdateOrganizationSettingsData {
   paymentReminderDaysAfter?: number[];
   paymentReminderMinIntervalHours?: number;
   settings?: Record<string, any>;
+  regulationsContent?: string | null;
+  regulationsUpdatedAt?: Date;
 }
 
 // Visibility settings for manager role
@@ -354,6 +356,44 @@ class OrganizationService {
     });
 
     return settings;
+  }
+
+  /**
+   * Get regulations for organization (accessible to all authenticated org members)
+   */
+  async getRegulations(organizationId: string) {
+    const settings = await prisma.organizationSettings.findUnique({
+      where: { organizationId },
+      select: { regulationsContent: true, regulationsUpdatedAt: true },
+    });
+    return {
+      regulationsContent: settings?.regulationsContent ?? null,
+      regulationsUpdatedAt: settings?.regulationsUpdatedAt ?? null,
+    };
+  }
+
+  /**
+   * Update regulations content (ADMIN/MANAGER only)
+   */
+  async updateRegulations(organizationId: string, regulationsContent: string | null, userId: string) {
+    const userOrg = await prisma.userOrganization.findFirst({
+      where: { userId, organizationId, role: { in: ['ADMIN', 'MANAGER'] } },
+    });
+    if (!userOrg) throw new Error('You do not have permission to update regulations');
+
+    return prisma.organizationSettings.upsert({
+      where: { organizationId },
+      create: {
+        organizationId,
+        regulationsContent,
+        regulationsUpdatedAt: new Date(),
+      },
+      update: {
+        regulationsContent,
+        regulationsUpdatedAt: new Date(),
+      },
+      select: { regulationsContent: true, regulationsUpdatedAt: true },
+    });
   }
 
   /**

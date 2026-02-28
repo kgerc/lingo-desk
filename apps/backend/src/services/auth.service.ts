@@ -139,6 +139,24 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
+    // Record login in student history (only for STUDENT role)
+    if (user.role === 'STUDENT') {
+      const student = await prisma.student.findUnique({
+        where: { userId: user.id },
+        select: { id: true, organizationId: true },
+      });
+      if (student) {
+        await prisma.studentLoginHistory.create({
+          data: {
+            studentId: student.id,
+            organizationId: student.organizationId,
+          },
+        }).catch(() => {
+          // Non-critical: don't fail login if history write fails
+        });
+      }
+    }
+
     // Generate token
     const token = this.generateToken({
       id: user.id,

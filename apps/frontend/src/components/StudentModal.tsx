@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { studentService, Student, CreateStudentData, UpdateStudentData } from '../services/studentService';
-import { X } from 'lucide-react';
+import { X, FileText, Activity } from 'lucide-react';
 import StudentBalanceCard from './StudentBalanceCard';
+import StudentDocumentsTab from './StudentDocumentsTab';
+import StudentActivityTab from './StudentActivityTab';
 import { handleApiError } from '../lib/errorUtils';
 import { useAuthStore } from '../stores/authStore';
 import { generateSecurePassword } from '../lib/passwordUtils';
@@ -25,7 +27,7 @@ const LANGUAGES = [
   { value: 'pl', label: 'Polski' },
 ];
 
-type TabType = 'personal' | 'cancellation' | 'balance' | 'notes';
+type TabType = 'personal' | 'cancellation' | 'balance' | 'notes' | 'documents' | 'activity';
 
 const PERSONAL_TAB_FIELDS = [
   'firstName', 'lastName', 'email', 'phone', 'password',
@@ -307,6 +309,34 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
                 }`}
               >
                 Notatki
+              </button>
+            )}
+            {isEdit && canSeeNotes && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('documents')}
+                className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+                  activeTab === 'documents'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Dokumenty
+              </button>
+            )}
+            {isEdit && canSeeNotes && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('activity')}
+                className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+                  activeTab === 'activity'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Activity className="w-4 h-4" />
+                Aktywność
               </button>
             )}
           </nav>
@@ -816,8 +846,21 @@ const StudentModal: React.FC<StudentModalProps> = ({ student, onClose, onSuccess
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+          {/* Documents Tab */}
+          {activeTab === 'documents' && student && canSeeNotes && (
+            <StudentDocumentsTab
+              studentId={student.id}
+              studentEmail={student.user.email}
+            />
+          )}
+
+          {/* Activity Tab */}
+          {activeTab === 'activity' && student && canSeeNotes && (
+            <StudentActivityTab studentId={student.id} />
+          )}
+
+          {/* Actions — hidden on documents and activity tabs */}
+          <div className={`flex items-center justify-end gap-3 pt-4 border-t border-gray-200 ${activeTab === 'documents' || activeTab === 'activity' ? 'hidden' : ''}`}>
             <button
               type="button"
               onClick={onClose}

@@ -432,6 +432,19 @@ export class StudentController {
       return next(error);
     }
   }
+
+  async getStudentActivity(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user!.organizationId;
+      const limit = Math.min(parseInt(String(req.query.limit ?? '20'), 10), 100);
+
+      const activity = await studentService.getStudentActivity(id, organizationId, limit);
+      return res.json({ success: true, data: activity });
+    } catch (error) {
+      return next(error);
+    }
+  }
 }
 
 export default new StudentController();

@@ -32,7 +32,8 @@
       "Bash(xargs grep -l \"StudentDashboard\\\\|role.*STUDENT\")",
       "Bash(xargs grep -l \"alertService\")",
       "Bash(xargs grep -l \"balance\\\\|budget\\\\|settlement\")",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(xargs grep -l \"student.*modal\\\\|StudentModal\" -i)"
     ]
   }
 }
