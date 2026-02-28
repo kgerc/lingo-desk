@@ -147,15 +147,11 @@ export class AuthService {
       organizationId: user.organizationId,
     });
 
+    // Fetch full user with organization (same shape as getMe)
+    const fullUser = await this.getMe(user.id);
+
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        organizationId: user.organizationId,
-      },
+      user: fullUser,
       token,
     };
   }

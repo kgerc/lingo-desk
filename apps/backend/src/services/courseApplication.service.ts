@@ -1,6 +1,8 @@
 import prisma from '../utils/prisma';
 import { ApplicationStatus, AlertType, LanguageLevel } from '@prisma/client';
 import studentService from './student.service';
+import emailService from './email.service';
+import courseService from './course.service';
 
 interface CreateApplicationData {
   name: string;
@@ -102,6 +104,16 @@ class CourseApplicationService {
       }
     }
 
+    // Get course name for email (if provided)
+    let courseName: string | undefined;
+    if (data.courseId) {
+      const course = await prisma.course.findFirst({
+        where: { id: data.courseId },
+        select: { name: true },
+      });
+      courseName = course?.name;
+    }
+
     // Create application
     const application = await prisma.courseApplication.create({
       data: {
@@ -131,6 +143,18 @@ class CourseApplicationService {
         },
       },
     });
+
+    // Send confirmation email to applicant
+    try {
+      await emailService.sendApplicationConfirmation({
+        applicantEmail: data.email,
+        applicantName: data.name,
+        organizationName: organization.name,
+        courseName,
+      });
+    } catch (emailError) {
+      console.error('Failed to send application confirmation email:', emailError);
+    }
 
     return application;
   }
@@ -177,7 +201,7 @@ class CourseApplicationService {
   ) {
     const application = await this.getApplicationById(id, organizationId);
 
-    return prisma.courseApplication.update({
+    const updated = await prisma.courseApplication.update({
       where: { id: application.id },
       data: {
         status,
@@ -195,6 +219,31 @@ class CourseApplicationService {
         },
       },
     });
+
+    // Send status change email only when accepting or rejecting
+    if (status === ApplicationStatus.ACCEPTED || status === ApplicationStatus.REJECTED) {
+      try {
+        const organization = await prisma.organization.findUnique({
+          where: { id: organizationId },
+          select: { name: true },
+        });
+
+        if (organization) {
+          await emailService.sendApplicationStatusChange({
+            applicantEmail: application.email,
+            applicantName: application.name,
+            organizationName: organization.name,
+            status,
+            courseName: updated.course?.name,
+            internalNotes: updated.internalNotes,
+          });
+        }
+      } catch (emailError) {
+        console.error('Failed to send application status change email:', emailError);
+      }
+    }
+
+    return updated;
   }
 
   /**
@@ -211,6 +260,7 @@ class CourseApplicationService {
       phone?: string;
       languageLevel?: string;
       language?: string;
+      skipEnroll?: boolean;
     },
   ) {
     const application = await this.getApplicationById(id, organizationId);
@@ -218,6 +268,14 @@ class CourseApplicationService {
     if (application.convertedStudentId) {
       throw new Error('To zgłoszenie zostało już przekonwertowane na ucznia');
     }
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { name: true },
+    });
+
+    // Save plaintext password before hashing (for welcome email)
+    const plaintextPassword = studentData.password;
 
     // Create student using existing studentService
     const student = await studentService.createStudent({
@@ -227,7 +285,7 @@ class CourseApplicationService {
       language: studentData.language || 'en',
     });
 
-    // Update application with converted student ID
+    // Update application with converted student ID and ACCEPTED status
     await prisma.courseApplication.update({
       where: { id: application.id },
       data: {
@@ -236,7 +294,36 @@ class CourseApplicationService {
       },
     });
 
-    return { student, application };
+    // Auto-enroll student in the requested course (if application had courseId and not skipped)
+    let enrolledCourseName: string | undefined;
+    if (application.courseId && !studentData.skipEnroll) {
+      try {
+        const enrollment = await courseService.enrollStudent(
+          application.courseId,
+          student.id,
+          organizationId,
+        );
+        enrolledCourseName = enrollment.course?.name || undefined;
+      } catch (enrollError) {
+        // Log but don't fail — enrollment may fail if course is full or already enrolled
+        console.error('Failed to auto-enroll student from application:', enrollError);
+      }
+    }
+
+    // Send welcome email with credentials
+    try {
+      await emailService.sendApplicationConverted({
+        studentEmail: studentData.email,
+        studentName: `${studentData.firstName} ${studentData.lastName}`,
+        organizationName: organization?.name || '',
+        temporaryPassword: plaintextPassword,
+        courseName: enrolledCourseName,
+      });
+    } catch (emailError) {
+      console.error('Failed to send application converted email:', emailError);
+    }
+
+    return { student, application, enrolledCourseName };
   }
 }
 

@@ -36,6 +36,7 @@ const convertToStudentSchema = z.object({
   phone: optionalPhone('Telefon'),
   languageLevel: optionalString('Poziom językowy'),
   language: optionalString('Język'),
+  skipEnroll: z.boolean().optional(),
 });
 
 class CourseApplicationController {

@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { studentService } from '../services/studentService';
 import toast from 'react-hot-toast';
 import LoadingSpinner from './LoadingSpinner';
+import * as XLSX from 'xlsx';
 
 interface ImportStudentsModalProps {
   onClose: () => void;
@@ -25,6 +26,27 @@ interface ImportResults {
 
 type ImportStep = 'upload' | 'mapping' | 'importing' | 'results';
 
+const ACCEPTED_EXTENSIONS = ['.csv', '.xls', '.xlsx'];
+
+/**
+ * Convert an XLS/XLSX File to a CSV string.
+ * Uses the first sheet. Dates are formatted as YYYY-MM-DD strings.
+ */
+async function excelToCsv(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+  const firstSheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[firstSheetName];
+
+  // dateNF keeps dates human-readable instead of Excel serial numbers
+  return XLSX.utils.sheet_to_csv(worksheet, { FS: ',', RS: '\n', dateNF: 'YYYY-MM-DD' });
+}
+
+function isExcelFile(file: File): boolean {
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  return ext === 'xls' || ext === 'xlsx';
+}
+
 const ImportStudentsModal: React.FC<ImportStudentsModalProps> = ({ onClose, onSuccess }) => {
   const [step, setStep] = useState<ImportStep>('upload');
   const [file, setFile] = useState<File | null>(null);
@@ -43,7 +65,7 @@ const ImportStudentsModal: React.FC<ImportStudentsModalProps> = ({ onClose, onSu
       setStep('mapping');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Błąd podczas przetwarzania pliku CSV');
+      toast.error(error.response?.data?.error?.message || 'Błąd podczas przetwarzania pliku');
     },
   });
 
@@ -64,41 +86,50 @@ const ImportStudentsModal: React.FC<ImportStudentsModalProps> = ({ onClose, onSu
     },
   });
 
+  const processFile = async (selectedFile: File) => {
+    setFile(selectedFile);
+
+    try {
+      let content: string;
+
+      if (isExcelFile(selectedFile)) {
+        content = await excelToCsv(selectedFile);
+      } else {
+        content = await selectedFile.text();
+      }
+
+      setCsvContent(content);
+      previewMutation.mutate(content);
+    } catch {
+      toast.error('Błąd podczas odczytu pliku');
+    }
+  };
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
 
-    if (!selectedFile.name.endsWith('.csv')) {
-      toast.error('Proszę wybrać plik CSV');
+    const ext = selectedFile.name.split('.').pop()?.toLowerCase();
+    if (!ext || !ACCEPTED_EXTENSIONS.includes(`.${ext}`)) {
+      toast.error('Proszę wybrać plik CSV, XLS lub XLSX');
       return;
     }
 
-    setFile(selectedFile);
-
-    // Read file content
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      setCsvContent(content);
-      previewMutation.mutate(content);
-    };
-    reader.onerror = () => {
-      toast.error('Błąd podczas odczytu pliku');
-    };
-    reader.readAsText(selectedFile);
+    processFile(selectedFile);
   };
 
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();
     const droppedFile = event.dataTransfer.files[0];
-    if (droppedFile && droppedFile.name.endsWith('.csv')) {
-      const fakeEvent = {
-        target: { files: [droppedFile] },
-      } as unknown as React.ChangeEvent<HTMLInputElement>;
-      handleFileSelect(fakeEvent);
-    } else {
-      toast.error('Proszę wybrać plik CSV');
+    if (!droppedFile) return;
+
+    const ext = droppedFile.name.split('.').pop()?.toLowerCase();
+    if (!ext || !ACCEPTED_EXTENSIONS.includes(`.${ext}`)) {
+      toast.error('Proszę wybrać plik CSV, XLS lub XLSX');
+      return;
     }
+
+    processFile(droppedFile);
   };
 
   const handleDragOver = (event: React.DragEvent) => {
@@ -106,7 +137,6 @@ const ImportStudentsModal: React.FC<ImportStudentsModalProps> = ({ onClose, onSu
   };
 
   const handleImport = () => {
-    // Validate required mappings
     if (!columnMapping.email || !columnMapping.firstName || !columnMapping.lastName) {
       toast.error('Email, Imię i Nazwisko są wymagane');
       return;
@@ -153,7 +183,7 @@ anna.nowak@example.com,Anna,Nowak,+48987654321,ul. Testowa 2,B1,Przygotowanie do
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">Import uczniów z CSV</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Import uczniów</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -172,7 +202,7 @@ anna.nowak@example.com,Anna,Nowak,+48987654321,ul. Testowa 2,B1,Przygotowanie do
                 <div className="text-sm text-blue-800">
                   <p className="font-medium mb-2">Wymagania:</p>
                   <ul className="list-disc list-inside space-y-1">
-                    <li>Plik musi być w formacie CSV</li>
+                    <li>Obsługiwane formaty: CSV, XLS, XLSX</li>
                     <li>Pierwsza linia powinna zawierać nagłówki kolumn</li>
                     <li>Wymagane kolumny: email, imię, nazwisko</li>
                     <li>Domyślne hasło dla wszystkich: LingoDesk2024!</li>
@@ -198,15 +228,18 @@ anna.nowak@example.com,Anna,Nowak,+48987654321,ul. Testowa 2,B1,Przygotowanie do
               >
                 <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-lg font-medium text-gray-700 mb-2">
-                  {file ? file.name : 'Przeciągnij plik CSV tutaj'}
+                  {file ? file.name : 'Przeciągnij plik tutaj'}
                 </p>
                 <p className="text-sm text-gray-500">
                   lub kliknij aby wybrać plik
                 </p>
+                <p className="text-xs text-gray-400 mt-2">
+                  Obsługiwane formaty: CSV, XLS, XLSX
+                </p>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.xls,.xlsx"
                   onChange={handleFileSelect}
                   className="hidden"
                 />
@@ -227,7 +260,7 @@ anna.nowak@example.com,Anna,Nowak,+48987654321,ul. Testowa 2,B1,Przygotowanie do
                 <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-green-800">
                   Znaleziono {previewData.preview.length} wierszy do zaimportowania.
-                  Zmapuj kolumny z pliku CSV do pól systemu.
+                  Zmapuj kolumny z pliku do pól systemu.
                 </div>
               </div>
 

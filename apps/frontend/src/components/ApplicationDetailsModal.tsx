@@ -5,7 +5,7 @@ import courseApplicationService, {
   CourseApplication,
   ConvertToStudentData,
 } from '../services/courseApplicationService';
-import { X, CheckCircle, XCircle, UserPlus, Copy, Eye } from 'lucide-react';
+import { X, CheckCircle, XCircle, UserPlus, Copy, Eye, ChevronRight } from 'lucide-react';
 
 interface ApplicationDetailsModalProps {
   application: CourseApplication;
@@ -40,12 +40,23 @@ function generatePassword(length = 10): string {
   return result;
 }
 
+type ActionPanel = 'none' | 'accept' | 'reject';
+
 const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
   application,
   onClose,
   onStatusChange,
 }) => {
   const queryClient = useQueryClient();
+
+  // Which inline panel is open
+  const [actionPanel, setActionPanel] = useState<ActionPanel>('none');
+
+  // Accept options
+  const [createStudent, setCreateStudent] = useState(true);
+  const [enrollInCourse, setEnrollInCourse] = useState(true);
+
+  // Convert form
   const [showConvertForm, setShowConvertForm] = useState(false);
 
   const { firstName: defaultFirst, lastName: defaultLast } = splitName(application.name);
@@ -62,6 +73,12 @@ const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
   });
   const [convertErrors, setConvertErrors] = useState<Record<string, string>>({});
 
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['applications'] });
+    queryClient.invalidateQueries({ queryKey: ['students'] });
+    queryClient.invalidateQueries({ queryKey: ['enrollments'] });
+  };
+
   const updateStatusMutation = useMutation({
     mutationFn: ({ status, internalNotes }: { status: string; internalNotes?: string }) =>
       courseApplicationService.updateStatus(application.id, status, internalNotes),
@@ -74,11 +91,13 @@ const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
   const convertMutation = useMutation({
     mutationFn: (data: ConvertToStudentData) =>
       courseApplicationService.convertToStudent(application.id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
-      queryClient.invalidateQueries({ queryKey: ['students'] });
+    onSuccess: (result: any) => {
+      invalidate();
       onStatusChange();
-      toast.success('Uczeń został utworzony na podstawie zgłoszenia');
+      const msg = result?.enrolledCourseName
+        ? `Uczeń utworzony i zapisany na kurs „${result.enrolledCourseName}". Dane logowania wysłano emailem.`
+        : 'Uczeń został utworzony. Dane logowania wysłano emailem.';
+      toast.success(msg, { duration: 5000 });
       onClose();
     },
     onError: () => {
@@ -86,14 +105,28 @@ const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
     },
   });
 
-  const handleAccept = async () => {
+  // Accept without creating student — just change status
+  const handleAcceptOnly = async () => {
     await updateStatusMutation.mutateAsync({ status: 'ACCEPTED' });
     toast.success('Zgłoszenie zaakceptowane');
+    setActionPanel('none');
+    onClose();
   };
 
-  const handleReject = async () => {
+  // Proceed with accept — if createStudent: show form; else: accept only
+  const handleAcceptProceed = () => {
+    if (createStudent) {
+      setShowConvertForm(true);
+    } else {
+      handleAcceptOnly();
+    }
+  };
+
+  const handleRejectConfirm = async () => {
     await updateStatusMutation.mutateAsync({ status: 'REJECTED' });
     toast.success('Zgłoszenie odrzucone');
+    setActionPanel('none');
+    onClose();
   };
 
   const validateConvert = () => {
@@ -110,7 +143,7 @@ const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
   const handleConvert = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateConvert()) return;
-    convertMutation.mutate(convertData);
+    convertMutation.mutate({ ...convertData, skipEnroll: !enrollInCourse });
   };
 
   const handleCopyPassword = () => {
@@ -139,10 +172,7 @@ const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
                 <p className="text-sm text-gray-500">{application.name}</p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -152,9 +182,7 @@ const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
             {/* Status */}
             <div className="flex items-center gap-3 mb-6">
               <span className="text-sm font-medium text-gray-500">Status:</span>
-              <span
-                className={`px-3 py-1 text-sm font-semibold rounded-full ${STATUS_BADGE[application.status]}`}
-              >
+              <span className={`px-3 py-1 text-sm font-semibold rounded-full ${STATUS_BADGE[application.status]}`}>
                 {STATUS_LABEL[application.status]}
               </span>
               {application.convertedStudentId && (
@@ -174,20 +202,19 @@ const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
                 label="Preferowany kurs"
                 value={application.course ? `${application.course.name} (${application.course.level})` : null}
               />
-              <DetailRow label="Data zgłoszenia" value={new Date(application.createdAt).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} />
+              <DetailRow
+                label="Data zgłoszenia"
+                value={new Date(application.createdAt).toLocaleDateString('pl-PL', {
+                  day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                })}
+              />
             </div>
 
             {(application.preferences || application.availability || application.notes) && (
               <div className="space-y-3 mb-6 border-t border-gray-200 pt-4">
-                {application.preferences && (
-                  <DetailRow label="Preferencje / oczekiwania" value={application.preferences} />
-                )}
-                {application.availability && (
-                  <DetailRow label="Dostępność" value={application.availability} />
-                )}
-                {application.notes && (
-                  <DetailRow label="Dodatkowe uwagi" value={application.notes} />
-                )}
+                {application.preferences && <DetailRow label="Preferencje / oczekiwania" value={application.preferences} />}
+                {application.availability && <DetailRow label="Dostępność" value={application.availability} />}
+                {application.notes && <DetailRow label="Dodatkowe uwagi" value={application.notes} />}
               </div>
             )}
 
@@ -199,10 +226,10 @@ const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
             )}
 
             {/* Action buttons for NEW */}
-            {application.status === 'NEW' && (
+            {application.status === 'NEW' && actionPanel === 'none' && (
               <div className="flex gap-3 border-t border-gray-200 pt-4">
                 <button
-                  onClick={handleAccept}
+                  onClick={() => setActionPanel('accept')}
                   disabled={updateStatusMutation.isPending}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                 >
@@ -210,7 +237,7 @@ const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
                   Zaakceptuj
                 </button>
                 <button
-                  onClick={handleReject}
+                  onClick={() => setActionPanel('reject')}
                   disabled={updateStatusMutation.isPending}
                   className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                 >
@@ -220,10 +247,111 @@ const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
               </div>
             )}
 
-            {/* Convert to student section */}
-            {application.status === 'ACCEPTED' && !application.convertedStudentId && (
+            {/* Accept options panel */}
+            {application.status === 'NEW' && actionPanel === 'accept' && !showConvertForm && (
+              <div className="border-t border-gray-200 pt-4 space-y-4">
+                <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  Akceptacja zgłoszenia
+                </h3>
+
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
+                  <p className="text-sm text-green-800 font-medium">Co chcesz zrobić po akceptacji?</p>
+
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={createStudent}
+                      onChange={(e) => {
+                        setCreateStudent(e.target.checked);
+                        if (!e.target.checked) setEnrollInCourse(false);
+                      }}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">Utwórz konto ucznia</span>
+                      <p className="text-xs text-gray-500">Nowy uczeń otrzyma email z danymi logowania</p>
+                    </div>
+                  </label>
+
+                  {application.course && (
+                    <label className={`flex items-start gap-3 ${!createStudent ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <input
+                        type="checkbox"
+                        checked={enrollInCourse}
+                        disabled={!createStudent}
+                        onChange={(e) => setEnrollInCourse(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:cursor-not-allowed"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">
+                          Zapisz na kurs <span className="text-green-700">„{application.course.name}"</span>
+                        </span>
+                        <p className="text-xs text-gray-500">Automatyczny zapis na wskazany kurs</p>
+                      </div>
+                    </label>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleAcceptProceed}
+                    disabled={updateStatusMutation.isPending}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                    {createStudent ? 'Dalej — uzupełnij dane ucznia' : 'Zaakceptuj zgłoszenie'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActionPanel('none')}
+                    className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Anuluj
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Reject confirmation panel */}
+            {application.status === 'NEW' && actionPanel === 'reject' && (
+              <div className="border-t border-gray-200 pt-4 space-y-4">
+                <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <XCircle className="h-5 w-5 text-red-500" />
+                  Odrzucenie zgłoszenia
+                </h3>
+
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-800">
+                    Zgłoszenie zostanie odrzucone. Zgłaszający otrzyma email z informacją o odrzuceniu.
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleRejectConfirm}
+                    disabled={updateStatusMutation.isPending}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    {updateStatusMutation.isPending ? 'Odrzucanie...' : 'Potwierdź odrzucenie'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActionPanel('none')}
+                    className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Anuluj
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Convert to student form — shown after accept options when createStudent=true */}
+            {(application.status === 'ACCEPTED' || (application.status === 'NEW' && showConvertForm)) &&
+              !application.convertedStudentId && (
               <div className="border-t border-gray-200 pt-4">
-                {!showConvertForm ? (
+                {!showConvertForm && application.status === 'ACCEPTED' ? (
                   <button
                     onClick={() => setShowConvertForm(true)}
                     className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors"
@@ -237,6 +365,32 @@ const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
                       <UserPlus className="h-5 w-5" />
                       Utwórz ucznia
                     </h3>
+
+                    {/* Summary of selected options (only visible when coming from accept flow) */}
+                    {application.status === 'NEW' && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 space-y-1">
+                        <p className="font-medium">Po utworzeniu ucznia:</p>
+                        <p>✓ Zgłoszenie zostanie zaakceptowane</p>
+                        <p>✓ Uczeń otrzyma email z danymi logowania</p>
+                        {application.course && enrollInCourse && (
+                          <p>✓ Uczeń zostanie zapisany na kurs <strong>{application.course.name}</strong></p>
+                        )}
+                        {application.course && !enrollInCourse && (
+                          <p className="text-blue-600">✗ Bez automatycznego zapisu na kurs</p>
+                        )}
+                      </div>
+                    )}
+
+                    {application.status === 'ACCEPTED' && application.course && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                        Uczeń zostanie automatycznie zapisany na kurs <strong>{application.course.name}</strong> i otrzyma email z danymi logowania.
+                      </div>
+                    )}
+                    {application.status === 'ACCEPTED' && !application.course && (
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-600">
+                        Uczeń otrzyma email z danymi logowania po utworzeniu konta.
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -337,10 +491,13 @@ const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setShowConvertForm(false)}
+                        onClick={() => {
+                          setShowConvertForm(false);
+                          setActionPanel(application.status === 'NEW' ? 'accept' : 'none');
+                        }}
                         className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                       >
-                        Anuluj
+                        Wróć
                       </button>
                     </div>
                   </form>
@@ -351,11 +508,7 @@ const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = ({
 
           {/* Footer */}
           <div className="flex items-center justify-end p-6 border-t border-gray-200 bg-gray-50">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
+            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               Zamknij
             </button>
           </div>

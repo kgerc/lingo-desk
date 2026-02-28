@@ -69,6 +69,7 @@ export interface ConvertToStudentData {
   phone?: string;
   languageLevel?: string;
   language?: string;
+  skipEnroll?: boolean;
 }
 
 const courseApplicationService = {

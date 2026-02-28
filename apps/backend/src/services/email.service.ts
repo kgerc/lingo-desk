@@ -749,6 +749,127 @@ class EmailService {
   }
 
   /**
+   * Send application received confirmation to the applicant
+   */
+  async sendApplicationConfirmation(data: {
+    applicantEmail: string;
+    applicantName: string;
+    organizationName: string;
+    courseName?: string;
+  }) {
+    const { applicantEmail, applicantName, organizationName, courseName } = data;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #3b82f6;">✅ Zgłoszenie otrzymane</h2>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${applicantName},</p>
+        <p style="margin: 0 0 16px 0;">Dziękujemy za złożenie zgłoszenia! Twoja aplikacja została pomyślnie przyjęta przez szkołę <strong>${organizationName}</strong>.</p>
+        ${courseName ? `
+        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Preferowany kurs:</strong> ${courseName}</p>
+        </div>
+        ` : ''}
+        <p style="margin: 0 0 16px 0;">Nasz zespół zapozna się z Twoim zgłoszeniem i skontaktuje się z Tobą wkrótce.</p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">${organizationName} - LingoDesk</p>
+      </div>
+    `;
+
+    return await this.sendEmail({
+      to: applicantEmail,
+      subject: `✅ Zgłoszenie otrzymane - ${organizationName}`,
+      html,
+    });
+  }
+
+  /**
+   * Send application status change email (ACCEPTED or REJECTED)
+   */
+  async sendApplicationStatusChange(data: {
+    applicantEmail: string;
+    applicantName: string;
+    organizationName: string;
+    status: 'ACCEPTED' | 'REJECTED';
+    courseName?: string;
+    internalNotes?: string | null;
+  }) {
+    const { applicantEmail, applicantName, organizationName, status, courseName, internalNotes } = data;
+
+    const isAccepted = status === 'ACCEPTED';
+    const headerColor = isAccepted ? '#10b981' : '#ef4444';
+    const headerEmoji = isAccepted ? '🎉' : '❌';
+    const headerText = isAccepted ? 'Zgłoszenie zaakceptowane' : 'Zgłoszenie odrzucone';
+    const bodyText = isAccepted
+      ? 'Mamy przyjemność poinformować, że Twoje zgłoszenie zostało <strong>zaakceptowane</strong>. Wkrótce skontaktujemy się z Tobą w celu omówienia szczegółów.'
+      : 'Przykro nam, ale Twoje zgłoszenie zostało <strong>odrzucone</strong>. Jeśli masz pytania, prosimy o kontakt z naszą szkołą.';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: ${headerColor};">${headerEmoji} ${headerText}</h2>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${applicantName},</p>
+        <p style="margin: 0 0 16px 0;">${bodyText}</p>
+        ${courseName ? `
+        <div style="background-color: ${isAccepted ? '#f0fdf4' : '#fef2f2'}; border-left: 4px solid ${headerColor}; padding: 20px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Kurs:</strong> ${courseName}</p>
+          ${internalNotes ? `<p style="margin: 5px 0;"><strong>Informacja:</strong> ${internalNotes}</p>` : ''}
+        </div>
+        ` : (internalNotes ? `
+        <div style="background-color: ${isAccepted ? '#f0fdf4' : '#fef2f2'}; border-left: 4px solid ${headerColor}; padding: 20px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Informacja:</strong> ${internalNotes}</p>
+        </div>
+        ` : '')}
+        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">${organizationName} - LingoDesk</p>
+      </div>
+    `;
+
+    return await this.sendEmail({
+      to: applicantEmail,
+      subject: `${headerEmoji} ${headerText} - ${organizationName}`,
+      html,
+    });
+  }
+
+  /**
+   * Send application converted to student (welcome + credentials)
+   */
+  async sendApplicationConverted(data: {
+    studentEmail: string;
+    studentName: string;
+    organizationName: string;
+    temporaryPassword: string;
+    courseName?: string;
+  }) {
+    const { studentEmail, studentName, organizationName, temporaryPassword, courseName } = data;
+    const loginUrl = process.env.FRONTEND_URL || 'https://lingodesk.pl';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #3b82f6;">🎓 Twoje konto ucznia zostało utworzone!</h2>
+        <p style="margin: 0 0 16px 0;">Dzień dobry ${studentName},</p>
+        <p style="margin: 0 0 16px 0;">Twoje zgłoszenie zostało zaakceptowane i zostało dla Ciebie utworzone konto ucznia w <strong>${organizationName}</strong>.</p>
+        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Email:</strong> ${studentEmail}</p>
+          <p style="margin: 5px 0;"><strong>Tymczasowe hasło:</strong></p>
+          <p style="margin: 5px 0; font-family: monospace; background-color: #e0e7ff; padding: 10px; border-radius: 4px; font-size: 18px; letter-spacing: 1px;">${temporaryPassword}</p>
+          ${courseName ? `<p style="margin: 10px 0 0 0;"><strong>Zapisany kurs:</strong> ${courseName}</p>` : ''}
+        </div>
+        <p style="color: #dc2626; font-weight: bold;">⚠️ Ze względów bezpieczeństwa zmień hasło po pierwszym logowaniu!</p>
+        <p style="margin: 0 0 16px 0;">
+          <a href="${loginUrl}/login" style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
+            Zaloguj się
+          </a>
+        </p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">${organizationName} - LingoDesk</p>
+      </div>
+    `;
+
+    return await this.sendEmail({
+      to: studentEmail,
+      subject: `🎓 Konto ucznia gotowe - ${organizationName}`,
+      html,
+    });
+  }
+
+  /**
    * Send password reset email with new temporary password
    */
   async sendPasswordReset(data: {
