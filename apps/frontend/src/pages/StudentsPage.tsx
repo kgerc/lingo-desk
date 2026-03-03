@@ -1,10 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { displayEmail } from '../utils/email';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { studentService, Student } from '../services/studentService';
-import { Plus, Search, Mail, Phone, MoreVertical, Upload, X, Calculator, Trash2, Loader2, Archive, ArchiveRestore, AlertTriangle, SlidersHorizontal, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Mail, Phone, MoreVertical, Upload, Calculator, Trash2, Loader2, Archive, ArchiveRestore, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react';
+import FilterBar from '../components/FilterBar';
 import { useAuthStore } from '../stores/authStore';
 import StudentModal from '../components/StudentModal';
 import ImportStudentsModal from '../components/ImportStudentsModal';
@@ -19,12 +20,9 @@ const StudentsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<string>('studentNumber');
+  const [sortBy, setSortBy] = useState<'studentNumber' | 'firstName' | 'languageLevel' | 'balance' | 'email'>('studentNumber');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [filterLevel, setFilterLevel] = useState<string>('');
-  const [filterBalanceMin, setFilterBalanceMin] = useState<string>('');
-  const [filterBalanceMax, setFilterBalanceMax] = useState<string>('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isCancellationsModalOpen, setIsCancellationsModalOpen] = useState(false);
@@ -46,18 +44,29 @@ const StudentsPage: React.FC = () => {
     navigate(`/payments?tab=settlements&studentId=${student.id}`);
   };
 
-  // Fetch active students
-  const { data: students = [], isLoading } = useQuery({
-    queryKey: ['students', searchTerm, sortBy, sortOrder, filterLevel, filterBalanceMin, filterBalanceMax],
+  // Fetch active students (filters server-side, sorting client-side)
+  const { data: rawStudents = [], isLoading } = useQuery({
+    queryKey: ['students', searchTerm, filterValues],
     queryFn: () => studentService.getStudents({
       search: searchTerm || undefined,
-      sortBy,
-      sortOrder,
-      languageLevel: filterLevel || undefined,
-      balanceMin: filterBalanceMin !== '' ? Number(filterBalanceMin) : undefined,
-      balanceMax: filterBalanceMax !== '' ? Number(filterBalanceMax) : undefined,
+      languageLevel: filterValues['languageLevel'] || undefined,
+      isActive: filterValues['isActive'] === 'true' ? true : filterValues['isActive'] === 'false' ? false : undefined,
+      balanceMin: filterValues['balanceMin'] !== undefined && filterValues['balanceMin'] !== '' ? Number(filterValues['balanceMin']) : undefined,
+      balanceMax: filterValues['balanceMax'] !== undefined && filterValues['balanceMax'] !== '' ? Number(filterValues['balanceMax']) : undefined,
     }),
   });
+
+  const students = useMemo(() => {
+    const dir = sortOrder === 'asc' ? 1 : -1;
+    return [...rawStudents].sort((a, b) => {
+      if (sortBy === 'studentNumber') return dir * (Number(a.studentNumber) - Number(b.studentNumber));
+      if (sortBy === 'firstName') return dir * a.user.firstName.localeCompare(b.user.firstName, 'pl');
+      if (sortBy === 'languageLevel') return dir * a.languageLevel.localeCompare(b.languageLevel);
+      if (sortBy === 'balance') return dir * ((a.budget?.balance ?? 0) - (b.budget?.balance ?? 0));
+      if (sortBy === 'email') return dir * (a.user.email ?? '').localeCompare(b.user.email ?? '');
+      return 0;
+    });
+  }, [rawStudents, sortBy, sortOrder]);
 
   // Fetch archived students
   const { data: archivedStudents = [], isLoading: isLoadingArchived } = useQuery({
@@ -187,7 +196,7 @@ const StudentsPage: React.FC = () => {
   const allSelected = students.length > 0 && selectedIds.size === students.length;
   const someSelected = selectedIds.size > 0 && !allSelected;
 
-  const handleSort = (column: string) => {
+  const handleSort = (column: typeof sortBy) => {
     if (sortBy === column) {
       setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -196,18 +205,8 @@ const StudentsPage: React.FC = () => {
     }
   };
 
-  const activeFiltersCount = [filterLevel, filterBalanceMin, filterBalanceMax].filter(Boolean).length;
 
-  const clearFilters = () => {
-    setFilterLevel('');
-    setFilterBalanceMin('');
-    setFilterBalanceMax('');
-    setSortBy('studentNumber');
-    setSortOrder('desc');
-    setShowFilters(false);
-  };
-
-  const SortIcon = ({ column }: { column: string }) => {
+  const SortIcon = ({ column }: { column: typeof sortBy }) => {
     if (sortBy !== column) return <ChevronsUpDown className="inline ml-1 h-3.5 w-3.5 text-gray-400" />;
     return sortOrder === 'asc'
       ? <ChevronUp className="inline ml-1 h-3.5 w-3.5 text-primary" />
@@ -268,84 +267,31 @@ const StudentsPage: React.FC = () => {
 
       {/* Search + Filters (active tab only) */}
       {activeTab === 'active' && (
-        <div className="bg-white rounded-lg shadow p-4 border border-gray-200 mb-6">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Szukaj ucznia po imieniu, nazwisku lub emailu..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
-            <button
-              onClick={() => setShowFilters((v) => !v)}
-              className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition-colors ${
-                showFilters || activeFiltersCount > 0
-                  ? 'bg-primary/10 border-primary text-primary'
-                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Filtry
-              {activeFiltersCount > 0 && (
-                <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-semibold bg-primary text-white rounded-full">
-                  {activeFiltersCount}
-                </span>
-              )}
-            </button>
-            {activeFiltersCount > 0 && (
-              <button
-                onClick={clearFilters}
-                className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-                title="Wyczyść filtry"
-              >
-                <X className="h-4 w-4" />
-                Wyczyść
-              </button>
-            )}
-          </div>
-
-          {showFilters && (
-            <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Poziom językowy</label>
-                <select
-                  value={filterLevel}
-                  onChange={(e) => setFilterLevel(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                >
-                  <option value="">Wszystkie poziomy</option>
-                  {['A0', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'ALL_LEVELS'].map((lvl) => (
-                    <option key={lvl} value={lvl}>{lvl}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Saldo od (zł)</label>
-                <input
-                  type="number"
-                  value={filterBalanceMin}
-                  onChange={(e) => setFilterBalanceMin(e.target.value)}
-                  placeholder="np. 0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Saldo do (zł)</label>
-                <input
-                  type="number"
-                  value={filterBalanceMax}
-                  onChange={(e) => setFilterBalanceMax(e.target.value)}
-                  placeholder="np. 500"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
-              </div>
-            </div>
-          )}
-        </div>
+        <FilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Szukaj ucznia po imieniu, nazwisku lub emailu..."
+          filters={[
+            { key: 'languageLevel', label: 'Poziom językowy', type: 'select', options:
+              ['A0', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'ALL_LEVELS'].map((lvl) => ({ value: lvl, label: lvl }))
+            },
+            {
+              key: 'isActive',
+              label: 'Status',
+              type: 'select',
+              options: [
+                { value: 'true', label: 'Aktywny' },
+                { value: 'false', label: 'Nieaktywny' },
+              ],
+            },
+            { key: 'balanceMin', label: 'Saldo od (zł)', type: 'number', placeholder: 'np. 0' },
+            { key: 'balanceMax', label: 'Saldo do (zł)', type: 'number', placeholder: 'np. 500' },
+          ]}
+          filterValues={filterValues}
+          onFilterChange={(key, value) => setFilterValues((prev) => ({ ...prev, [key]: value }))}
+          onClearAll={() => { setSearchTerm(''); setFilterValues({}); setSortBy('studentNumber'); setSortOrder('desc'); }}
+          filterCols={4}
+        />
       )}
 
       {/* Bulk action bar */}
@@ -409,8 +355,11 @@ const StudentsPage: React.FC = () => {
                   >
                     Uczeń<SortIcon column="firstName" />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Kontakt
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                    onClick={() => handleSort('email')}
+                  >
+                    Kontakt<SortIcon column="email" />
                   </th>
                   <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"

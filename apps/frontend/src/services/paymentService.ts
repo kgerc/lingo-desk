@@ -75,6 +75,9 @@ export interface GetPaymentsFilters {
   offset?: number;
   currency?: string;
   convertToCurrency?: string;
+  search?: string;
+  sortBy?: 'createdAt' | 'amount' | 'paidAt';
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface PaymentStats {

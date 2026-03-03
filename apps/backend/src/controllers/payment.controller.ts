@@ -66,7 +66,7 @@ class PaymentController {
   async getPayments(req: AuthRequest, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
-      const { studentId, status, paymentMethod, dateFrom, dateTo, limit, offset, currency, convertToCurrency } = req.query;
+      const { studentId, status, paymentMethod, dateFrom, dateTo, limit, offset, currency, convertToCurrency, search, sortBy, sortOrder } = req.query;
 
       const payments = await paymentService.getPayments({
         organizationId,
@@ -79,6 +79,9 @@ class PaymentController {
         offset: offset ? parseInt(offset as string) : undefined,
         currency: currency as string | undefined,
         convertToCurrency: convertToCurrency as string | undefined,
+        search: search as string | undefined,
+        sortBy: sortBy as 'createdAt' | 'amount' | 'paidAt' | undefined,
+        sortOrder: sortOrder as 'asc' | 'desc' | undefined,
       });
 
       res.json({

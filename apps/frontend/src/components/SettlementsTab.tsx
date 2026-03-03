@@ -5,9 +5,10 @@ import toast from 'react-hot-toast';
 import settlementService, { StudentWithBalance, SettlementPreview } from '../services/settlementService';
 import { courseService } from '../services/courseService';
 import paymentService from '../services/paymentService';
-import { Search, Calculator, Calendar, TrendingUp, TrendingDown, Minus, ChevronRight, ArrowLeft, Save, Trash2, Eye, History, Bell, AlertTriangle, Info, CheckCircle, Hourglass } from 'lucide-react';
+import { Calculator, Calendar, TrendingUp, TrendingDown, Minus, ChevronRight, ArrowLeft, Save, Trash2, Eye, History, Bell, AlertTriangle, Info, CheckCircle, Hourglass, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import LoadingSpinner from './LoadingSpinner';
 import ConfirmDialog from './ConfirmDialog';
+import FilterBar from './FilterBar';
 
 type ViewMode = 'list' | 'settlement' | 'history';
 
@@ -24,6 +25,10 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
   const [selectedStudent, setSelectedStudent] = useState<StudentWithBalance | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCourseId, setSelectedCourseId] = useState<string>(preselectedCourseId || '');
+  const [sortBy, setSortBy] = useState<'lastName' | 'currentBalance' | 'lastSettlementDate'>('lastName');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [balanceMin, setBalanceMin] = useState('');
+  const [balanceMax, setBalanceMax] = useState('');
   const [periodStart, setPeriodStart] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -237,14 +242,49 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
     return course?.enrollments?.map((e) => e.studentId) || [];
   }, [selectedCourseId, groupCourses]);
 
-  // Filter students by search and optional course filter
-  const filteredStudents = students.filter((student) => {
-    const matchesSearch =
-      `${student.firstName} ${student.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCourse = !enrolledStudentIds || enrolledStudentIds.includes(student.id);
-    return matchesSearch && matchesCourse;
-  });
+  // Filter and sort students
+  const filteredStudents = useMemo(() => {
+    const minVal = balanceMin !== '' ? Number(balanceMin) : null;
+    const maxVal = balanceMax !== '' ? Number(balanceMax) : null;
+
+    const filtered = students.filter((student) => {
+      const matchesSearch =
+        `${student.firstName} ${student.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.email.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCourse = !enrolledStudentIds || enrolledStudentIds.includes(student.id);
+      const matchesBalanceMin = minVal === null || student.currentBalance >= minVal;
+      const matchesBalanceMax = maxVal === null || student.currentBalance <= maxVal;
+      return matchesSearch && matchesCourse && matchesBalanceMin && matchesBalanceMax;
+    });
+
+    return [...filtered].sort((a, b) => {
+      const dir = sortOrder === 'asc' ? 1 : -1;
+      if (sortBy === 'lastName') return dir * a.lastName.localeCompare(b.lastName, 'pl');
+      if (sortBy === 'currentBalance') return dir * (a.currentBalance - b.currentBalance);
+      if (sortBy === 'lastSettlementDate') {
+        const aTime = a.lastSettlementDate ? new Date(a.lastSettlementDate).getTime() : 0;
+        const bTime = b.lastSettlementDate ? new Date(b.lastSettlementDate).getTime() : 0;
+        return dir * (aTime - bTime);
+      }
+      return 0;
+    });
+  }, [students, searchTerm, enrolledStudentIds, balanceMin, balanceMax, sortBy, sortOrder]);
+
+  function handleSort(col: typeof sortBy) {
+    if (sortBy === col) {
+      setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(col);
+      setSortOrder('asc');
+    }
+  }
+
+  function SortIcon({ col }: { col: typeof sortBy }) {
+    if (sortBy !== col) return <ChevronsUpDown className="inline w-3.5 h-3.5 ml-1 text-gray-400" />;
+    return sortOrder === 'asc'
+      ? <ChevronUp className="inline w-3.5 h-3.5 ml-1" />
+      : <ChevronDown className="inline w-3.5 h-3.5 ml-1" />;
+  }
 
   const formatCurrency = (amount: number, currency = 'PLN') => {
     return `${amount.toFixed(2)} ${currency}`;
@@ -273,34 +313,29 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
     return (
       <div>
         {/* Search and Group Filter */}
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Szukaj ucznia..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
-              />
-            </div>
-            <div className="w-full md:w-72">
-              <select
-                value={selectedCourseId}
-                onChange={(e) => setSelectedCourseId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
-              >
-                <option value="">Wszyscy uczniowie</option>
-                {groupCourses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.name} ({course.enrollments?.length || 0})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
+        <FilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Szukaj ucznia po imieniu, nazwisku lub emailu..."
+          filters={[
+            {
+              key: 'courseId',
+              label: 'Kurs grupowy',
+              type: 'select',
+              options: groupCourses.map((c) => ({ value: c.id, label: `${c.name} (${c.enrollments?.length || 0})` })),
+            },
+            { key: 'balanceMin', label: 'Saldo od (zł)', type: 'number', placeholder: 'np. -100' },
+            { key: 'balanceMax', label: 'Saldo do (zł)', type: 'number', placeholder: 'np. 500' },
+          ]}
+          filterValues={{ courseId: selectedCourseId, balanceMin, balanceMax }}
+          onFilterChange={(key, value) => {
+            if (key === 'courseId') setSelectedCourseId(value);
+            if (key === 'balanceMin') setBalanceMin(value);
+            if (key === 'balanceMax') setBalanceMax(value);
+          }}
+          onClearAll={() => { setSearchTerm(''); setSelectedCourseId(''); setBalanceMin(''); setBalanceMax(''); }}
+          filterCols={3}
+        />
 
         {/* Students Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -308,17 +343,26 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Uczeń
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => handleSort('lastName')}
+                  >
+                    Uczeń <SortIcon col="lastName" />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Aktualne saldo
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => handleSort('currentBalance')}
+                  >
+                    Aktualne saldo <SortIcon col="currentBalance" />
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Oczekujące płatności
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ostatnie rozliczenie
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => handleSort('lastSettlementDate')}
+                  >
+                    Ostatnie rozliczenie <SortIcon col="lastSettlementDate" />
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Akcje

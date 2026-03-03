@@ -1,15 +1,16 @@
 import toast from 'react-hot-toast';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { courseService, Course } from '../services/courseService';
-import { Plus, Search, Users, BookOpen, Calendar, MapPin, Wifi, Home, MoreVertical, Trash2, Loader2, ExternalLink } from 'lucide-react';
+import { Plus, Users, BookOpen, Calendar, MapPin, Wifi, Home, MoreVertical, Trash2, Loader2, ExternalLink, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import CourseModal from '../components/CourseModal';
 import EnrollStudentModal from '../components/EnrollStudentModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Dropdown from '../components/Dropdown';
+import FilterBar from '../components/FilterBar';
 
 const CoursesPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -17,6 +18,9 @@ const CoursesPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
   const canAccessSettlements = ['ADMIN', 'MANAGER'].includes(user?.role || '');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'startDate' | 'createdAt' | 'teacher'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
@@ -28,11 +32,41 @@ const CoursesPage: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
-  // Fetch courses
-  const { data: courses = [], isLoading } = useQuery({
-    queryKey: ['courses', searchTerm],
-    queryFn: () => courseService.getCourses({ search: searchTerm }),
+  // Fetch courses (filters server-side, sorting client-side)
+  const { data: rawCourses = [], isLoading } = useQuery({
+    queryKey: ['courses', searchTerm, filterValues],
+    queryFn: () => courseService.getCourses({
+      search: searchTerm || undefined,
+      courseType: filterValues['courseType'] as 'GROUP' | 'INDIVIDUAL' | undefined || undefined,
+      isActive: filterValues['isActive'] !== '' && filterValues['isActive'] !== undefined
+        ? filterValues['isActive'] === 'true'
+        : undefined,
+    }),
   });
+
+  const courses = useMemo(() => {
+    const levelFilter = filterValues['level'] || '';
+    const deliveryModeFilter = filterValues['deliveryMode'] || '';
+
+    const filtered = rawCourses.filter((c) => {
+      if (levelFilter && c.level !== levelFilter) return false;
+      if (deliveryModeFilter && c.deliveryMode !== deliveryModeFilter) return false;
+      return true;
+    });
+
+    const dir = sortOrder === 'asc' ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'name') return dir * a.name.localeCompare(b.name, 'pl');
+      if (sortBy === 'startDate') return dir * (new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+      if (sortBy === 'createdAt') return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      if (sortBy === 'teacher') {
+        const aName = a.teacher ? `${a.teacher.user.lastName} ${a.teacher.user.firstName}` : '';
+        const bName = b.teacher ? `${b.teacher.user.lastName} ${b.teacher.user.firstName}` : '';
+        return dir * aName.localeCompare(bName, 'pl');
+      }
+      return 0;
+    });
+  }, [rawCourses, filterValues, sortBy, sortOrder]);
 
   // Fetch delete impact when dialog is open
   const { data: deleteImpact, isLoading: isImpactLoading } = useQuery({
@@ -208,6 +242,22 @@ const CoursesPage: React.FC = () => {
   const allSelected = courses.length > 0 && selectedIds.size === courses.length;
   const someSelected = selectedIds.size > 0 && !allSelected;
 
+  const handleSort = (column: 'name' | 'startDate' | 'createdAt' | 'teacher') => {
+    if (sortBy === column) {
+      setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+
+  const SortIcon = ({ column }: { column: 'name' | 'startDate' | 'createdAt' | 'teacher' }) => {
+    if (sortBy !== column) return <ChevronsUpDown className="inline ml-1 h-3.5 w-3.5 text-gray-400" />;
+    return sortOrder === 'asc'
+      ? <ChevronUp className="inline ml-1 h-3.5 w-3.5 text-primary" />
+      : <ChevronDown className="inline ml-1 h-3.5 w-3.5 text-primary" />;
+  };
+
   return (
     <div>
       <div className="mb-8 flex justify-between items-center">
@@ -226,19 +276,37 @@ const CoursesPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Search */}
-      <div className="bg-white rounded-lg shadow p-6 border border-gray-200 mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Szukaj kursu po nazwie, opisie lub lektorze..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-          />
-        </div>
-      </div>
+      <FilterBar
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Szukaj kursu po nazwie, opisie lub lektorze..."
+        filters={[
+          { key: 'courseType', label: 'Typ kursu', type: 'select', options: [
+            { value: 'GROUP', label: 'Grupowy' },
+            { value: 'INDIVIDUAL', label: 'Indywidualny' },
+          ]},
+          { key: 'level', label: 'Poziom', type: 'select', options: [
+            { value: 'A1', label: 'A1' }, { value: 'A2', label: 'A2' },
+            { value: 'B1', label: 'B1' }, { value: 'B2', label: 'B2' },
+            { value: 'C1', label: 'C1' }, { value: 'C2', label: 'C2' },
+            { value: 'BEGINNER', label: 'Beginner' }, { value: 'INTERMEDIATE', label: 'Intermediate' },
+            { value: 'ADVANCED', label: 'Advanced' }, { value: 'ALL_LEVELS', label: 'Wszystkie poziomy' },
+          ]},
+          { key: 'deliveryMode', label: 'Tryb', type: 'select', options: [
+            { value: 'IN_PERSON', label: 'Stacjonarne' },
+            { value: 'ONLINE', label: 'Online' },
+            { value: 'BOTH', label: 'Hybrydowe' },
+          ]},
+          { key: 'isActive', label: 'Status', type: 'select', options: [
+            { value: 'true', label: 'Aktywny' },
+            { value: 'false', label: 'Nieaktywny' },
+          ]},
+        ]}
+        filterValues={filterValues}
+        onFilterChange={(key, value) => setFilterValues((prev) => ({ ...prev, [key]: value }))}
+        onClearAll={() => { setSearchTerm(''); setFilterValues({}); setSortBy('createdAt'); setSortOrder('desc'); }}
+        filterCols={4}
+      />
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
@@ -289,11 +357,17 @@ const CoursesPage: React.FC = () => {
                       className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
                     />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Kurs
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                    onClick={() => handleSort('name')}
+                  >
+                    Kurs <SortIcon column="name" />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Lektor
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                    onClick={() => handleSort('teacher')}
+                  >
+                    Lektor <SortIcon column="teacher" />
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Typ
@@ -307,8 +381,11 @@ const CoursesPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Uczestnicy
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Data rozpoczęcia
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                    onClick={() => handleSort('startDate')}
+                  >
+                    Data rozpoczęcia <SortIcon column="startDate" />
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status

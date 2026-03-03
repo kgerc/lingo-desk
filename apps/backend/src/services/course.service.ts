@@ -203,6 +203,14 @@ export interface CourseFilters {
   teacherId?: string;
   courseType?: CourseFormat;
   isActive?: boolean;
+  sortBy?: 'name' | 'startDate' | 'createdAt';
+  sortOrder?: 'asc' | 'desc';
+}
+
+function buildCourseOrderBy(sortBy?: string, sortOrder: 'asc' | 'desc' = 'desc'): any {
+  if (sortBy === 'name') return { name: sortOrder };
+  if (sortBy === 'startDate') return { startDate: sortOrder };
+  return { createdAt: sortOrder }; // default: createdAt
 }
 
 class CourseService {
@@ -592,7 +600,7 @@ class CourseService {
   }
 
   async getCourses(organizationId: string, filters?: CourseFilters) {
-    const { search, teacherId, courseType, isActive } = filters || {};
+    const { search, teacherId, courseType, isActive, sortBy, sortOrder = 'desc' } = filters || {};
 
     const where: any = {
       organizationId,
@@ -659,9 +667,7 @@ class CourseService {
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: buildCourseOrderBy(sortBy, sortOrder),
     });
 
     return courses;

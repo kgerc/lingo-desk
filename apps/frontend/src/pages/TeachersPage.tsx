@@ -1,13 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { teacherService, Teacher } from '../services/teacherService';
-import { Plus, Search, Mail, Phone, BookOpen, Calendar, MoreVertical, Users, Wallet, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Mail, Phone, BookOpen, Calendar, MoreVertical, Users, Wallet, Trash2, Loader2, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import TeacherModal from '../components/TeacherModal';
 import TeacherPayoutsTab from '../components/TeacherPayoutsTab';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Dropdown from '../components/Dropdown';
+import FilterBar from '../components/FilterBar';
 
 type TabType = 'list' | 'payouts';
 
@@ -15,6 +16,9 @@ const TeachersPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('list');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'lastName' | 'hourlyRate' | 'createdAt' | 'email'>('lastName');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; teacherId: string | null }>({ isOpen: false, teacherId: null });
@@ -23,12 +27,37 @@ const TeachersPage: React.FC = () => {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
-  // Fetch teachers
-  const { data: teachers = [], isLoading } = useQuery({
-    queryKey: ['teachers', searchTerm],
-    queryFn: () => teacherService.getTeachers({ search: searchTerm }),
+  // Fetch teachers (filters server-side, sorting client-side)
+  const { data: rawTeachers = [], isLoading } = useQuery({
+    queryKey: ['teachers', searchTerm, filterValues],
+    queryFn: () => teacherService.getTeachers({
+      search: searchTerm || undefined,
+      isActive: filterValues['isActive'] === 'true' ? true : filterValues['isActive'] === 'false' ? false : undefined,
+      hourlyRateMin: filterValues['hourlyRateMin'] !== undefined && filterValues['hourlyRateMin'] !== '' ? Number(filterValues['hourlyRateMin']) : undefined,
+      hourlyRateMax: filterValues['hourlyRateMax'] !== undefined && filterValues['hourlyRateMax'] !== '' ? Number(filterValues['hourlyRateMax']) : undefined,
+    }),
     enabled: activeTab === 'list',
   });
+
+  const teachers = useMemo(() => {
+    const contractTypeFilter = filterValues['contractType'] || '';
+    const languageFilter = filterValues['language'] || '';
+
+    const filtered = rawTeachers.filter((t) => {
+      if (contractTypeFilter && t.contractType !== contractTypeFilter) return false;
+      if (languageFilter && !t.languages.includes(languageFilter)) return false;
+      return true;
+    });
+
+    const dir = sortOrder === 'asc' ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'lastName') return dir * a.user.lastName.localeCompare(b.user.lastName, 'pl');
+      if (sortBy === 'hourlyRate') return dir * (a.hourlyRate - b.hourlyRate);
+      if (sortBy === 'createdAt') return dir * (new Date(a.user.createdAt).getTime() - new Date(b.user.createdAt).getTime());
+      if (sortBy === 'email') return dir * a.user.email.localeCompare(b.user.email);
+      return 0;
+    });
+  }, [rawTeachers, filterValues, sortBy, sortOrder]);
 
   // Bulk delete mutation
   const bulkDeleteMutation = useMutation({
@@ -129,6 +158,22 @@ const TeachersPage: React.FC = () => {
   const allSelected = teachers.length > 0 && selectedIds.size === teachers.length;
   const someSelected = selectedIds.size > 0 && !allSelected;
 
+  const handleSort = (column: 'lastName' | 'hourlyRate' | 'createdAt' | 'email') => {
+    if (sortBy === column) {
+      setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+
+  const SortIcon = ({ column }: { column: 'lastName' | 'hourlyRate' | 'createdAt' | 'email' }) => {
+    if (sortBy !== column) return <ChevronsUpDown className="inline ml-1 h-3.5 w-3.5 text-gray-400" />;
+    return sortOrder === 'asc'
+      ? <ChevronUp className="inline ml-1 h-3.5 w-3.5 text-primary" />
+      : <ChevronDown className="inline ml-1 h-3.5 w-3.5 text-primary" />;
+  };
+
   return (
     <div>
       <div className="mb-6 flex justify-between items-center">
@@ -177,19 +222,34 @@ const TeachersPage: React.FC = () => {
       {/* Tab Content */}
       {activeTab === 'list' && (
         <>
-          {/* Search */}
-          <div className="bg-white rounded-lg shadow p-6 border border-gray-200 mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Szukaj lektora po imieniu, nazwisku lub emailu..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
-          </div>
+          <FilterBar
+            searchValue={searchTerm}
+            onSearchChange={setSearchTerm}
+            searchPlaceholder="Szukaj lektora po imieniu, nazwisku lub emailu..."
+            filters={[
+              {
+                key: 'isActive',
+                label: 'Status',
+                type: 'select',
+                options: [
+                  { value: 'true', label: 'Aktywny' },
+                  { value: 'false', label: 'Nieaktywny' },
+                ],
+              },
+              { key: 'contractType', label: 'Typ umowy', type: 'select', options: [
+                { value: 'B2B', label: 'B2B' },
+                { value: 'EMPLOYMENT', label: 'Umowa o pracę' },
+                { value: 'CIVIL', label: 'Umowa cywilna' },
+              ]},
+              { key: 'language', label: 'Język', type: 'text', placeholder: 'np. angielski' },
+              { key: 'hourlyRateMin', label: 'Stawka od (PLN/h)', type: 'number', placeholder: 'np. 50' },
+              { key: 'hourlyRateMax', label: 'Stawka do (PLN/h)', type: 'number', placeholder: 'np. 150' },
+            ]}
+            filterValues={filterValues}
+            onFilterChange={(key, value) => setFilterValues((prev) => ({ ...prev, [key]: value }))}
+            onClearAll={() => { setSearchTerm(''); setFilterValues({}); setSortBy('lastName'); setSortOrder('asc'); }}
+            filterCols={5}
+          />
 
           {/* Bulk action bar */}
           {selectedIds.size > 0 && (
@@ -240,14 +300,23 @@ const TeachersPage: React.FC = () => {
                           className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
                         />
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Lektor
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                        onClick={() => handleSort('lastName')}
+                      >
+                        Lektor <SortIcon column="lastName" />
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Kontakt
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                        onClick={() => handleSort('email')}
+                      >
+                        Kontakt <SortIcon column="email" />
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Stawka
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                        onClick={() => handleSort('hourlyRate')}
+                      >
+                        Stawka <SortIcon column="hourlyRate" />
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Typ umowy

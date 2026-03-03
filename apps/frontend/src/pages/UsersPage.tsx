@@ -4,7 +4,6 @@ import toast from 'react-hot-toast';
 import {
   Users,
   UserPlus,
-  Search,
   MoreVertical,
   Mail,
   Phone,
@@ -13,7 +12,11 @@ import {
   RefreshCw,
   Copy,
   Check,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
 } from 'lucide-react';
+import FilterBar from '../components/FilterBar';
 import userService, {
   User,
   UserRole,
@@ -399,8 +402,9 @@ const UsersPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
+  const [sortBy, setSortBy] = useState<'lastName' | 'role' | 'lastLoginAt' | 'email'>('lastName');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
@@ -425,40 +429,41 @@ const UsersPage: React.FC = () => {
     queryFn: userService.getUserStats,
   });
 
-  // Filter users locally - exclude STUDENT and PARENT roles (managed in Students module)
+  // Filter and sort users locally - exclude STUDENT and PARENT roles (managed in Students module)
   const filteredUsers = useMemo(() => {
-    return allUsers.filter((user) => {
-      // Exclude students and parents - managed in dedicated modules
-      if (user.role === 'STUDENT' || user.role === 'PARENT') {
-        return false;
-      }
+    const roleFilter = filterValues['role'] || '';
+    const statusFilter = filterValues['status'] || 'all';
 
-      // Role filter
-      if (roleFilter && user.role !== roleFilter) {
-        return false;
-      }
-
-      // Status filter
-      if (statusFilter === 'active' && !user.isActive) {
-        return false;
-      }
-      if (statusFilter === 'inactive' && user.isActive) {
-        return false;
-      }
-
-      // Search filter (case-insensitive)
+    const filtered = allUsers.filter((user) => {
+      if (user.role === 'STUDENT' || user.role === 'PARENT') return false;
+      if (roleFilter && user.role !== roleFilter) return false;
+      if (statusFilter === 'active' && !user.isActive) return false;
+      if (statusFilter === 'inactive' && user.isActive) return false;
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
-        const email = user.email.toLowerCase();
-        if (!fullName.includes(query) && !email.includes(query)) {
-          return false;
-        }
+        if (!fullName.includes(query) && !user.email.toLowerCase().includes(query)) return false;
       }
-
       return true;
     });
-  }, [allUsers, roleFilter, statusFilter, searchQuery]);
+
+    return [...filtered].sort((a, b) => {
+      const dir = sortOrder === 'asc' ? 1 : -1;
+      if (sortBy === 'lastName') {
+        return dir * a.lastName.localeCompare(b.lastName, 'pl');
+      }
+      if (sortBy === 'role') {
+        return dir * a.role.localeCompare(b.role);
+      }
+      if (sortBy === 'lastLoginAt') {
+        const aTime = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : 0;
+        const bTime = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : 0;
+        return dir * (aTime - bTime);
+      }
+      if (sortBy === 'email') return dir * a.email.localeCompare(b.email);
+      return 0;
+    });
+  }, [allUsers, filterValues, searchQuery, sortBy, sortOrder]);
 
   // Mutations
   const deactivateMutation = useMutation({
@@ -534,6 +539,22 @@ const UsersPage: React.FC = () => {
     });
   };
 
+  const handleSort = (column: typeof sortBy) => {
+    if (sortBy === column) {
+      setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+
+  const SortIcon = ({ column }: { column: typeof sortBy }) => {
+    if (sortBy !== column) return <ChevronsUpDown className="inline ml-1 h-3.5 w-3.5 text-gray-400" />;
+    return sortOrder === 'asc'
+      ? <ChevronUp className="inline ml-1 h-3.5 w-3.5 text-primary" />
+      : <ChevronDown className="inline ml-1 h-3.5 w-3.5 text-primary" />;
+  };
+
   if (isLoading) {
     return <LoadingSpinner message="Ładowanie użytkowników..." />;
   }
@@ -541,12 +562,21 @@ const UsersPage: React.FC = () => {
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-          <Users className="h-8 w-8 text-blue-600" />
-          Użytkownicy
-        </h1>
-        <p className="mt-2 text-gray-600">Zarządzanie użytkownikami i rolami w organizacji</p>
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <Users className="h-8 w-8 text-blue-600" />
+            Użytkownicy
+          </h1>
+          <p className="mt-2 text-gray-600">Zarządzanie użytkownikami i rolami w organizacji</p>
+        </div>
+        <button
+          onClick={() => setIsInviteModalOpen(true)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+        >
+          <UserPlus className="h-5 w-5" />
+          Zaproś użytkownika
+        </button>
       </div>
 
       {/* Stats Cards */}
@@ -578,57 +608,22 @@ const UsersPage: React.FC = () => {
       )}
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div className="flex flex-wrap gap-4 items-center">
-          {/* Search */}
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Szukaj po imieniu, nazwisku lub email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Role Filter */}
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value as UserRole | '')}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">Wszystkie role</option>
-            {STAFF_ROLES.map((role) => (
-              <option key={role} value={role}>
-                {ROLE_LABELS[role]}
-              </option>
-            ))}
-          </select>
-
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="all">Wszyscy</option>
-            <option value="active">Aktywni</option>
-            <option value="inactive">Nieaktywni</option>
-          </select>
-
-          {/* Invite Button */}
-          <button
-            onClick={() => setIsInviteModalOpen(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-          >
-            <UserPlus className="h-5 w-5" />
-            Zaproś użytkownika
-          </button>
-        </div>
-      </div>
+      <FilterBar
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Szukaj po imieniu, nazwisku lub emailu..."
+        filters={[
+          { key: 'role', label: 'Rola', type: 'select', options: STAFF_ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] })) },
+          { key: 'status', label: 'Status', type: 'select', options: [
+            { value: 'active', label: 'Aktywni' },
+            { value: 'inactive', label: 'Nieaktywni' },
+          ]},
+        ]}
+        filterValues={filterValues}
+        onFilterChange={(key, value) => setFilterValues((prev) => ({ ...prev, [key]: value }))}
+        onClearAll={() => { setSearchQuery(''); setFilterValues({}); setSortBy('lastName'); setSortOrder('asc'); }}
+        filterCols={2}
+      />
 
       {/* Users Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -653,20 +648,32 @@ const UsersPage: React.FC = () => {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Użytkownik
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                  onClick={() => handleSort('lastName')}
+                >
+                  Użytkownik <SortIcon column="lastName" />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Kontakt
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                  onClick={() => handleSort('email')}
+                >
+                  Kontakt <SortIcon column="email" />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rola
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                  onClick={() => handleSort('role')}
+                >
+                  Rola <SortIcon column="role" />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ostatnie logowanie
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                  onClick={() => handleSort('lastLoginAt')}
+                >
+                  Ostatnie logowanie <SortIcon column="lastLoginAt" />
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Akcje

@@ -90,7 +90,7 @@ export class TeacherController {
         });
       }
 
-      const { search, isActive, isAvailableForBooking } = req.query;
+      const { search, isActive, isAvailableForBooking, hourlyRateMin, hourlyRateMax, sortBy, sortOrder } = req.query;
 
       const teachers = await teacherService.getTeachersWithVisibility(
         req.user.organizationId,
@@ -104,6 +104,10 @@ export class TeacherController {
               : isAvailableForBooking === 'false'
               ? false
               : undefined,
+          hourlyRateMin: hourlyRateMin ? Number(hourlyRateMin) : undefined,
+          hourlyRateMax: hourlyRateMax ? Number(hourlyRateMax) : undefined,
+          sortBy: sortBy as 'lastName' | 'hourlyRate' | 'createdAt' | undefined,
+          sortOrder: sortOrder as 'asc' | 'desc' | undefined,
         }
       );
 

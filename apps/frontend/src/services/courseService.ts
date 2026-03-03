@@ -177,12 +177,16 @@ export const courseService = {
     teacherId?: string;
     courseType?: 'GROUP' | 'INDIVIDUAL';
     isActive?: boolean;
+    sortBy?: 'name' | 'startDate' | 'createdAt';
+    sortOrder?: 'asc' | 'desc';
   }) {
     const params = new URLSearchParams();
     if (filters?.search) params.append('search', filters.search);
     if (filters?.teacherId) params.append('teacherId', filters.teacherId);
     if (filters?.courseType) params.append('courseType', filters.courseType);
     if (filters?.isActive !== undefined) params.append('isActive', String(filters.isActive));
+    if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
 
     const response = await api.get(`/courses?${params.toString()}`) as any;
     return response.data.data as Course[];

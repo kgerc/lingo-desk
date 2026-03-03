@@ -33,7 +33,9 @@
       "Bash(xargs grep -l \"alertService\")",
       "Bash(xargs grep -l \"balance\\\\|budget\\\\|settlement\")",
       "Bash(npx prisma:*)",
-      "Bash(xargs grep -l \"student.*modal\\\\|StudentModal\" -i)"
+      "Bash(xargs grep -l \"student.*modal\\\\|StudentModal\" -i)",
+      "Bash(xargs basename -a)",
+      "Bash(sed 's/\\\\.tsx$//')"
     ]
   }
 }

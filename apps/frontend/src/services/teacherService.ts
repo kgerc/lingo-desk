@@ -68,12 +68,20 @@ export const teacherService = {
     search?: string;
     isActive?: boolean;
     isAvailableForBooking?: boolean;
+    hourlyRateMin?: number;
+    hourlyRateMax?: number;
+    sortBy?: 'lastName' | 'hourlyRate' | 'createdAt';
+    sortOrder?: 'asc' | 'desc';
   }) {
     const params = new URLSearchParams();
     if (filters?.search) params.append('search', filters.search);
     if (filters?.isActive !== undefined) params.append('isActive', String(filters.isActive));
     if (filters?.isAvailableForBooking !== undefined)
       params.append('isAvailableForBooking', String(filters.isAvailableForBooking));
+    if (filters?.hourlyRateMin !== undefined) params.append('hourlyRateMin', String(filters.hourlyRateMin));
+    if (filters?.hourlyRateMax !== undefined) params.append('hourlyRateMax', String(filters.hourlyRateMax));
+    if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
 
     const response = await api.get(`/teachers?${params.toString()}`) as any;
     return response.data.data as Teacher[];

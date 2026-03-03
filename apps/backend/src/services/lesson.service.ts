@@ -53,6 +53,8 @@ export interface LessonFilters {
   status?: string;
   startDate?: string;
   endDate?: string;
+  sortBy?: 'scheduledAt' | 'createdAt';
+  sortOrder?: 'asc' | 'desc';
   // Pagination
   page?: number;
   limit?: number;
@@ -287,6 +289,7 @@ class LessonService {
   async getLessons(organizationId: string, filters?: LessonFilters): Promise<PaginatedResult<any>> {
     const {
       search, teacherId, studentId, courseId, status, startDate, endDate,
+      sortBy = 'scheduledAt', sortOrder = 'desc',
       page = 1, limit = 50
     } = filters || {};
 
@@ -426,7 +429,7 @@ class LessonService {
           },
         },
         orderBy: {
-          scheduledAt: 'desc',
+          [sortBy]: sortOrder,
         },
       }),
     ]);

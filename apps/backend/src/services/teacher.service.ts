@@ -34,6 +34,13 @@ interface UpdateTeacherData {
   cancellationPayoutPercent?: number | null;
 }
 
+function buildTeacherOrderBy(sortBy?: string, sortOrder: 'asc' | 'desc' = 'asc'): any {
+  if (sortBy === 'lastName') return { user: { lastName: sortOrder } };
+  if (sortBy === 'hourlyRate') return { hourlyRate: sortOrder };
+  if (sortBy === 'createdAt') return { createdAt: sortOrder };
+  return { createdAt: 'desc' }; // default: newest first
+}
+
 export class TeacherService {
   async createTeacher(data: CreateTeacherData) {
     const {
@@ -120,6 +127,10 @@ export class TeacherService {
     search?: string;
     isActive?: boolean;
     isAvailableForBooking?: boolean;
+    hourlyRateMin?: number;
+    hourlyRateMax?: number;
+    sortBy?: 'lastName' | 'hourlyRate' | 'createdAt';
+    sortOrder?: 'asc' | 'desc';
   }) {
     const where: any = { organizationId };
 
@@ -144,6 +155,12 @@ export class TeacherService {
       where.isAvailableForBooking = filters.isAvailableForBooking;
     }
 
+    if (filters?.hourlyRateMin !== undefined || filters?.hourlyRateMax !== undefined) {
+      where.hourlyRate = {};
+      if (filters.hourlyRateMin !== undefined) where.hourlyRate.gte = filters.hourlyRateMin;
+      if (filters.hourlyRateMax !== undefined) where.hourlyRate.lte = filters.hourlyRateMax;
+    }
+
     const teachers = await prisma.teacher.findMany({
       where,
       include: {
@@ -166,9 +183,7 @@ export class TeacherService {
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: buildTeacherOrderBy(filters?.sortBy, filters?.sortOrder),
     });
 
     return teachers;
@@ -477,7 +492,7 @@ export class TeacherService {
   async getTeachersWithVisibility(
     organizationId: string,
     userRole: UserRole,
-    filters?: { search?: string; isActive?: boolean; isAvailableForBooking?: boolean }
+    filters?: { search?: string; isActive?: boolean; isAvailableForBooking?: boolean; hourlyRateMin?: number; hourlyRateMax?: number; sortBy?: 'lastName' | 'hourlyRate' | 'createdAt'; sortOrder?: 'asc' | 'desc' }
   ) {
     const teachers = await this.getTeachers(organizationId, filters);
 

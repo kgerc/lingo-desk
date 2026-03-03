@@ -165,6 +165,8 @@ export const lessonService = {
     status?: LessonStatus;
     startDate?: string;
     endDate?: string;
+    sortBy?: 'scheduledAt' | 'createdAt';
+    sortOrder?: 'asc' | 'desc';
   }) {
     const params = new URLSearchParams();
     if (filters?.search) params.append('search', filters.search);
@@ -174,6 +176,8 @@ export const lessonService = {
     if (filters?.status) params.append('status', filters.status);
     if (filters?.startDate) params.append('startDate', filters.startDate);
     if (filters?.endDate) params.append('endDate', filters.endDate);
+    if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
 
     const response = await api.get(`/lessons?${params.toString()}`) as any;
     return response.data.data as Lesson[];

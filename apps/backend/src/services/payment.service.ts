@@ -38,6 +38,9 @@ export interface GetPaymentsFilters {
   limit?: number;
   offset?: number;
   convertToCurrency?: string; // Convert all amounts to this currency
+  search?: string;
+  sortBy?: 'createdAt' | 'amount' | 'paidAt';
+  sortOrder?: 'asc' | 'desc';
 }
 
 class PaymentService {
@@ -56,24 +59,40 @@ class PaymentService {
       limit = 50,
       offset = 0,
       convertToCurrency,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
     } = filters;
 
+    const where: any = {
+      organizationId,
+      ...(studentId && { studentId }),
+      ...(status && { status }),
+      ...(paymentMethod && { paymentMethod }),
+      ...(currency && { currency }),
+      ...(dateFrom || dateTo
+        ? {
+            createdAt: {
+              ...(dateFrom && { gte: dateFrom }),
+              ...(dateTo && { lte: dateTo }),
+            },
+          }
+        : {}),
+    };
+
+    if (search) {
+      where.student = {
+        user: {
+          OR: [
+            { firstName: { contains: search, mode: 'insensitive' } },
+            { lastName: { contains: search, mode: 'insensitive' } },
+          ],
+        },
+      };
+    }
+
     const payments = await prisma.payment.findMany({
-      where: {
-        organizationId,
-        ...(studentId && { studentId }),
-        ...(status && { status }),
-        ...(paymentMethod && { paymentMethod }),
-        ...(currency && { currency }),
-        ...(dateFrom || dateTo
-          ? {
-              createdAt: {
-                ...(dateFrom && { gte: dateFrom }),
-                ...(dateTo && { lte: dateTo }),
-              },
-            }
-          : {}),
-      },
+      where,
       include: {
         student: {
           include: {
@@ -103,7 +122,7 @@ class PaymentService {
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        [sortBy]: sortOrder,
       },
       take: limit,
       skip: offset,

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { displayEmail } from '../utils/email';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import paymentService, { Payment } from '../services/paymentService';
-import { Plus, Search, Trash2, Edit, DollarSign, Clock, CheckCircle, XCircle, Upload, Calculator, CreditCard, Bell, Settings } from 'lucide-react';
+import { Plus, Trash2, Edit, DollarSign, Clock, CheckCircle, XCircle, Upload, Calculator, CreditCard, Bell, Settings, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import FilterBar from '../components/FilterBar';
 import PaymentModal from '../components/PaymentModal';
 import ImportPaymentsModal from '../components/ImportPaymentsModal';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -48,21 +49,55 @@ export default function PaymentsPage() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [currencyFilter, setCurrencyFilter] = useState<string>('ALL');
-  const [convertToCurrency, setConvertToCurrency] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'createdAt' | 'amount' | 'paidAt' | 'student' | 'course'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; paymentId: string | null }>({ isOpen: false, paymentId: null });
   const [reminderDialog, setReminderDialog] = useState<{ isOpen: boolean; paymentId: string | null; studentName: string }>({ isOpen: false, paymentId: null, studentName: '' });
 
-  // Fetch payments
-  const { data: payments = [], isLoading } = useQuery({
-    queryKey: ['payments', currencyFilter, convertToCurrency],
+  // Fetch payments (filters server-side, sorting client-side)
+  const { data: rawPayments = [] as Payment[], isLoading } = useQuery({
+    queryKey: ['payments', searchTerm, statusFilter, filterValues],
     queryFn: () => paymentService.getPayments({
-      currency: currencyFilter !== 'ALL' ? currencyFilter : undefined,
-      convertToCurrency: convertToCurrency || undefined,
+      search: searchTerm || undefined,
+      status: statusFilter as any || undefined,
+      currency: filterValues['currency'] || undefined,
+      convertToCurrency: filterValues['convertToCurrency'] || undefined,
+      dateFrom: filterValues['dateFrom'] || undefined,
+      dateTo: filterValues['dateTo'] || undefined,
     }),
     enabled: activeTab === 'payments',
   });
+
+  const payments = useMemo(() => {
+    const paymentMethodFilter = filterValues['paymentMethod'] || '';
+    const filtered = paymentMethodFilter
+      ? rawPayments.filter((p) => p.paymentMethod === paymentMethodFilter)
+      : rawPayments;
+
+    const dir = sortOrder === 'asc' ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'createdAt') return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      if (sortBy === 'amount') return dir * (a.amount - b.amount);
+      if (sortBy === 'paidAt') {
+        const aTime = a.paidAt ? new Date(a.paidAt).getTime() : 0;
+        const bTime = b.paidAt ? new Date(b.paidAt).getTime() : 0;
+        return dir * (aTime - bTime);
+      }
+      if (sortBy === 'student') {
+        const aName = a.student ? `${a.student.user.lastName}${a.student.user.firstName}` : '';
+        const bName = b.student ? `${b.student.user.lastName}${b.student.user.firstName}` : '';
+        return dir * aName.localeCompare(bName, 'pl');
+      }
+      if (sortBy === 'course') {
+        const aName = a.enrollment?.course?.name || '';
+        const bName = b.enrollment?.course?.name || '';
+        return dir * aName.localeCompare(bName, 'pl');
+      }
+      return 0;
+    });
+  }, [rawPayments, filterValues, sortBy, sortOrder]);
 
   // Fetch payment stats
   const { data: stats } = useQuery({
@@ -143,17 +178,23 @@ export default function PaymentsPage() {
     setSelectedPayment(null);
   };
 
-  // Filter payments
-  const filteredPayments = payments.filter((payment) => {
-    const matchesSearch =
-      payment.student?.user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.student?.user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+  // Payments are now filtered server-side
 
-    const matchesStatus = statusFilter === 'ALL' || payment.status === statusFilter;
+  const handleSort = (column: 'createdAt' | 'amount' | 'paidAt' | 'student' | 'course') => {
+    if (sortBy === column) {
+      setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
 
-    return matchesSearch && matchesStatus;
-  });
+  const SortIcon = ({ column }: { column: 'createdAt' | 'amount' | 'paidAt' | 'student' | 'course' }) => {
+    if (sortBy !== column) return <ChevronsUpDown className="inline ml-1 h-3.5 w-3.5 text-gray-400" />;
+    return sortOrder === 'asc'
+      ? <ChevronUp className="inline ml-1 h-3.5 w-3.5 text-primary" />
+      : <ChevronDown className="inline ml-1 h-3.5 w-3.5 text-primary" />;
+  };
 
   const getStatusBadge = (status: string) => {
     const badges = {
@@ -292,72 +333,44 @@ export default function PaymentsPage() {
           )}
 
           {/* Filters */}
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Szukaj po uczniu, notatkach..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
-                >
-                  <option value="ALL">Wszystkie statusy</option>
-                  <option value="PENDING">Oczekujące</option>
-                  <option value="COMPLETED">Opłacone</option>
-                  <option value="FAILED">Niepowodzenie</option>
-                  <option value="REFUNDED">Zwrócone</option>
-                </select>
-              </div>
-
-              <div>
-                <select
-                  value={currencyFilter}
-                  onChange={(e) => setCurrencyFilter(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
-                >
-                  <option value="ALL">Wszystkie waluty</option>
-                  <option value="PLN">PLN</option>
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="GBP">GBP</option>
-                  <option value="CHF">CHF</option>
-                  <option value="CZK">CZK</option>
-                  <option value="DKK">DKK</option>
-                  <option value="NOK">NOK</option>
-                  <option value="SEK">SEK</option>
-                </select>
-              </div>
-
-              <div>
-                <select
-                  value={convertToCurrency}
-                  onChange={(e) => setConvertToCurrency(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
-                >
-                  <option value="">Bez konwersji</option>
-                  <option value="PLN">Przelicz na PLN</option>
-                  <option value="USD">Przelicz na USD</option>
-                  <option value="EUR">Przelicz na EUR</option>
-                  <option value="GBP">Przelicz na GBP</option>
-                  <option value="CHF">Przelicz na CHF</option>
-                  <option value="CZK">Przelicz na CZK</option>
-                  <option value="DKK">Przelicz na DKK</option>
-                  <option value="NOK">Przelicz na NOK</option>
-                  <option value="SEK">Przelicz na SEK</option>
-                </select>
-              </div>
-            </div>
-          </div>
+          <FilterBar
+            searchValue={searchTerm}
+            onSearchChange={setSearchTerm}
+            searchPlaceholder="Szukaj po uczniu..."
+            filters={[
+              { key: 'status', label: 'Status', type: 'select', options: [
+                { value: 'PENDING', label: 'Oczekująca' },
+                { value: 'COMPLETED', label: 'Opłacona' },
+                { value: 'FAILED', label: 'Niepowodzenie' },
+                { value: 'REFUNDED', label: 'Zwrócona' },
+              ]},
+              { key: 'paymentMethod', label: 'Metoda', type: 'select', options: [
+                { value: 'CASH', label: 'Gotówka' },
+                { value: 'BANK_TRANSFER', label: 'Przelew' },
+                { value: 'CARD', label: 'Karta' },
+                { value: 'ONLINE', label: 'Online' },
+                { value: 'OTHER', label: 'Inne' },
+              ]},
+              { key: 'currency', label: 'Waluta', type: 'select', options: [
+                'PLN','USD','EUR','GBP','CHF','CZK','DKK','NOK','SEK',
+              ].map((c) => ({ value: c, label: c })) },
+              { key: 'convertToCurrency', label: 'Przelicz na', type: 'select', options: [
+                'PLN','USD','EUR','GBP','CHF','CZK','DKK','NOK','SEK',
+              ].map((c) => ({ value: c, label: c })) },
+              { key: 'dateFrom', label: 'Od daty', type: 'date' },
+              { key: 'dateTo', label: 'Do daty', type: 'date' },
+            ]}
+            filterValues={{ ...filterValues, status: statusFilter }}
+            onFilterChange={(key, value) => {
+              if (key === 'status') setStatusFilter(value);
+              else setFilterValues((prev) => ({ ...prev, [key]: value }));
+            }}
+            onClearAll={() => {
+              setSearchTerm(''); setStatusFilter(''); setFilterValues({});
+              setSortBy('createdAt'); setSortOrder('desc');
+            }}
+            filterCols={6}
+          />
 
           {/* Payments Table */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -365,14 +378,23 @@ export default function PaymentsPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Uczeń
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                      onClick={() => handleSort('student')}
+                    >
+                      Uczeń <SortIcon column="student" />
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Kurs
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                      onClick={() => handleSort('course')}
+                    >
+                      Kurs <SortIcon column="course" />
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Kwota
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                      onClick={() => handleSort('amount')}
+                    >
+                      Kwota <SortIcon column="amount" />
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Metoda
@@ -380,8 +402,11 @@ export default function PaymentsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Data płatności
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                      onClick={() => handleSort('paidAt')}
+                    >
+                      Data płatności <SortIcon column="paidAt" />
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Akcje
@@ -395,14 +420,14 @@ export default function PaymentsPage() {
                         <LoadingSpinner message="Ładowanie płatności..." />
                       </td>
                     </tr>
-                  ) : filteredPayments.length === 0 ? (
+                  ) : payments.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                         Brak płatności do wyświetlenia
                       </td>
                     </tr>
                   ) : (
-                    filteredPayments.map((payment) => (
+                    payments.map((payment) => (
                       <tr key={payment.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>

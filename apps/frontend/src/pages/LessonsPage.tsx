@@ -11,6 +11,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Dropdown from '../components/Dropdown';
 import SubstitutionsTab from '../components/SubstitutionsTab';
+import FilterBar from '../components/FilterBar';
 import {
   Calendar as CalendarIcon,
   List as ListIcon,
@@ -19,7 +20,6 @@ import {
   GraduationCap,
   Video,
   MapPin,
-  Search,
   CheckCircle,
   AlertCircle,
   XCircle,
@@ -28,6 +28,9 @@ import {
   Users,
   CheckSquare,
   Loader2,
+  ChevronsUpDown,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
@@ -115,6 +118,10 @@ const LessonsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<LessonStatus | ''>('');
   const [courseFilter, setCourseFilter] = useState<string>('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [sortBy, setSortBy] = useState<'scheduledAt' | 'createdAt' | 'title' | 'teacher' | 'student'>('scheduledAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Initialize courseFilter from URL params
   useEffect(() => {
@@ -157,16 +164,36 @@ const LessonsPage: React.FC = () => {
     queryFn: () => courseService.getCourses({ isActive: true }),
   });
 
-  // Shared data source - single query for both views
-  const { data: lessons = [], isLoading } = useQuery({
-    queryKey: ['lessons', searchTerm, statusFilter, courseFilter],
+  // Shared data source - single query for both views (filters server-side, sorting client-side)
+  const { data: rawLessons = [], isLoading } = useQuery({
+    queryKey: ['lessons', searchTerm, statusFilter, courseFilter, dateFrom, dateTo],
     queryFn: () =>
       lessonService.getLessons({
         search: searchTerm || undefined,
         status: statusFilter || undefined,
         courseId: courseFilter || undefined,
+        startDate: dateFrom || undefined,
+        endDate: dateTo || undefined,
       }),
   });
+
+  const [deliveryModeFilter, setDeliveryModeFilter] = useState('');
+
+  const lessons = useMemo(() => {
+    const filtered = deliveryModeFilter
+      ? rawLessons.filter((l) => l.deliveryMode === deliveryModeFilter)
+      : rawLessons;
+
+    const dir = sortOrder === 'asc' ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'scheduledAt') return dir * (new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+      if (sortBy === 'createdAt') return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      if (sortBy === 'title') return dir * a.title.localeCompare(b.title, 'pl');
+      if (sortBy === 'teacher') return dir * `${a.teacher.user.lastName}${a.teacher.user.firstName}`.localeCompare(`${b.teacher.user.lastName}${b.teacher.user.firstName}`, 'pl');
+      if (sortBy === 'student') return dir * `${a.student.user.lastName}${a.student.user.firstName}`.localeCompare(`${b.student.user.lastName}${b.student.user.firstName}`, 'pl');
+      return 0;
+    });
+  }, [rawLessons, deliveryModeFilter, sortBy, sortOrder]);
 
   // Fetch substitutions
   const { data: substitutions = [] } = useQuery({
@@ -715,6 +742,22 @@ const LessonsPage: React.FC = () => {
     timeGutterFormat: 'HH:mm',
   };
 
+  const handleSort = (column: 'scheduledAt' | 'createdAt' | 'title' | 'teacher' | 'student') => {
+    if (sortBy === column) {
+      setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+
+  const SortIcon = ({ column }: { column: 'scheduledAt' | 'createdAt' | 'title' | 'teacher' | 'student' }) => {
+    if (sortBy !== column) return <ChevronsUpDown className="inline ml-1 h-3.5 w-3.5 text-gray-400" />;
+    return sortOrder === 'asc'
+      ? <ChevronUp className="inline ml-1 h-3.5 w-3.5 text-primary" />
+      : <ChevronDown className="inline ml-1 h-3.5 w-3.5 text-primary" />;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -782,50 +825,48 @@ const LessonsPage: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Szukaj lekcji..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          {/* Course Filter */}
-          <select
-            value={courseFilter}
-            onChange={(e) => setCourseFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="">Wszystkie kursy</option>
-            {courses.map((course) => (
-              <option key={course.id} value={course.id}>
-                {course.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as LessonStatus | '')}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="">Wszystkie statusy</option>
-            <option value="SCHEDULED">Zaplanowane</option>
-            <option value="CONFIRMED">Potwierdzone</option>
-            <option value="PENDING_CONFIRMATION">Oczekujące potwierdzenia</option>
-            <option value="COMPLETED">Zakończone</option>
-            <option value="CANCELLED">Anulowane</option>
-            <option value="NO_SHOW">Nieobecność</option>
-          </select>
-        </div>
-      </div>
+      <FilterBar
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Szukaj lekcji po tytule, lektorze lub studencie..."
+        filters={[
+          { key: 'status', label: 'Status', type: 'select', options: [
+            { value: 'SCHEDULED', label: 'Zaplanowana' },
+            { value: 'CONFIRMED', label: 'Potwierdzona' },
+            { value: 'PENDING_CONFIRMATION', label: 'Oczekuje potwierdzenia' },
+            { value: 'COMPLETED', label: 'Zakończona' },
+            { value: 'CANCELLED', label: 'Anulowana' },
+            { value: 'NO_SHOW', label: 'Nieobecność' },
+          ]},
+          { key: 'courseId', label: 'Kurs', type: 'select', options: courses.map((c) => ({ value: c.id, label: c.name })) },
+          { key: 'deliveryMode', label: 'Tryb', type: 'select', options: [
+            { value: 'IN_PERSON', label: 'Stacjonarne' },
+            { value: 'ONLINE', label: 'Online' },
+          ]},
+          { key: 'dateFrom', label: 'Od daty', type: 'date' },
+          { key: 'dateTo', label: 'Do daty', type: 'date' },
+        ]}
+        filterValues={{
+          status: statusFilter,
+          courseId: courseFilter,
+          deliveryMode: deliveryModeFilter,
+          dateFrom,
+          dateTo,
+        }}
+        onFilterChange={(key, value) => {
+          if (key === 'status') setStatusFilter(value as LessonStatus | '');
+          if (key === 'courseId') setCourseFilter(value);
+          if (key === 'deliveryMode') setDeliveryModeFilter(value);
+          if (key === 'dateFrom') setDateFrom(value);
+          if (key === 'dateTo') setDateTo(value);
+        }}
+        onClearAll={() => {
+          setSearchTerm(''); setStatusFilter(''); setCourseFilter('');
+          setDeliveryModeFilter(''); setDateFrom(''); setDateTo('');
+          setSortBy('scheduledAt'); setSortOrder('desc');
+        }}
+        filterCols={5}
+      />
 
       {/* Content - List, Calendar, or Substitutions */}
       {isLoading ? (
@@ -889,10 +930,30 @@ const LessonsPage: React.FC = () => {
                 />
               </div>
               <div className="flex-1 grid grid-cols-6 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                <div>Lekcja</div>
-                <div>Lektor</div>
-                <div>Uczeń</div>
-                <div>Data i czas</div>
+                <div
+                  className="cursor-pointer select-none hover:text-gray-700 flex items-center gap-0.5"
+                  onClick={() => handleSort('title')}
+                >
+                  Lekcja <SortIcon column="title" />
+                </div>
+                <div
+                  className="cursor-pointer select-none hover:text-gray-700 flex items-center gap-0.5"
+                  onClick={() => handleSort('teacher')}
+                >
+                  Lektor <SortIcon column="teacher" />
+                </div>
+                <div
+                  className="cursor-pointer select-none hover:text-gray-700 flex items-center gap-0.5"
+                  onClick={() => handleSort('student')}
+                >
+                  Uczeń <SortIcon column="student" />
+                </div>
+                <div
+                  className="cursor-pointer select-none hover:text-gray-700 flex items-center gap-0.5"
+                  onClick={() => handleSort('scheduledAt')}
+                >
+                  Data i czas <SortIcon column="scheduledAt" />
+                </div>
                 <div>Tryb</div>
                 <div>Status</div>
               </div>
