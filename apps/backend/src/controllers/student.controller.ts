@@ -110,9 +110,9 @@ export class StudentController {
         });
       }
 
-      const { search, languageLevel, isActive, balanceMin, balanceMax, sortBy, sortOrder } = req.query;
+      const { search, languageLevel, isActive, balanceMin, balanceMax, sortBy, sortOrder, page, pageSize } = req.query;
 
-      const students = await studentService.getStudentsWithVisibility(
+      const result = await studentService.getStudentsWithVisibility(
         req.user.organizationId,
         req.user.role,
         {
@@ -121,13 +121,16 @@ export class StudentController {
           isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
           balanceMin: balanceMin ? Number(balanceMin) : undefined,
           balanceMax: balanceMax ? Number(balanceMax) : undefined,
-          sortBy: sortBy as 'studentNumber' | 'firstName' | 'languageLevel' | 'balance' | undefined,
+          sortBy: sortBy as 'studentNumber' | 'firstName' | 'languageLevel' | 'balance' | 'email' | undefined,
           sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+          page: page ? parseInt(page as string) : undefined,
+          pageSize: pageSize ? parseInt(pageSize as string) : undefined,
         }
       );
 
       return res.json({
-        data: students,
+        data: result.data,
+        pagination: result.pagination,
       });
     } catch (error) {
       return next(error);

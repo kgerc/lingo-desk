@@ -90,25 +90,28 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
   }, [existingSubstitution]);
 
   // Fetch teachers - with longer staleTime to reduce refetches
-  const { data: teachers = [] } = useQuery({
+  const { data: teachersResult } = useQuery({
     queryKey: ['teachers', 'active'],
-    queryFn: () => teacherService.getTeachers({ isActive: true }),
+    queryFn: () => teacherService.getTeachers({ isActive: true, pageSize: 200 }),
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
+  const teachers = teachersResult?.data ?? [];
 
   // Fetch students - with longer staleTime
-  const { data: students = [] } = useQuery({
+  const { data: studentsResult } = useQuery({
     queryKey: ['students', 'active'],
-    queryFn: () => studentService.getStudents({ isActive: true }),
+    queryFn: () => studentService.getStudents({ isActive: true, pageSize: 500 }),
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
+  const students = studentsResult?.data ?? [];
 
   // Fetch courses - with longer staleTime
-  const { data: courses = [] } = useQuery({
+  const { data: coursesResult } = useQuery({
     queryKey: ['courses', 'active'],
-    queryFn: () => courseService.getCourses({ isActive: true }),
+    queryFn: () => courseService.getCourses({ isActive: true, pageSize: 500 }),
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
+  const courses = coursesResult?.data ?? [];
 
   // Fetch classrooms for IN_PERSON mode
   const { data: classrooms = [] } = useQuery({

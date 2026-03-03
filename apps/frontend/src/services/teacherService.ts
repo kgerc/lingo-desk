@@ -70,8 +70,12 @@ export const teacherService = {
     isAvailableForBooking?: boolean;
     hourlyRateMin?: number;
     hourlyRateMax?: number;
-    sortBy?: 'lastName' | 'hourlyRate' | 'createdAt';
+    contractType?: 'B2B' | 'EMPLOYMENT' | 'CIVIL';
+    language?: string;
+    sortBy?: 'lastName' | 'hourlyRate' | 'createdAt' | 'email';
     sortOrder?: 'asc' | 'desc';
+    page?: number;
+    pageSize?: number;
   }) {
     const params = new URLSearchParams();
     if (filters?.search) params.append('search', filters.search);
@@ -80,11 +84,15 @@ export const teacherService = {
       params.append('isAvailableForBooking', String(filters.isAvailableForBooking));
     if (filters?.hourlyRateMin !== undefined) params.append('hourlyRateMin', String(filters.hourlyRateMin));
     if (filters?.hourlyRateMax !== undefined) params.append('hourlyRateMax', String(filters.hourlyRateMax));
+    if (filters?.contractType) params.append('contractType', filters.contractType);
+    if (filters?.language) params.append('language', filters.language);
     if (filters?.sortBy) params.append('sortBy', filters.sortBy);
     if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
+    if (filters?.page !== undefined) params.append('page', String(filters.page));
+    if (filters?.pageSize !== undefined) params.append('pageSize', String(filters.pageSize));
 
     const response = await api.get(`/teachers?${params.toString()}`) as any;
-    return response.data.data as Teacher[];
+    return { data: response.data.data as Teacher[], pagination: response.data.pagination };
   },
 
   async getTeacherById(id: string) {

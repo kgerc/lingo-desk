@@ -28,10 +28,11 @@ export default function PaymentModal({ payment, onClose }: PaymentModalProps) {
   });
 
   // Fetch students for dropdown
-  const { data: students = [] } = useQuery({
+  const { data: studentsResult } = useQuery({
     queryKey: ['students'],
-    queryFn: () => studentService.getStudents(),
+    queryFn: () => studentService.getStudents({ pageSize: 500 }),
   });
+  const students = studentsResult?.data ?? [];
 
   // Fetch enrollments for selected student
   const { data: selectedStudent } = useQuery({

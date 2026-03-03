@@ -19,13 +19,15 @@ const StudentDashboard: React.FC = () => {
   });
 
   // Fetch student's lessons using the student record ID
-  const { data: lessons = [], isLoading: isLoadingLessons } = useQuery({
+  const { data: lessonsResult, isLoading: isLoadingLessons } = useQuery({
     queryKey: ['studentLessons', studentData?.id],
     queryFn: () => lessonService.getLessons({
       studentId: studentData?.id,
+      pageSize: 200,
     }),
     enabled: !!studentData?.id,
   });
+  const lessons = lessonsResult?.data ?? [];
 
   if (isLoadingStudent || isLoadingLessons) {
     return <LoadingSpinner message="Ładowanie danych..." />;

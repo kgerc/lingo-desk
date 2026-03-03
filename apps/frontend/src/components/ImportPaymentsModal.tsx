@@ -7,7 +7,7 @@ import {
 import paymentService, {
   ColumnMapping, CsvAnalysisResult, ImportResult, SYSTEM_FIELDS, SystemFieldKey, UnmatchedPayment,
 } from '../services/paymentService';
-import { studentService, Student } from '../services/studentService';
+import { studentService } from '../services/studentService';
 import toast from 'react-hot-toast';
 
 /** Count Polish diacritic characters in a string (higher = better decode quality). */
@@ -661,11 +661,12 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ results }) => {
   // Which rows have been successfully imported
   const [assigned, setAssigned] = useState<Set<number>>(new Set());
 
-  const { data: students = [] } = useQuery<Student[]>({
+  const { data: studentsResult } = useQuery({
     queryKey: ['students'],
-    queryFn: () => studentService.getStudents({ isActive: true }),
+    queryFn: () => studentService.getStudents({ isActive: true, pageSize: 500 }),
     enabled: results.unmatched.length > 0,
   });
+  const students = studentsResult?.data ?? [];
 
   const assignMutation = useMutation({
     mutationFn: ({ unmatched, studentId }: { unmatched: UnmatchedPayment; studentId: string }) =>

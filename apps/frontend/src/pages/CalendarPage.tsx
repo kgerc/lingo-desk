@@ -68,13 +68,15 @@ const CalendarPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<LessonStatus | ''>('');
 
   // Fetch lessons
-  const { data: lessons = [], isLoading } = useQuery({
+  const { data: lessonsResult, isLoading } = useQuery({
     queryKey: ['lessons', statusFilter],
     queryFn: () =>
       lessonService.getLessons({
         status: statusFilter || undefined,
+        pageSize: 500,
       }),
   });
+  const lessons = lessonsResult?.data ?? [];
 
   // Update lesson mutation (for drag & drop)
   const updateLessonMutation = useMutation({

@@ -44,6 +44,10 @@ export interface UserFilters {
   role?: UserRole;
   isActive?: boolean;
   search?: string;
+  sortBy?: 'lastName' | 'email' | 'role' | 'lastLoginAt' | 'createdAt';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
 }
 
 export interface UserStats {
@@ -90,14 +94,18 @@ const userService = {
   /**
    * Get all users with optional filters
    */
-  async getUsers(filters?: UserFilters): Promise<User[]> {
+  async getUsers(filters?: UserFilters): Promise<{ data: User[]; pagination: any }> {
     const params = new URLSearchParams();
     if (filters?.role) params.append('role', filters.role);
     if (filters?.isActive !== undefined) params.append('isActive', String(filters.isActive));
     if (filters?.search) params.append('search', filters.search);
+    if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
+    if (filters?.page !== undefined) params.append('page', String(filters.page));
+    if (filters?.pageSize !== undefined) params.append('pageSize', String(filters.pageSize));
 
     const response = await api.get(`/users?${params.toString()}`) as any;
-    return response.data.data;
+    return { data: response.data.data, pagination: response.data.pagination };
   },
 
   /**

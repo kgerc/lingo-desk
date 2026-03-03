@@ -40,18 +40,23 @@ class UserController {
         });
       }
 
-      const { role, isActive, search } = req.query;
+      const { role, isActive, search, sortBy, sortOrder, page, pageSize } = req.query;
 
       const filters = {
         role: role as UserRole | undefined,
         isActive: isActive !== undefined ? isActive === 'true' : undefined,
         search: search as string | undefined,
+        sortBy: sortBy as 'lastName' | 'email' | 'role' | 'lastLoginAt' | 'createdAt' | undefined,
+        sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+        page: page ? parseInt(page as string) : undefined,
+        pageSize: pageSize ? parseInt(pageSize as string) : undefined,
       };
 
-      const users = await userService.getUsers(req.user.organizationId, filters);
+      const result = await userService.getUsers(req.user.organizationId, filters);
 
       return res.json({
-        data: users,
+        data: result.data,
+        pagination: result.pagination,
       });
     } catch (error) {
       return next(error);

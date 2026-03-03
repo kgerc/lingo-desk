@@ -202,14 +202,19 @@ export interface CourseFilters {
   search?: string;
   teacherId?: string;
   courseType?: CourseFormat;
+  level?: string;
+  deliveryMode?: string;
   isActive?: boolean;
-  sortBy?: 'name' | 'startDate' | 'createdAt';
+  sortBy?: 'name' | 'startDate' | 'createdAt' | 'teacher';
   sortOrder?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
 }
 
 function buildCourseOrderBy(sortBy?: string, sortOrder: 'asc' | 'desc' = 'desc'): any {
   if (sortBy === 'name') return { name: sortOrder };
   if (sortBy === 'startDate') return { startDate: sortOrder };
+  if (sortBy === 'teacher') return { teacher: { user: { lastName: sortOrder } } };
   return { createdAt: sortOrder }; // default: createdAt
 }
 
@@ -600,7 +605,11 @@ class CourseService {
   }
 
   async getCourses(organizationId: string, filters?: CourseFilters) {
-    const { search, teacherId, courseType, isActive, sortBy, sortOrder = 'desc' } = filters || {};
+    const { search, teacherId, courseType, level, deliveryMode, isActive, sortBy, sortOrder = 'desc', page = 1, pageSize = 10 } = filters || {};
+
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.min(Math.max(1, pageSize), 100);
+    const skip = (safePage - 1) * safePageSize;
 
     const where: any = {
       organizationId,
@@ -630,47 +639,70 @@ class CourseService {
       where.courseType = courseType;
     }
 
+    if (level) {
+      where.level = level;
+    }
+
+    if (deliveryMode) {
+      where.deliveryMode = deliveryMode;
+    }
+
     if (isActive !== undefined) {
       where.isActive = isActive;
     }
 
-    const courses = await prisma.course.findMany({
-      where,
-      include: {
-        teacher: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                avatarUrl: true,
+    const [total, courses] = await Promise.all([
+      prisma.course.count({ where }),
+      prisma.course.findMany({
+        where,
+        skip,
+        take: safePageSize,
+        include: {
+          teacher: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  avatarUrl: true,
+                },
               },
             },
           },
-        },
-        enrollments: {
-          where: {
-            status: 'ACTIVE',
+          enrollments: {
+            where: {
+              status: 'ACTIVE',
+            },
+            select: {
+              id: true,
+              studentId: true,
+              status: true,
+            },
           },
-          select: {
-            id: true,
-            studentId: true,
-            status: true,
+          _count: {
+            select: {
+              enrollments: true,
+              lessons: true,
+            },
           },
         },
-        _count: {
-          select: {
-            enrollments: true,
-            lessons: true,
-          },
-        },
-      },
-      orderBy: buildCourseOrderBy(sortBy, sortOrder),
-    });
+        orderBy: buildCourseOrderBy(sortBy, sortOrder),
+      }),
+    ]);
 
-    return courses;
+    const totalPages = Math.ceil(total / safePageSize);
+    return {
+      data: courses,
+      pagination: {
+        page: safePage,
+        pageSize: safePageSize,
+        total,
+        totalPages,
+        hasMore: safePage < totalPages,
+      },
+    };
   }
 
   async getCourseById(id: string, organizationId: string) {

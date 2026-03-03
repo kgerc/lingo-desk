@@ -163,10 +163,13 @@ export const lessonService = {
     studentId?: string;
     courseId?: string;
     status?: LessonStatus;
+    deliveryMode?: LessonDeliveryMode;
     startDate?: string;
     endDate?: string;
     sortBy?: 'scheduledAt' | 'createdAt';
     sortOrder?: 'asc' | 'desc';
+    page?: number;
+    pageSize?: number;
   }) {
     const params = new URLSearchParams();
     if (filters?.search) params.append('search', filters.search);
@@ -174,13 +177,16 @@ export const lessonService = {
     if (filters?.studentId) params.append('studentId', filters.studentId);
     if (filters?.courseId) params.append('courseId', filters.courseId);
     if (filters?.status) params.append('status', filters.status);
+    if (filters?.deliveryMode) params.append('deliveryMode', filters.deliveryMode);
     if (filters?.startDate) params.append('startDate', filters.startDate);
     if (filters?.endDate) params.append('endDate', filters.endDate);
     if (filters?.sortBy) params.append('sortBy', filters.sortBy);
     if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
+    if (filters?.page !== undefined) params.append('page', String(filters.page));
+    if (filters?.pageSize !== undefined) params.append('pageSize', String(filters.pageSize));
 
     const response = await api.get(`/lessons?${params.toString()}`) as any;
-    return response.data.data as Lesson[];
+    return { data: response.data.data as Lesson[], pagination: response.data.pagination };
   },
 
   async getLessonById(id: string) {

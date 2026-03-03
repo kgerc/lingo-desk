@@ -35,8 +35,8 @@ export interface GetPaymentsFilters {
   currency?: string; // Filter by currency
   dateFrom?: Date;
   dateTo?: Date;
-  limit?: number;
-  offset?: number;
+  page?: number;
+  pageSize?: number;
   convertToCurrency?: string; // Convert all amounts to this currency
   search?: string;
   sortBy?: 'createdAt' | 'amount' | 'paidAt';
@@ -56,13 +56,17 @@ class PaymentService {
       currency,
       dateFrom,
       dateTo,
-      limit = 50,
-      offset = 0,
+      page = 1,
+      pageSize = 10,
       convertToCurrency,
       search,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = filters;
+
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.min(Math.max(1, pageSize), 100);
+    const skip = (safePage - 1) * safePageSize;
 
     const where: any = {
       organizationId,
@@ -91,8 +95,12 @@ class PaymentService {
       };
     }
 
+    const total = await prisma.payment.count({ where });
+
     const payments = await prisma.payment.findMany({
       where,
+      skip,
+      take: safePageSize,
       include: {
         student: {
           include: {
@@ -124,13 +132,14 @@ class PaymentService {
       orderBy: {
         [sortBy]: sortOrder,
       },
-      take: limit,
-      skip: offset,
     });
 
+    const totalPages = Math.ceil(total / safePageSize);
+
     // If convertToCurrency is specified, convert all amounts
+    let resultData: any[] = payments;
     if (convertToCurrency) {
-      const paymentsWithConversion = await Promise.all(
+      resultData = await Promise.all(
         payments.map(async (payment) => {
           const convertedAmount = await this.convertPaymentAmount(
             payment,
@@ -148,11 +157,18 @@ class PaymentService {
           };
         })
       );
-
-      return paymentsWithConversion;
     }
 
-    return payments;
+    return {
+      data: resultData,
+      pagination: {
+        page: safePage,
+        pageSize: safePageSize,
+        total,
+        totalPages,
+        hasMore: safePage < totalPages,
+      },
+    };
   }
 
   /**

@@ -19,10 +19,11 @@ const MaterialsPage: React.FC = () => {
   });
 
   // Fetch courses
-  const { data: courses = [] } = useQuery({
+  const { data: coursesResult } = useQuery({
     queryKey: ['courses'],
-    queryFn: () => courseService.getCourses({ isActive: true }),
+    queryFn: () => courseService.getCourses({ isActive: true, pageSize: 200 }),
   });
+  const courses = coursesResult?.data ?? [];
 
   // Fetch materials for selected course
   const { data: materials = [], isLoading: isLoadingMaterials } = useQuery({

@@ -1,5 +1,5 @@
 import toast from 'react-hot-toast';
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { courseService, Course } from '../services/courseService';
@@ -11,6 +11,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Dropdown from '../components/Dropdown';
 import FilterBar from '../components/FilterBar';
+import Pagination from '../components/Pagination';
 
 const CoursesPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -21,6 +22,8 @@ const CoursesPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<'name' | 'startDate' | 'createdAt' | 'teacher'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
@@ -32,41 +35,26 @@ const CoursesPage: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
-  // Fetch courses (filters server-side, sorting client-side)
-  const { data: rawCourses = [], isLoading } = useQuery({
-    queryKey: ['courses', searchTerm, filterValues],
+  // Fetch courses (all filters and sorting server-side)
+  const { data: coursesResult, isLoading } = useQuery({
+    queryKey: ['courses', searchTerm, filterValues, sortBy, sortOrder, page, pageSize],
     queryFn: () => courseService.getCourses({
       search: searchTerm || undefined,
       courseType: filterValues['courseType'] as 'GROUP' | 'INDIVIDUAL' | undefined || undefined,
+      level: filterValues['level'] || undefined,
+      deliveryMode: filterValues['deliveryMode'] as 'IN_PERSON' | 'ONLINE' | 'BOTH' | undefined || undefined,
       isActive: filterValues['isActive'] !== '' && filterValues['isActive'] !== undefined
         ? filterValues['isActive'] === 'true'
         : undefined,
+      sortBy,
+      sortOrder,
+      page,
+      pageSize,
     }),
   });
 
-  const courses = useMemo(() => {
-    const levelFilter = filterValues['level'] || '';
-    const deliveryModeFilter = filterValues['deliveryMode'] || '';
-
-    const filtered = rawCourses.filter((c) => {
-      if (levelFilter && c.level !== levelFilter) return false;
-      if (deliveryModeFilter && c.deliveryMode !== deliveryModeFilter) return false;
-      return true;
-    });
-
-    const dir = sortOrder === 'asc' ? 1 : -1;
-    return [...filtered].sort((a, b) => {
-      if (sortBy === 'name') return dir * a.name.localeCompare(b.name, 'pl');
-      if (sortBy === 'startDate') return dir * (new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-      if (sortBy === 'createdAt') return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      if (sortBy === 'teacher') {
-        const aName = a.teacher ? `${a.teacher.user.lastName} ${a.teacher.user.firstName}` : '';
-        const bName = b.teacher ? `${b.teacher.user.lastName} ${b.teacher.user.firstName}` : '';
-        return dir * aName.localeCompare(bName, 'pl');
-      }
-      return 0;
-    });
-  }, [rawCourses, filterValues, sortBy, sortOrder]);
+  const courses = coursesResult?.data ?? [];
+  const coursesPagination = coursesResult?.pagination;
 
   // Fetch delete impact when dialog is open
   const { data: deleteImpact, isLoading: isImpactLoading } = useQuery({
@@ -249,6 +237,7 @@ const CoursesPage: React.FC = () => {
       setSortBy(column);
       setSortOrder('asc');
     }
+    setPage(1);
   };
 
   const SortIcon = ({ column }: { column: 'name' | 'startDate' | 'createdAt' | 'teacher' }) => {
@@ -264,7 +253,7 @@ const CoursesPage: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Kursy</h1>
           <p className="mt-2 text-gray-600">
-            Zarządzaj kursami i pakietami ({courses.length} kursów)
+            Zarządzaj kursami i pakietami ({coursesPagination?.total ?? courses.length} kursów)
           </p>
         </div>
         <button
@@ -278,7 +267,7 @@ const CoursesPage: React.FC = () => {
 
       <FilterBar
         searchValue={searchTerm}
-        onSearchChange={setSearchTerm}
+        onSearchChange={(v) => { setSearchTerm(v); setPage(1); }}
         searchPlaceholder="Szukaj kursu po nazwie, opisie lub lektorze..."
         filters={[
           { key: 'courseType', label: 'Typ kursu', type: 'select', options: [
@@ -303,8 +292,8 @@ const CoursesPage: React.FC = () => {
           ]},
         ]}
         filterValues={filterValues}
-        onFilterChange={(key, value) => setFilterValues((prev) => ({ ...prev, [key]: value }))}
-        onClearAll={() => { setSearchTerm(''); setFilterValues({}); setSortBy('createdAt'); setSortOrder('desc'); }}
+        onFilterChange={(key, value) => { setFilterValues((prev) => ({ ...prev, [key]: value })); setPage(1); }}
+        onClearAll={() => { setSearchTerm(''); setFilterValues({}); setSortBy('createdAt'); setSortOrder('desc'); setPage(1); }}
         filterCols={4}
       />
 
@@ -344,6 +333,7 @@ const CoursesPage: React.FC = () => {
             {searchTerm ? 'Nie znaleziono kursów' : 'Brak kursów. Dodaj pierwszy kurs!'}
           </div>
         ) : (
+          <>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
@@ -542,6 +532,18 @@ const CoursesPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+          {coursesPagination && coursesPagination.totalPages > 1 && (
+            <Pagination
+              page={coursesPagination.page}
+              totalPages={coursesPagination.totalPages}
+              pageSize={coursesPagination.pageSize}
+              total={coursesPagination.total}
+              onPageChange={setPage}
+              onPageSizeChange={(ps) => { setPageSize(ps); setPage(1); }}
+              isLoading={isLoading}
+            />
+          )}
+          </>
         )}
       </div>
 

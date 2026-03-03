@@ -90,9 +90,9 @@ export class TeacherController {
         });
       }
 
-      const { search, isActive, isAvailableForBooking, hourlyRateMin, hourlyRateMax, sortBy, sortOrder } = req.query;
+      const { search, isActive, isAvailableForBooking, hourlyRateMin, hourlyRateMax, contractType, language, sortBy, sortOrder, page, pageSize } = req.query;
 
-      const teachers = await teacherService.getTeachersWithVisibility(
+      const result = await teacherService.getTeachersWithVisibility(
         req.user.organizationId,
         req.user.role,
         {
@@ -106,13 +106,18 @@ export class TeacherController {
               : undefined,
           hourlyRateMin: hourlyRateMin ? Number(hourlyRateMin) : undefined,
           hourlyRateMax: hourlyRateMax ? Number(hourlyRateMax) : undefined,
-          sortBy: sortBy as 'lastName' | 'hourlyRate' | 'createdAt' | undefined,
+          contractType: contractType as ContractType | undefined,
+          language: language as string | undefined,
+          sortBy: sortBy as 'lastName' | 'hourlyRate' | 'createdAt' | 'email' | undefined,
           sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+          page: page ? parseInt(page as string) : undefined,
+          pageSize: pageSize ? parseInt(pageSize as string) : undefined,
         }
       );
 
       return res.json({
-        data: teachers,
+        data: result.data,
+        pagination: result.pagination,
       });
     } catch (error) {
       return next(error);

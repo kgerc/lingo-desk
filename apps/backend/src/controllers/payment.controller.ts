@@ -66,17 +66,17 @@ class PaymentController {
   async getPayments(req: AuthRequest, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
-      const { studentId, status, paymentMethod, dateFrom, dateTo, limit, offset, currency, convertToCurrency, search, sortBy, sortOrder } = req.query;
+      const { studentId, status, paymentMethod, dateFrom, dateTo, page, pageSize, currency, convertToCurrency, search, sortBy, sortOrder } = req.query;
 
-      const payments = await paymentService.getPayments({
+      const result = await paymentService.getPayments({
         organizationId,
         studentId: studentId as string | undefined,
         status: status as PaymentStatus | undefined,
         paymentMethod: paymentMethod as PaymentMethod | undefined,
         dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
         dateTo: dateTo ? new Date(dateTo as string) : undefined,
-        limit: limit ? parseInt(limit as string) : undefined,
-        offset: offset ? parseInt(offset as string) : undefined,
+        page: page ? parseInt(page as string) : undefined,
+        pageSize: pageSize ? parseInt(pageSize as string) : undefined,
         currency: currency as string | undefined,
         convertToCurrency: convertToCurrency as string | undefined,
         search: search as string | undefined,
@@ -86,7 +86,8 @@ class PaymentController {
 
       res.json({
         success: true,
-        data: payments,
+        data: result.data,
+        pagination: result.pagination,
       });
     } catch (error) {
       console.error('Error fetching payments:', error);

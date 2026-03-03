@@ -71,8 +71,8 @@ export interface GetPaymentsFilters {
   paymentMethod?: 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'ONLINE' | 'OTHER';
   dateFrom?: string;
   dateTo?: string;
-  limit?: number;
-  offset?: number;
+  page?: number;
+  pageSize?: number;
   currency?: string;
   convertToCurrency?: string;
   search?: string;
@@ -162,9 +162,9 @@ const paymentService = {
   /**
    * Get all payments with filters
    */
-  async getPayments(filters?: GetPaymentsFilters): Promise<Payment[]> {
+  async getPayments(filters?: GetPaymentsFilters): Promise<{ data: Payment[]; pagination: any }> {
     const response = await api.get('/payments', { params: filters }) as any;
-    return response.data.data;
+    return { data: response.data.data, pagination: response.data.pagination };
   },
 
   /**

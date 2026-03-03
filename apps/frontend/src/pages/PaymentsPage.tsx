@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { displayEmail } from '../utils/email';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import paymentService, { Payment } from '../services/paymentService';
 import { Plus, Trash2, Edit, DollarSign, Clock, CheckCircle, XCircle, Upload, Calculator, CreditCard, Bell, Settings, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import FilterBar from '../components/FilterBar';
+import Pagination from '../components/Pagination';
 import PaymentModal from '../components/PaymentModal';
 import ImportPaymentsModal from '../components/ImportPaymentsModal';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -53,51 +54,35 @@ export default function PaymentsPage() {
   const [sortBy, setSortBy] = useState<'createdAt' | 'amount' | 'paidAt' | 'student' | 'course'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const serverSortBy = (['createdAt', 'amount', 'paidAt'] as const).includes(sortBy as any)
+    ? sortBy as 'createdAt' | 'amount' | 'paidAt'
+    : undefined;
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; paymentId: string | null }>({ isOpen: false, paymentId: null });
   const [reminderDialog, setReminderDialog] = useState<{ isOpen: boolean; paymentId: string | null; studentName: string }>({ isOpen: false, paymentId: null, studentName: '' });
 
-  // Fetch payments (filters server-side, sorting client-side)
-  const { data: rawPayments = [] as Payment[], isLoading } = useQuery({
-    queryKey: ['payments', searchTerm, statusFilter, filterValues],
+  // Fetch payments (all filters server-side, pagination server-side)
+  const { data: paymentsResult, isLoading } = useQuery({
+    queryKey: ['payments', searchTerm, statusFilter, filterValues, sortBy, sortOrder, page, pageSize],
     queryFn: () => paymentService.getPayments({
       search: searchTerm || undefined,
       status: statusFilter as any || undefined,
+      paymentMethod: filterValues['paymentMethod'] as any || undefined,
       currency: filterValues['currency'] || undefined,
       convertToCurrency: filterValues['convertToCurrency'] || undefined,
       dateFrom: filterValues['dateFrom'] || undefined,
       dateTo: filterValues['dateTo'] || undefined,
+      sortBy: serverSortBy,
+      sortOrder,
+      page,
+      pageSize,
     }),
     enabled: activeTab === 'payments',
   });
 
-  const payments = useMemo(() => {
-    const paymentMethodFilter = filterValues['paymentMethod'] || '';
-    const filtered = paymentMethodFilter
-      ? rawPayments.filter((p) => p.paymentMethod === paymentMethodFilter)
-      : rawPayments;
-
-    const dir = sortOrder === 'asc' ? 1 : -1;
-    return [...filtered].sort((a, b) => {
-      if (sortBy === 'createdAt') return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      if (sortBy === 'amount') return dir * (a.amount - b.amount);
-      if (sortBy === 'paidAt') {
-        const aTime = a.paidAt ? new Date(a.paidAt).getTime() : 0;
-        const bTime = b.paidAt ? new Date(b.paidAt).getTime() : 0;
-        return dir * (aTime - bTime);
-      }
-      if (sortBy === 'student') {
-        const aName = a.student ? `${a.student.user.lastName}${a.student.user.firstName}` : '';
-        const bName = b.student ? `${b.student.user.lastName}${b.student.user.firstName}` : '';
-        return dir * aName.localeCompare(bName, 'pl');
-      }
-      if (sortBy === 'course') {
-        const aName = a.enrollment?.course?.name || '';
-        const bName = b.enrollment?.course?.name || '';
-        return dir * aName.localeCompare(bName, 'pl');
-      }
-      return 0;
-    });
-  }, [rawPayments, filterValues, sortBy, sortOrder]);
+  const payments = paymentsResult?.data ?? [];
+  const paymentsPagination = paymentsResult?.pagination;
 
   // Fetch payment stats
   const { data: stats } = useQuery({
@@ -187,6 +172,7 @@ export default function PaymentsPage() {
       setSortBy(column);
       setSortOrder('asc');
     }
+    setPage(1);
   };
 
   const SortIcon = ({ column }: { column: 'createdAt' | 'amount' | 'paidAt' | 'student' | 'course' }) => {
@@ -335,7 +321,7 @@ export default function PaymentsPage() {
           {/* Filters */}
           <FilterBar
             searchValue={searchTerm}
-            onSearchChange={setSearchTerm}
+            onSearchChange={(v) => { setSearchTerm(v); setPage(1); }}
             searchPlaceholder="Szukaj po uczniu..."
             filters={[
               { key: 'status', label: 'Status', type: 'select', options: [
@@ -362,12 +348,13 @@ export default function PaymentsPage() {
             ]}
             filterValues={{ ...filterValues, status: statusFilter }}
             onFilterChange={(key, value) => {
+              setPage(1);
               if (key === 'status') setStatusFilter(value);
               else setFilterValues((prev) => ({ ...prev, [key]: value }));
             }}
             onClearAll={() => {
               setSearchTerm(''); setStatusFilter(''); setFilterValues({});
-              setSortBy('createdAt'); setSortOrder('desc');
+              setSortBy('createdAt'); setSortOrder('desc'); setPage(1);
             }}
             filterCols={6}
           />
@@ -488,6 +475,17 @@ export default function PaymentsPage() {
                 </tbody>
               </table>
             </div>
+            {paymentsPagination && paymentsPagination.totalPages > 1 && (
+              <Pagination
+                page={paymentsPagination.page}
+                totalPages={paymentsPagination.totalPages}
+                pageSize={paymentsPagination.pageSize}
+                total={paymentsPagination.total}
+                onPageChange={(p) => setPage(p)}
+                onPageSizeChange={(ps) => { setPageSize(ps); setPage(1); }}
+                isLoading={isLoading}
+              />
+            )}
           </div>
         </>
       )}

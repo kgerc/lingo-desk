@@ -19,10 +19,11 @@ const EnrollStudentModal: React.FC<EnrollStudentModalProps> = ({ course, onClose
   const [error, setError] = useState('');
 
   // Fetch all active students
-  const { data: allStudents = [] } = useQuery({
+  const { data: allStudentsResult } = useQuery({
     queryKey: ['students'],
-    queryFn: () => studentService.getStudents({ isActive: true }),
+    queryFn: () => studentService.getStudents({ isActive: true, pageSize: 500 }),
   });
+  const allStudents = allStudentsResult?.data ?? [];
 
   // Fetch current course data to get updated enrollments
   const { data: currentCourse } = useQuery({

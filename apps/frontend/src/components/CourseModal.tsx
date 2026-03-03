@@ -153,16 +153,18 @@ const CourseModal: React.FC<CourseModalProps> = ({ course, isCopy, onClose, onSu
   }, [errors]);
 
   // Fetch teachers for dropdown
-  const { data: teachers = [] } = useQuery({
+  const { data: teachersResult } = useQuery({
     queryKey: ['teachers'],
-    queryFn: () => teacherService.getTeachers({ isActive: true }),
+    queryFn: () => teacherService.getTeachers({ isActive: true, pageSize: 200 }),
   });
+  const teachers = teachersResult?.data ?? [];
 
   // Fetch students for selection
-  const { data: students = [] } = useQuery({
+  const { data: studentsResult } = useQuery({
     queryKey: ['students'],
-    queryFn: () => studentService.getStudents({ isActive: true }),
+    queryFn: () => studentService.getStudents({ isActive: true, pageSize: 500 }),
   });
+  const students = studentsResult?.data ?? [];
 
   // Fetch skipHolidays setting
   const { data: holidaysSettings } = useQuery({

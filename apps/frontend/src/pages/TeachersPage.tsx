@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { teacherService, Teacher } from '../services/teacherService';
@@ -9,6 +9,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Dropdown from '../components/Dropdown';
 import FilterBar from '../components/FilterBar';
+import Pagination from '../components/Pagination';
 
 type TabType = 'list' | 'payouts';
 
@@ -19,6 +20,8 @@ const TeachersPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<'lastName' | 'hourlyRate' | 'createdAt' | 'email'>('lastName');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; teacherId: string | null }>({ isOpen: false, teacherId: null });
@@ -27,37 +30,26 @@ const TeachersPage: React.FC = () => {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
-  // Fetch teachers (filters server-side, sorting client-side)
-  const { data: rawTeachers = [], isLoading } = useQuery({
-    queryKey: ['teachers', searchTerm, filterValues],
+  // Fetch teachers (all filters and sorting server-side)
+  const { data: teachersResult, isLoading } = useQuery({
+    queryKey: ['teachers', searchTerm, filterValues, sortBy, sortOrder, page, pageSize],
     queryFn: () => teacherService.getTeachers({
       search: searchTerm || undefined,
       isActive: filterValues['isActive'] === 'true' ? true : filterValues['isActive'] === 'false' ? false : undefined,
-      hourlyRateMin: filterValues['hourlyRateMin'] !== undefined && filterValues['hourlyRateMin'] !== '' ? Number(filterValues['hourlyRateMin']) : undefined,
-      hourlyRateMax: filterValues['hourlyRateMax'] !== undefined && filterValues['hourlyRateMax'] !== '' ? Number(filterValues['hourlyRateMax']) : undefined,
+      contractType: filterValues['contractType'] as 'B2B' | 'EMPLOYMENT' | 'CIVIL' | undefined || undefined,
+      language: filterValues['language'] || undefined,
+      hourlyRateMin: filterValues['hourlyRateMin'] !== '' && filterValues['hourlyRateMin'] !== undefined ? Number(filterValues['hourlyRateMin']) : undefined,
+      hourlyRateMax: filterValues['hourlyRateMax'] !== '' && filterValues['hourlyRateMax'] !== undefined ? Number(filterValues['hourlyRateMax']) : undefined,
+      sortBy,
+      sortOrder,
+      page,
+      pageSize,
     }),
     enabled: activeTab === 'list',
   });
 
-  const teachers = useMemo(() => {
-    const contractTypeFilter = filterValues['contractType'] || '';
-    const languageFilter = filterValues['language'] || '';
-
-    const filtered = rawTeachers.filter((t) => {
-      if (contractTypeFilter && t.contractType !== contractTypeFilter) return false;
-      if (languageFilter && !t.languages.includes(languageFilter)) return false;
-      return true;
-    });
-
-    const dir = sortOrder === 'asc' ? 1 : -1;
-    return [...filtered].sort((a, b) => {
-      if (sortBy === 'lastName') return dir * a.user.lastName.localeCompare(b.user.lastName, 'pl');
-      if (sortBy === 'hourlyRate') return dir * (a.hourlyRate - b.hourlyRate);
-      if (sortBy === 'createdAt') return dir * (new Date(a.user.createdAt).getTime() - new Date(b.user.createdAt).getTime());
-      if (sortBy === 'email') return dir * a.user.email.localeCompare(b.user.email);
-      return 0;
-    });
-  }, [rawTeachers, filterValues, sortBy, sortOrder]);
+  const teachers = teachersResult?.data ?? [];
+  const teachersPagination = teachersResult?.pagination;
 
   // Bulk delete mutation
   const bulkDeleteMutation = useMutation({
@@ -165,6 +157,7 @@ const TeachersPage: React.FC = () => {
       setSortBy(column);
       setSortOrder('asc');
     }
+    setPage(1);
   };
 
   const SortIcon = ({ column }: { column: 'lastName' | 'hourlyRate' | 'createdAt' | 'email' }) => {
@@ -224,7 +217,7 @@ const TeachersPage: React.FC = () => {
         <>
           <FilterBar
             searchValue={searchTerm}
-            onSearchChange={setSearchTerm}
+            onSearchChange={(v) => { setSearchTerm(v); setPage(1); }}
             searchPlaceholder="Szukaj lektora po imieniu, nazwisku lub emailu..."
             filters={[
               {
@@ -246,8 +239,8 @@ const TeachersPage: React.FC = () => {
               { key: 'hourlyRateMax', label: 'Stawka do (PLN/h)', type: 'number', placeholder: 'np. 150' },
             ]}
             filterValues={filterValues}
-            onFilterChange={(key, value) => setFilterValues((prev) => ({ ...prev, [key]: value }))}
-            onClearAll={() => { setSearchTerm(''); setFilterValues({}); setSortBy('lastName'); setSortOrder('asc'); }}
+            onFilterChange={(key, value) => { setFilterValues((prev) => ({ ...prev, [key]: value })); setPage(1); }}
+            onClearAll={() => { setSearchTerm(''); setFilterValues({}); setSortBy('lastName'); setSortOrder('asc'); setPage(1); }}
             filterCols={5}
           />
 
@@ -287,6 +280,7 @@ const TeachersPage: React.FC = () => {
                 {searchTerm ? 'Nie znaleziono lektorów' : 'Brak lektorów. Dodaj pierwszego lektora!'}
               </div>
             ) : (
+              <>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
@@ -477,6 +471,18 @@ const TeachersPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+              {teachersPagination && teachersPagination.totalPages > 1 && (
+                <Pagination
+                  page={teachersPagination.page}
+                  totalPages={teachersPagination.totalPages}
+                  pageSize={teachersPagination.pageSize}
+                  total={teachersPagination.total}
+                  onPageChange={setPage}
+                  onPageSizeChange={(ps) => { setPageSize(ps); setPage(1); }}
+                  isLoading={isLoading}
+                />
+              )}
+              </>
             )}
           </div>
         </>

@@ -24,9 +24,8 @@ const GroupsPage: React.FC = () => {
   const { data: groups = [], isLoading } = useQuery({
     queryKey: ['groups', searchTerm],
     queryFn: async () => {
-      const allCourses = await courseService.getCourses({ search: searchTerm });
-      // Filter only GROUP format courses
-      return allCourses.filter((course) => course.courseType === 'GROUP');
+      const result = await courseService.getCourses({ search: searchTerm, courseType: 'GROUP', pageSize: 200 });
+      return result.data;
     },
   });
 

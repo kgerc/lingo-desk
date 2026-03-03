@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef } from 'react';
 import { displayEmail } from '../utils/email';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { studentService, Student } from '../services/studentService';
 import { Plus, Mail, Phone, MoreVertical, Upload, Calculator, Trash2, Loader2, Archive, ArchiveRestore, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react';
 import FilterBar from '../components/FilterBar';
+import Pagination from '../components/Pagination';
 import { useAuthStore } from '../stores/authStore';
 import StudentModal from '../components/StudentModal';
 import ImportStudentsModal from '../components/ImportStudentsModal';
@@ -23,6 +24,8 @@ const StudentsPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<'studentNumber' | 'firstName' | 'languageLevel' | 'balance' | 'email'>('studentNumber');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isCancellationsModalOpen, setIsCancellationsModalOpen] = useState(false);
@@ -44,29 +47,24 @@ const StudentsPage: React.FC = () => {
     navigate(`/payments?tab=settlements&studentId=${student.id}`);
   };
 
-  // Fetch active students (filters server-side, sorting client-side)
-  const { data: rawStudents = [], isLoading } = useQuery({
-    queryKey: ['students', searchTerm, filterValues],
+  // Fetch active students (all filters and sorting server-side)
+  const { data: studentsResult, isLoading } = useQuery({
+    queryKey: ['students', searchTerm, filterValues, sortBy, sortOrder, page, pageSize],
     queryFn: () => studentService.getStudents({
       search: searchTerm || undefined,
       languageLevel: filterValues['languageLevel'] || undefined,
       isActive: filterValues['isActive'] === 'true' ? true : filterValues['isActive'] === 'false' ? false : undefined,
       balanceMin: filterValues['balanceMin'] !== undefined && filterValues['balanceMin'] !== '' ? Number(filterValues['balanceMin']) : undefined,
       balanceMax: filterValues['balanceMax'] !== undefined && filterValues['balanceMax'] !== '' ? Number(filterValues['balanceMax']) : undefined,
+      sortBy,
+      sortOrder,
+      page,
+      pageSize,
     }),
   });
 
-  const students = useMemo(() => {
-    const dir = sortOrder === 'asc' ? 1 : -1;
-    return [...rawStudents].sort((a, b) => {
-      if (sortBy === 'studentNumber') return dir * (Number(a.studentNumber) - Number(b.studentNumber));
-      if (sortBy === 'firstName') return dir * a.user.firstName.localeCompare(b.user.firstName, 'pl');
-      if (sortBy === 'languageLevel') return dir * a.languageLevel.localeCompare(b.languageLevel);
-      if (sortBy === 'balance') return dir * ((a.budget?.balance ?? 0) - (b.budget?.balance ?? 0));
-      if (sortBy === 'email') return dir * (a.user.email ?? '').localeCompare(b.user.email ?? '');
-      return 0;
-    });
-  }, [rawStudents, sortBy, sortOrder]);
+  const students = studentsResult?.data ?? [];
+  const studentsPagination = studentsResult?.pagination;
 
   // Fetch archived students
   const { data: archivedStudents = [], isLoading: isLoadingArchived } = useQuery({
@@ -203,6 +201,7 @@ const StudentsPage: React.FC = () => {
       setSortBy(column);
       setSortOrder('asc');
     }
+    setPage(1);
   };
 
 
@@ -219,7 +218,7 @@ const StudentsPage: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Uczniowie</h1>
           <p className="mt-2 text-gray-600">
-            Zarządzaj uczniami swojej szkoły ({students.length} uczniów)
+            Zarządzaj uczniami swojej szkoły ({studentsPagination?.total ?? students.length} uczniów)
           </p>
         </div>
         <div className="flex gap-3">
@@ -250,7 +249,7 @@ const StudentsPage: React.FC = () => {
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Aktywni ({students.length})
+          Aktywni ({studentsPagination?.total ?? students.length})
         </button>
         <button
           onClick={() => setActiveTab('archived')}
@@ -269,7 +268,7 @@ const StudentsPage: React.FC = () => {
       {activeTab === 'active' && (
         <FilterBar
           searchValue={searchTerm}
-          onSearchChange={setSearchTerm}
+          onSearchChange={(v) => { setSearchTerm(v); setPage(1); }}
           searchPlaceholder="Szukaj ucznia po imieniu, nazwisku lub emailu..."
           filters={[
             { key: 'languageLevel', label: 'Poziom językowy', type: 'select', options:
@@ -288,8 +287,8 @@ const StudentsPage: React.FC = () => {
             { key: 'balanceMax', label: 'Saldo do (zł)', type: 'number', placeholder: 'np. 500' },
           ]}
           filterValues={filterValues}
-          onFilterChange={(key, value) => setFilterValues((prev) => ({ ...prev, [key]: value }))}
-          onClearAll={() => { setSearchTerm(''); setFilterValues({}); setSortBy('studentNumber'); setSortOrder('desc'); }}
+          onFilterChange={(key, value) => { setFilterValues((prev) => ({ ...prev, [key]: value })); setPage(1); }}
+          onClearAll={() => { setSearchTerm(''); setFilterValues({}); setSortBy('studentNumber'); setSortOrder('desc'); setPage(1); }}
           filterCols={4}
         />
       )}
@@ -330,6 +329,7 @@ const StudentsPage: React.FC = () => {
             {searchTerm ? 'Nie znaleziono uczniów' : 'Brak uczniów. Dodaj pierwszego ucznia!'}
           </div>
         ) : (
+          <>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
@@ -506,6 +506,18 @@ const StudentsPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+          {studentsPagination && studentsPagination.totalPages > 1 && (
+            <Pagination
+              page={studentsPagination.page}
+              totalPages={studentsPagination.totalPages}
+              pageSize={studentsPagination.pageSize}
+              total={studentsPagination.total}
+              onPageChange={setPage}
+              onPageSizeChange={(ps) => { setPageSize(ps); setPage(1); }}
+              isLoading={isLoading}
+            />
+          )}
+          </>
         )}
       </div>}
 

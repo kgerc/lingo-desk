@@ -59,23 +59,26 @@ const MailingsPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch all students for selection
-  const { data: students = [] } = useQuery({
+  const { data: studentsResult } = useQuery({
     queryKey: ['students'],
-    queryFn: () => studentService.getStudents(),
+    queryFn: () => studentService.getStudents({ pageSize: 500 }),
   });
+  const students = studentsResult?.data ?? [];
 
   // Fetch courses for course recipient selection
-  const { data: courses = [] } = useQuery({
+  const { data: coursesResult } = useQuery({
     queryKey: ['courses'],
-    queryFn: () => courseService.getCourses({ isActive: true }),
+    queryFn: () => courseService.getCourses({ isActive: true, pageSize: 200 }),
   });
+  const courses = coursesResult?.data ?? [];
 
   // Fetch lessons for lesson recipient selection (only when course is selected)
-  const { data: lessons = [] } = useQuery({
+  const { data: lessonsResult } = useQuery({
     queryKey: ['lessons', formData.courseId],
-    queryFn: () => lessonService.getLessons({ courseId: formData.courseId }),
+    queryFn: () => lessonService.getLessons({ courseId: formData.courseId, pageSize: 200 }),
     enabled: formData.recipients === 'lesson' && !!formData.courseId,
   });
+  const lessons = lessonsResult?.data ?? [];
 
   // Fetch debtors count
   const { data: debtorsCount = 0 } = useQuery({

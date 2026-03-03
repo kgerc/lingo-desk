@@ -9,6 +9,7 @@ import { Calculator, Calendar, TrendingUp, TrendingDown, Minus, ChevronRight, Ar
 import LoadingSpinner from './LoadingSpinner';
 import ConfirmDialog from './ConfirmDialog';
 import FilterBar from './FilterBar';
+import Pagination from './Pagination';
 
 type ViewMode = 'list' | 'settlement' | 'history';
 
@@ -29,6 +30,8 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [balanceMin, setBalanceMin] = useState('');
   const [balanceMax, setBalanceMax] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [periodStart, setPeriodStart] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -44,11 +47,12 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
   });
 
   // Fetch group courses for filter dropdown
-  const { data: groupCourses = [] } = useQuery({
+  const { data: groupCoursesResult } = useQuery({
     queryKey: ['group-courses-for-settlement'],
-    queryFn: () => courseService.getCourses({ courseType: 'GROUP' }),
+    queryFn: () => courseService.getCourses({ courseType: 'GROUP', pageSize: 200 }),
     enabled: viewMode === 'list',
   });
+  const groupCourses = groupCoursesResult?.data ?? [];
 
   // Fetch student settlement info when selected
   const { data: settlementInfo, isLoading: isLoadingInfo } = useQuery({
@@ -277,6 +281,7 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
       setSortBy(col);
       setSortOrder('asc');
     }
+    setPage(1);
   }
 
   function SortIcon({ col }: { col: typeof sortBy }) {
@@ -308,6 +313,9 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
     return 'Rozliczone';
   };
 
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
+  const pagedStudents = filteredStudents.slice((page - 1) * pageSize, page * pageSize);
+
   // Render student list view
   if (viewMode === 'list') {
     return (
@@ -315,7 +323,7 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
         {/* Search and Group Filter */}
         <FilterBar
           searchValue={searchTerm}
-          onSearchChange={setSearchTerm}
+          onSearchChange={(v) => { setSearchTerm(v); setPage(1); }}
           searchPlaceholder="Szukaj ucznia po imieniu, nazwisku lub emailu..."
           filters={[
             {
@@ -332,8 +340,9 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
             if (key === 'courseId') setSelectedCourseId(value);
             if (key === 'balanceMin') setBalanceMin(value);
             if (key === 'balanceMax') setBalanceMax(value);
+            setPage(1);
           }}
-          onClearAll={() => { setSearchTerm(''); setSelectedCourseId(''); setBalanceMin(''); setBalanceMax(''); }}
+          onClearAll={() => { setSearchTerm(''); setSelectedCourseId(''); setBalanceMin(''); setBalanceMax(''); setPage(1); }}
           filterCols={3}
         />
 
@@ -383,7 +392,7 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
                     </td>
                   </tr>
                 ) : (
-                  filteredStudents.map((student) => (
+                  pagedStudents.map((student) => (
                     <tr key={student.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
@@ -437,6 +446,17 @@ export default function SettlementsTab({ preselectedStudentId, onStudentSelected
               </tbody>
             </table>
           </div>
+          {filteredStudents.length > 0 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              total={filteredStudents.length}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+              isLoading={isLoadingStudents}
+            />
+          )}
         </div>
       </div>
     );

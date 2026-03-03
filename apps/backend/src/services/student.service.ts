@@ -1,5 +1,5 @@
 import prisma from '../utils/prisma';
-import { LanguageLevel, UserRole } from '@prisma/client';
+import { EnrollmentStatus, LanguageLevel, UserRole } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { parse } from 'csv-parse/sync';
 import { organizationService, VisibilitySettings } from './organization.service';
@@ -158,8 +158,10 @@ export class StudentService {
     isActive?: boolean;
     balanceMin?: number;
     balanceMax?: number;
-    sortBy?: 'studentNumber' | 'firstName' | 'languageLevel' | 'balance';
+    sortBy?: 'studentNumber' | 'firstName' | 'languageLevel' | 'balance' | 'email';
     sortOrder?: 'asc' | 'desc';
+    page?: number;
+    pageSize?: number;
   }) {
     const where: any = { organizationId };
 
@@ -196,60 +198,91 @@ export class StudentService {
       orderBy = { languageLevel: sortOrder };
     } else if (filters?.sortBy === 'studentNumber') {
       orderBy = { studentNumber: sortOrder };
+    } else if (filters?.sortBy === 'email') {
+      orderBy = { user: { email: sortOrder } };
     }
     // 'balance' sorting handled in JS after fetch
 
-    let students = await prisma.student.findMany({
-      where,
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-            avatarUrl: true,
-            isActive: true,
-            createdAt: true,
-          },
+    const needsJsFallback = filters?.sortBy === 'balance' || filters?.balanceMin !== undefined || filters?.balanceMax !== undefined;
+
+    const safePage = Math.max(1, filters?.page ?? 1);
+    const safePageSize = Math.min(Math.max(1, filters?.pageSize ?? 10), 100);
+
+    const include = {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          avatarUrl: true,
+          isActive: true,
+          createdAt: true,
         },
-        budget: true,
-        enrollments: {
-          where: { status: 'ACTIVE' },
-          include: {
-            course: {
-              select: {
-                id: true,
-                name: true,
-              },
+      },
+      budget: true,
+      enrollments: {
+        where: { status: EnrollmentStatus.ACTIVE },
+        include: {
+          course: {
+            select: {
+              id: true,
+              name: true,
             },
           },
         },
       },
-      orderBy,
-    });
+    };
 
-    // Filter by balance range (JS — budget is a relation, can't filter in Prisma directly)
-    if (filters?.balanceMin !== undefined || filters?.balanceMax !== undefined) {
-      students = students.filter((s) => {
-        const bal = Number(s.budget?.currentBalance ?? 0);
-        if (filters.balanceMin !== undefined && bal < filters.balanceMin) return false;
-        if (filters.balanceMax !== undefined && bal > filters.balanceMax) return false;
-        return true;
-      });
+    if (needsJsFallback) {
+      // Fetch all (no pagination) for JS balance filter/sort
+      let students = await prisma.student.findMany({ where, include, orderBy }) as any[];
+
+      // Filter by balance range
+      if (filters?.balanceMin !== undefined || filters?.balanceMax !== undefined) {
+        students = students.filter((s) => {
+          const bal = Number(s.budget?.currentBalance ?? 0);
+          if (filters.balanceMin !== undefined && bal < filters.balanceMin) return false;
+          if (filters.balanceMax !== undefined && bal > filters.balanceMax) return false;
+          return true;
+        });
+      }
+
+      // Sort by balance in JS
+      if (filters?.sortBy === 'balance') {
+        students = students.sort((a, b) => {
+          const ba = Number(a.budget?.currentBalance ?? 0);
+          const bb = Number(b.budget?.currentBalance ?? 0);
+          return sortOrder === 'asc' ? ba - bb : bb - ba;
+        });
+      }
+
+      const total = students.length;
+      const totalPages = Math.ceil(total / safePageSize);
+      const skip = (safePage - 1) * safePageSize;
+      return {
+        data: students.slice(skip, skip + safePageSize),
+        pagination: { page: safePage, pageSize: safePageSize, total, totalPages, hasMore: safePage < totalPages },
+      };
     }
 
-    // Sort by balance in JS
-    if (filters?.sortBy === 'balance') {
-      students = students.sort((a, b) => {
-        const ba = Number(a.budget?.currentBalance ?? 0);
-        const bb = Number(b.budget?.currentBalance ?? 0);
-        return sortOrder === 'asc' ? ba - bb : bb - ba;
-      });
-    }
+    const [total, students] = await Promise.all([
+      prisma.student.count({ where }),
+      prisma.student.findMany({
+        where,
+        include,
+        orderBy,
+        skip: (safePage - 1) * safePageSize,
+        take: safePageSize,
+      }),
+    ]);
 
-    return students;
+    const totalPages = Math.ceil(total / safePageSize);
+    return {
+      data: students,
+      pagination: { page: safePage, pageSize: safePageSize, total, totalPages, hasMore: safePage < totalPages },
+    };
   }
 
   async getStudentById(id: string, organizationId: string) {
@@ -558,7 +591,7 @@ export class StudentService {
         },
         budget: true,
         enrollments: {
-          where: { status: 'ACTIVE' },
+          where: { status: EnrollmentStatus.ACTIVE },
           include: { course: { select: { id: true, name: true } } },
         },
       },
@@ -913,36 +946,41 @@ export class StudentService {
       isActive?: boolean;
       balanceMin?: number;
       balanceMax?: number;
-      sortBy?: 'studentNumber' | 'firstName' | 'languageLevel' | 'balance';
+      sortBy?: 'studentNumber' | 'firstName' | 'languageLevel' | 'balance' | 'email';
       sortOrder?: 'asc' | 'desc';
+      page?: number;
+      pageSize?: number;
     }
   ) {
-    const students = await this.getStudents(organizationId, filters);
+    const result = await this.getStudents(organizationId, filters);
 
     // ADMIN sees everything
     if (userRole === UserRole.ADMIN) {
-      return students;
+      return result;
     }
 
     // MANAGER - apply visibility settings
     if (userRole === UserRole.MANAGER) {
       const visibility = await organizationService.getVisibilitySettings(organizationId);
-      return students.map(student => this.filterStudentForManager(student, visibility.student));
+      return { ...result, data: result.data.map(student => this.filterStudentForManager(student, visibility.student)) };
     }
 
     // Other roles - return basic info (no internalNotes)
-    return students.map(student => ({
-      id: student.id,
-      studentNumber: student.studentNumber,
-      user: {
-        id: student.user.id,
-        firstName: student.user.firstName,
-        lastName: student.user.lastName,
-        avatarUrl: student.user.avatarUrl,
-      },
-      languageLevel: student.languageLevel,
-      language: student.language,
-    }));
+    return {
+      ...result,
+      data: result.data.map((student: any) => ({
+        id: student.id,
+        studentNumber: student.studentNumber,
+        user: {
+          id: student.user.id,
+          firstName: student.user.firstName,
+          lastName: student.user.lastName,
+          avatarUrl: student.user.avatarUrl,
+        },
+        languageLevel: student.languageLevel,
+        language: student.language,
+      })),
+    };
   }
 
   /**

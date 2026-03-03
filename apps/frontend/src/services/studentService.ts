@@ -91,6 +91,8 @@ export const studentService = {
     balanceMax?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    page?: number;
+    pageSize?: number;
   }) {
     const params = new URLSearchParams();
     if (filters?.search) params.append('search', filters.search);
@@ -100,9 +102,11 @@ export const studentService = {
     if (filters?.balanceMax !== undefined) params.append('balanceMax', String(filters.balanceMax));
     if (filters?.sortBy) params.append('sortBy', filters.sortBy);
     if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
+    if (filters?.page !== undefined) params.append('page', String(filters.page));
+    if (filters?.pageSize !== undefined) params.append('pageSize', String(filters.pageSize));
 
     const response = await api.get(`/students?${params.toString()}`) as any;
-    return response.data.data as Student[];
+    return { data: response.data.data as Student[], pagination: response.data.pagination };
   },
 
   async getMe() {
@@ -172,8 +176,8 @@ export const studentService = {
   },
 
   async getStudentsWithLowBudget() {
-    // Get all students with their enrollments
-    const students = await this.getStudents({ isActive: true });
+    // Get all students with their enrollments (fetch all pages by using large pageSize)
+    const { data: students } = await this.getStudents({ isActive: true, pageSize: 500 });
 
     // For each student, check their enrollments for low budget
     const lowBudgetAlerts: Array<{

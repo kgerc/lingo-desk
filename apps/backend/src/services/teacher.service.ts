@@ -36,6 +36,7 @@ interface UpdateTeacherData {
 
 function buildTeacherOrderBy(sortBy?: string, sortOrder: 'asc' | 'desc' = 'asc'): any {
   if (sortBy === 'lastName') return { user: { lastName: sortOrder } };
+  if (sortBy === 'email') return { user: { email: sortOrder } };
   if (sortBy === 'hourlyRate') return { hourlyRate: sortOrder };
   if (sortBy === 'createdAt') return { createdAt: sortOrder };
   return { createdAt: 'desc' }; // default: newest first
@@ -129,8 +130,12 @@ export class TeacherService {
     isAvailableForBooking?: boolean;
     hourlyRateMin?: number;
     hourlyRateMax?: number;
-    sortBy?: 'lastName' | 'hourlyRate' | 'createdAt';
+    contractType?: ContractType;
+    language?: string;
+    sortBy?: 'lastName' | 'hourlyRate' | 'createdAt' | 'email';
     sortOrder?: 'asc' | 'desc';
+    page?: number;
+    pageSize?: number;
   }) {
     const where: any = { organizationId };
 
@@ -161,32 +166,59 @@ export class TeacherService {
       if (filters.hourlyRateMax !== undefined) where.hourlyRate.lte = filters.hourlyRateMax;
     }
 
-    const teachers = await prisma.teacher.findMany({
-      where,
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-            avatarUrl: true,
-            isActive: true,
-            createdAt: true,
-          },
-        },
-        _count: {
-          select: {
-            courses: true,
-            lessons: true,
-          },
-        },
-      },
-      orderBy: buildTeacherOrderBy(filters?.sortBy, filters?.sortOrder),
-    });
+    if (filters?.contractType) {
+      where.contractType = filters.contractType;
+    }
 
-    return teachers;
+    if (filters?.language) {
+      where.languages = { has: filters.language };
+    }
+
+    const safePage = Math.max(1, filters?.page ?? 1);
+    const safePageSize = Math.min(Math.max(1, filters?.pageSize ?? 10), 100);
+    const skip = (safePage - 1) * safePageSize;
+
+    const [total, teachers] = await Promise.all([
+      prisma.teacher.count({ where }),
+      prisma.teacher.findMany({
+        where,
+        skip,
+        take: safePageSize,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              avatarUrl: true,
+              isActive: true,
+              createdAt: true,
+            },
+          },
+          _count: {
+            select: {
+              courses: true,
+              lessons: true,
+            },
+          },
+        },
+        orderBy: buildTeacherOrderBy(filters?.sortBy, filters?.sortOrder),
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / safePageSize);
+    return {
+      data: teachers,
+      pagination: {
+        page: safePage,
+        pageSize: safePageSize,
+        total,
+        totalPages,
+        hasMore: safePage < totalPages,
+      },
+    };
   }
 
   async getTeacherById(id: string, organizationId: string) {
@@ -492,32 +524,35 @@ export class TeacherService {
   async getTeachersWithVisibility(
     organizationId: string,
     userRole: UserRole,
-    filters?: { search?: string; isActive?: boolean; isAvailableForBooking?: boolean; hourlyRateMin?: number; hourlyRateMax?: number; sortBy?: 'lastName' | 'hourlyRate' | 'createdAt'; sortOrder?: 'asc' | 'desc' }
+    filters?: { search?: string; isActive?: boolean; isAvailableForBooking?: boolean; hourlyRateMin?: number; hourlyRateMax?: number; contractType?: ContractType; language?: string; sortBy?: 'lastName' | 'hourlyRate' | 'createdAt' | 'email'; sortOrder?: 'asc' | 'desc'; page?: number; pageSize?: number }
   ) {
-    const teachers = await this.getTeachers(organizationId, filters);
+    const result = await this.getTeachers(organizationId, filters);
 
     // ADMIN sees everything
     if (userRole === UserRole.ADMIN) {
-      return teachers;
+      return result;
     }
 
     // MANAGER - apply visibility settings
     if (userRole === UserRole.MANAGER) {
       const visibility = await organizationService.getVisibilitySettings(organizationId);
-      return teachers.map(teacher => this.filterTeacherForManager(teacher, visibility.teacher));
+      return { ...result, data: result.data.map(teacher => this.filterTeacherForManager(teacher, visibility.teacher)) };
     }
 
     // Other roles - return basic info
-    return teachers.map(teacher => ({
-      id: teacher.id,
-      user: {
-        id: teacher.user.id,
-        firstName: teacher.user.firstName,
-        lastName: teacher.user.lastName,
-        avatarUrl: teacher.user.avatarUrl,
-      },
-      isAvailableForBooking: teacher.isAvailableForBooking,
-    }));
+    return {
+      ...result,
+      data: result.data.map(teacher => ({
+        id: teacher.id,
+        user: {
+          id: teacher.user.id,
+          firstName: teacher.user.firstName,
+          lastName: teacher.user.lastName,
+          avatarUrl: teacher.user.avatarUrl,
+        },
+        isAvailableForBooking: teacher.isAvailableForBooking,
+      })),
+    };
   }
 
   /**

@@ -12,6 +12,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import Dropdown from '../components/Dropdown';
 import SubstitutionsTab from '../components/SubstitutionsTab';
 import FilterBar from '../components/FilterBar';
+import Pagination from '../components/Pagination';
 import {
   Calendar as CalendarIcon,
   List as ListIcon,
@@ -118,10 +119,13 @@ const LessonsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<LessonStatus | ''>('');
   const [courseFilter, setCourseFilter] = useState<string>('');
+  const [deliveryModeFilter, setDeliveryModeFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sortBy, setSortBy] = useState<'scheduledAt' | 'createdAt' | 'title' | 'teacher' | 'student'>('scheduledAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Initialize courseFilter from URL params
   useEffect(() => {
@@ -159,41 +163,32 @@ const LessonsPage: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
 
   // Fetch courses for dropdown
-  const { data: courses = [] } = useQuery({
+  const { data: coursesResult } = useQuery({
     queryKey: ['courses'],
-    queryFn: () => courseService.getCourses({ isActive: true }),
+    queryFn: () => courseService.getCourses({ isActive: true, pageSize: 500 }),
   });
+  const courses = coursesResult?.data ?? [];
 
-  // Shared data source - single query for both views (filters server-side, sorting client-side)
-  const { data: rawLessons = [], isLoading } = useQuery({
-    queryKey: ['lessons', searchTerm, statusFilter, courseFilter, dateFrom, dateTo],
+  // Shared data source - single query for both views (filters server-side, pagination server-side)
+  const { data: lessonsResult, isLoading } = useQuery({
+    queryKey: ['lessons', searchTerm, statusFilter, courseFilter, deliveryModeFilter, dateFrom, dateTo, sortBy, sortOrder, page, pageSize],
     queryFn: () =>
       lessonService.getLessons({
         search: searchTerm || undefined,
         status: statusFilter || undefined,
         courseId: courseFilter || undefined,
+        deliveryMode: deliveryModeFilter as any || undefined,
         startDate: dateFrom || undefined,
         endDate: dateTo || undefined,
+        sortBy: (sortBy === 'scheduledAt' || sortBy === 'createdAt') ? sortBy : 'scheduledAt',
+        sortOrder,
+        page,
+        pageSize,
       }),
   });
 
-  const [deliveryModeFilter, setDeliveryModeFilter] = useState('');
-
-  const lessons = useMemo(() => {
-    const filtered = deliveryModeFilter
-      ? rawLessons.filter((l) => l.deliveryMode === deliveryModeFilter)
-      : rawLessons;
-
-    const dir = sortOrder === 'asc' ? 1 : -1;
-    return [...filtered].sort((a, b) => {
-      if (sortBy === 'scheduledAt') return dir * (new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
-      if (sortBy === 'createdAt') return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      if (sortBy === 'title') return dir * a.title.localeCompare(b.title, 'pl');
-      if (sortBy === 'teacher') return dir * `${a.teacher.user.lastName}${a.teacher.user.firstName}`.localeCompare(`${b.teacher.user.lastName}${b.teacher.user.firstName}`, 'pl');
-      if (sortBy === 'student') return dir * `${a.student.user.lastName}${a.student.user.firstName}`.localeCompare(`${b.student.user.lastName}${b.student.user.firstName}`, 'pl');
-      return 0;
-    });
-  }, [rawLessons, deliveryModeFilter, sortBy, sortOrder]);
+  const lessons = lessonsResult?.data ?? [];
+  const lessonsPagination = lessonsResult?.pagination;
 
   // Fetch substitutions
   const { data: substitutions = [] } = useQuery({
@@ -749,6 +744,7 @@ const LessonsPage: React.FC = () => {
       setSortBy(column);
       setSortOrder('asc');
     }
+    setPage(1);
   };
 
   const SortIcon = ({ column }: { column: 'scheduledAt' | 'createdAt' | 'title' | 'teacher' | 'student' }) => {
@@ -765,7 +761,7 @@ const LessonsPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Grafik</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Zarządzaj grafikiem lekcji ({lessons.length} lekcji)
+            Zarządzaj grafikiem lekcji ({lessonsPagination?.total ?? lessons.length} lekcji)
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -827,7 +823,7 @@ const LessonsPage: React.FC = () => {
       {/* Filters */}
       <FilterBar
         searchValue={searchTerm}
-        onSearchChange={setSearchTerm}
+        onSearchChange={(v) => { setSearchTerm(v); setPage(1); }}
         searchPlaceholder="Szukaj lekcji po tytule, lektorze lub studencie..."
         filters={[
           { key: 'status', label: 'Status', type: 'select', options: [
@@ -854,6 +850,7 @@ const LessonsPage: React.FC = () => {
           dateTo,
         }}
         onFilterChange={(key, value) => {
+          setPage(1);
           if (key === 'status') setStatusFilter(value as LessonStatus | '');
           if (key === 'courseId') setCourseFilter(value);
           if (key === 'deliveryMode') setDeliveryModeFilter(value);
@@ -863,7 +860,7 @@ const LessonsPage: React.FC = () => {
         onClearAll={() => {
           setSearchTerm(''); setStatusFilter(''); setCourseFilter('');
           setDeliveryModeFilter(''); setDateFrom(''); setDateTo('');
-          setSortBy('scheduledAt'); setSortOrder('desc');
+          setSortBy('scheduledAt'); setSortOrder('desc'); setPage(1);
         }}
         filterCols={5}
       />
@@ -972,6 +969,17 @@ const LessonsPage: React.FC = () => {
             <div className="overflow-y-auto" style={{ maxHeight: '600px' }}>
               {lessons.map((lesson) => renderLessonRow(lesson))}
             </div>
+          )}
+          {lessonsPagination && lessonsPagination.totalPages > 1 && (
+            <Pagination
+              page={lessonsPagination.page}
+              totalPages={lessonsPagination.totalPages}
+              pageSize={lessonsPagination.pageSize}
+              total={lessonsPagination.total}
+              onPageChange={(p) => { setPage(p); }}
+              onPageSizeChange={(ps) => { setPageSize(ps); setPage(1); }}
+              isLoading={isLoading}
+            />
           )}
         </div>
       ) : (

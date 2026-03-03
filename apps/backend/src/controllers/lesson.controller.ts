@@ -66,7 +66,7 @@ const updateLessonSchema = z.object({
 class LessonController {
   async getLessons(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { search, teacherId, studentId, courseId, status, startDate, endDate, page, limit, sortBy, sortOrder } = req.query;
+      const { search, teacherId, studentId, courseId, status, deliveryMode, startDate, endDate, page, pageSize, sortBy, sortOrder } = req.query;
 
       const filters: any = {};
       if (search) filters.search = String(search);
@@ -74,10 +74,11 @@ class LessonController {
       if (studentId) filters.studentId = String(studentId);
       if (courseId) filters.courseId = String(courseId);
       if (status) filters.status = String(status);
+      if (deliveryMode) filters.deliveryMode = String(deliveryMode);
       if (startDate) filters.startDate = String(startDate);
       if (endDate) filters.endDate = String(endDate);
       if (page) filters.page = parseInt(String(page), 10);
-      if (limit) filters.limit = parseInt(String(limit), 10);
+      if (pageSize) filters.pageSize = parseInt(String(pageSize), 10);
       if (sortBy) filters.sortBy = String(sortBy);
       if (sortOrder) filters.sortOrder = String(sortOrder);
 

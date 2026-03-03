@@ -137,7 +137,7 @@ const bulkUpdateLessonsSchema = z.object({
 class CourseController {
   async getCourses(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { search, teacherId, courseType, isActive, sortBy, sortOrder } = req.query;
+      const { search, teacherId, courseType, level, deliveryMode, isActive, sortBy, sortOrder, page, pageSize } = req.query;
 
       const filters: any = {};
       if (search) filters.search = String(search);
@@ -145,12 +145,16 @@ class CourseController {
       if (courseType && (courseType === 'GROUP' || courseType === 'INDIVIDUAL')) {
         filters.courseType = courseType;
       }
+      if (level) filters.level = String(level);
+      if (deliveryMode) filters.deliveryMode = String(deliveryMode);
       if (isActive !== undefined) filters.isActive = isActive === 'true';
       if (sortBy) filters.sortBy = String(sortBy);
       if (sortOrder) filters.sortOrder = String(sortOrder);
+      if (page) filters.page = parseInt(String(page), 10);
+      if (pageSize) filters.pageSize = parseInt(String(pageSize), 10);
 
-      const courses = await courseService.getCourses(req.user!.organizationId, filters);
-      res.json({ message: 'Kursy pobrane pomyślnie', data: courses });
+      const result = await courseService.getCourses(req.user!.organizationId, filters);
+      res.json({ message: 'Kursy pobrane pomyślnie', data: result.data, pagination: result.pagination });
     } catch (error) {
       next(error);
     }

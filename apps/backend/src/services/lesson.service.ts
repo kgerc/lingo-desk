@@ -51,20 +51,21 @@ export interface LessonFilters {
   studentId?: string;
   courseId?: string;
   status?: string;
+  deliveryMode?: string;
   startDate?: string;
   endDate?: string;
   sortBy?: 'scheduledAt' | 'createdAt';
   sortOrder?: 'asc' | 'desc';
   // Pagination
   page?: number;
-  limit?: number;
+  pageSize?: number;
 }
 
 export interface PaginatedResult<T> {
   data: T[];
   pagination: {
     page: number;
-    limit: number;
+    pageSize: number;
     total: number;
     totalPages: number;
     hasMore: boolean;
@@ -288,13 +289,13 @@ class LessonService {
 
   async getLessons(organizationId: string, filters?: LessonFilters): Promise<PaginatedResult<any>> {
     const {
-      search, teacherId, studentId, courseId, status, startDate, endDate,
+      search, teacherId, studentId, courseId, status, deliveryMode, startDate, endDate,
       sortBy = 'scheduledAt', sortOrder = 'desc',
-      page = 1, limit = 50
+      page = 1, pageSize = 10
     } = filters || {};
 
     // Enforce reasonable limits
-    const safeLimit = Math.min(Math.max(1, limit), 100);
+    const safeLimit = Math.min(Math.max(1, pageSize), 100);
     const safePage = Math.max(1, page);
     const skip = (safePage - 1) * safeLimit;
 
@@ -343,6 +344,10 @@ class LessonService {
 
     if (status) {
       where.status = status;
+    }
+
+    if (deliveryMode) {
+      where.deliveryMode = deliveryMode;
     }
 
     if (startDate || endDate) {
@@ -440,7 +445,7 @@ class LessonService {
       data: lessons,
       pagination: {
         page: safePage,
-        limit: safeLimit,
+        pageSize: safeLimit,
         total,
         totalPages,
         hasMore: safePage < totalPages,

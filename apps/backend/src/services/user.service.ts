@@ -26,6 +26,10 @@ export interface UserFilters {
   role?: UserRole;
   isActive?: boolean;
   search?: string;
+  sortBy?: 'lastName' | 'email' | 'role' | 'lastLoginAt' | 'createdAt';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
 }
 
 class UserService {
@@ -56,29 +60,50 @@ class UserService {
       ];
     }
 
-    const users = await prisma.user.findMany({
-      where,
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        role: true,
-        isActive: true,
-        lastLoginAt: true,
-        createdAt: true,
-        updatedAt: true,
-        avatarUrl: true,
-      },
-      orderBy: [
-        { isActive: 'desc' },
-        { lastName: 'asc' },
-        { firstName: 'asc' },
-      ],
-    });
+    const safePage = Math.max(1, filters?.page ?? 1);
+    const safePageSize = Math.min(Math.max(1, filters?.pageSize ?? 10), 100);
+    const skip = (safePage - 1) * safePageSize;
 
-    return users;
+    let orderBy: any;
+    const dir = filters?.sortOrder ?? 'asc';
+    if (filters?.sortBy === 'email') {
+      orderBy = { email: dir };
+    } else if (filters?.sortBy === 'role') {
+      orderBy = { role: dir };
+    } else if (filters?.sortBy === 'lastLoginAt') {
+      orderBy = { lastLoginAt: dir };
+    } else if (filters?.sortBy === 'createdAt') {
+      orderBy = { createdAt: dir };
+    } else if (filters?.sortBy === 'lastName') {
+      orderBy = [{ lastName: dir }, { firstName: dir }];
+    } else {
+      orderBy = [{ isActive: 'desc' }, { lastName: 'asc' }, { firstName: 'asc' }];
+    }
+
+    const select = {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+      role: true,
+      isActive: true,
+      lastLoginAt: true,
+      createdAt: true,
+      updatedAt: true,
+      avatarUrl: true,
+    };
+
+    const [total, users] = await Promise.all([
+      prisma.user.count({ where }),
+      prisma.user.findMany({ where, select, orderBy, skip, take: safePageSize }),
+    ]);
+
+    const totalPages = Math.ceil(total / safePageSize);
+    return {
+      data: users,
+      pagination: { page: safePage, pageSize: safePageSize, total, totalPages, hasMore: safePage < totalPages },
+    };
   }
 
   /**

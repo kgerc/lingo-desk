@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -17,6 +17,7 @@ import {
   ChevronsUpDown,
 } from 'lucide-react';
 import FilterBar from '../components/FilterBar';
+import Pagination from '../components/Pagination';
 import userService, {
   User,
   UserRole,
@@ -405,6 +406,8 @@ const UsersPage: React.FC = () => {
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [sortBy, setSortBy] = useState<'lastName' | 'role' | 'lastLoginAt' | 'email'>('lastName');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
@@ -417,53 +420,29 @@ const UsersPage: React.FC = () => {
     variant: 'danger' | 'warning';
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, variant: 'warning' });
 
-  // Fetch all users once (no filters - filtering done on frontend)
-  const { data: allUsers = [], isLoading } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => userService.getUsers(),
+  // Fetch users with server-side filters, sorting and pagination
+  // Exclude STUDENT and PARENT roles (managed in Students module)
+  const { data: usersResult, isLoading } = useQuery({
+    queryKey: ['users', searchQuery, filterValues, sortBy, sortOrder, page, pageSize],
+    queryFn: () => userService.getUsers({
+      search: searchQuery || undefined,
+      role: filterValues['role'] as UserRole | undefined || undefined,
+      isActive: filterValues['status'] === 'active' ? true : filterValues['status'] === 'inactive' ? false : undefined,
+      sortBy,
+      sortOrder,
+      page,
+      pageSize,
+    }),
   });
+
+  const filteredUsers = usersResult?.data ?? [];
+  const usersPagination = usersResult?.pagination;
 
   // Fetch stats
   const { data: stats } = useQuery({
     queryKey: ['userStats'],
     queryFn: userService.getUserStats,
   });
-
-  // Filter and sort users locally - exclude STUDENT and PARENT roles (managed in Students module)
-  const filteredUsers = useMemo(() => {
-    const roleFilter = filterValues['role'] || '';
-    const statusFilter = filterValues['status'] || 'all';
-
-    const filtered = allUsers.filter((user) => {
-      if (user.role === 'STUDENT' || user.role === 'PARENT') return false;
-      if (roleFilter && user.role !== roleFilter) return false;
-      if (statusFilter === 'active' && !user.isActive) return false;
-      if (statusFilter === 'inactive' && user.isActive) return false;
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
-        if (!fullName.includes(query) && !user.email.toLowerCase().includes(query)) return false;
-      }
-      return true;
-    });
-
-    return [...filtered].sort((a, b) => {
-      const dir = sortOrder === 'asc' ? 1 : -1;
-      if (sortBy === 'lastName') {
-        return dir * a.lastName.localeCompare(b.lastName, 'pl');
-      }
-      if (sortBy === 'role') {
-        return dir * a.role.localeCompare(b.role);
-      }
-      if (sortBy === 'lastLoginAt') {
-        const aTime = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : 0;
-        const bTime = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : 0;
-        return dir * (aTime - bTime);
-      }
-      if (sortBy === 'email') return dir * a.email.localeCompare(b.email);
-      return 0;
-    });
-  }, [allUsers, filterValues, searchQuery, sortBy, sortOrder]);
 
   // Mutations
   const deactivateMutation = useMutation({
@@ -546,6 +525,7 @@ const UsersPage: React.FC = () => {
       setSortBy(column);
       setSortOrder('asc');
     }
+    setPage(1);
   };
 
   const SortIcon = ({ column }: { column: typeof sortBy }) => {
@@ -555,7 +535,7 @@ const UsersPage: React.FC = () => {
       : <ChevronDown className="inline ml-1 h-3.5 w-3.5 text-primary" />;
   };
 
-  if (isLoading) {
+  if (isLoading && !usersResult) {
     return <LoadingSpinner message="Ładowanie użytkowników..." />;
   }
 
@@ -610,7 +590,7 @@ const UsersPage: React.FC = () => {
       {/* Filters */}
       <FilterBar
         searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
+        onSearchChange={(v) => { setSearchQuery(v); setPage(1); }}
         searchPlaceholder="Szukaj po imieniu, nazwisku lub emailu..."
         filters={[
           { key: 'role', label: 'Rola', type: 'select', options: STAFF_ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] })) },
@@ -620,8 +600,8 @@ const UsersPage: React.FC = () => {
           ]},
         ]}
         filterValues={filterValues}
-        onFilterChange={(key, value) => setFilterValues((prev) => ({ ...prev, [key]: value }))}
-        onClearAll={() => { setSearchQuery(''); setFilterValues({}); setSortBy('lastName'); setSortOrder('asc'); }}
+        onFilterChange={(key, value) => { setFilterValues((prev) => ({ ...prev, [key]: value })); setPage(1); }}
+        onClearAll={() => { setSearchQuery(''); setFilterValues({}); setSortBy('lastName'); setSortOrder('asc'); setPage(1); }}
         filterCols={2}
       />
 
@@ -632,7 +612,7 @@ const UsersPage: React.FC = () => {
             <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Brak użytkowników</h3>
             <p className="text-gray-600 mb-4">
-              {allUsers.length === 0
+              {!searchQuery && !filterValues['role'] && !filterValues['status']
                 ? 'Nie masz jeszcze żadnych użytkowników w organizacji.'
                 : 'Nie znaleziono użytkowników spełniających kryteria wyszukiwania.'}
             </p>
@@ -645,6 +625,7 @@ const UsersPage: React.FC = () => {
             </button>
           </div>
         ) : (
+          <>
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -781,6 +762,18 @@ const UsersPage: React.FC = () => {
               })}
             </tbody>
           </table>
+          {usersPagination && usersPagination.totalPages > 1 && (
+            <Pagination
+              page={usersPagination.page}
+              totalPages={usersPagination.totalPages}
+              pageSize={usersPagination.pageSize}
+              total={usersPagination.total}
+              onPageChange={setPage}
+              onPageSizeChange={(ps) => { setPageSize(ps); setPage(1); }}
+              isLoading={isLoading}
+            />
+          )}
+          </>
         )}
       </div>
 

@@ -176,20 +176,28 @@ export const courseService = {
     search?: string;
     teacherId?: string;
     courseType?: 'GROUP' | 'INDIVIDUAL';
+    level?: string;
+    deliveryMode?: 'IN_PERSON' | 'ONLINE' | 'BOTH';
     isActive?: boolean;
-    sortBy?: 'name' | 'startDate' | 'createdAt';
+    sortBy?: 'name' | 'startDate' | 'createdAt' | 'teacher';
     sortOrder?: 'asc' | 'desc';
+    page?: number;
+    pageSize?: number;
   }) {
     const params = new URLSearchParams();
     if (filters?.search) params.append('search', filters.search);
     if (filters?.teacherId) params.append('teacherId', filters.teacherId);
     if (filters?.courseType) params.append('courseType', filters.courseType);
+    if (filters?.level) params.append('level', filters.level);
+    if (filters?.deliveryMode) params.append('deliveryMode', filters.deliveryMode);
     if (filters?.isActive !== undefined) params.append('isActive', String(filters.isActive));
     if (filters?.sortBy) params.append('sortBy', filters.sortBy);
     if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
+    if (filters?.page !== undefined) params.append('page', String(filters.page));
+    if (filters?.pageSize !== undefined) params.append('pageSize', String(filters.pageSize));
 
     const response = await api.get(`/courses?${params.toString()}`) as any;
-    return response.data.data as Course[];
+    return { data: response.data.data as Course[], pagination: response.data.pagination };
   },
 
   async getCourseById(id: string) {
