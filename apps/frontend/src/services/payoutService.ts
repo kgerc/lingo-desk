@@ -103,6 +103,39 @@ export interface LessonForDay {
   } | null;
 }
 
+export interface ForecastLesson {
+  id: string;
+  title: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  status: string;
+  studentName: string;
+  courseType: string | null;
+  amount: number;
+  currency: string;
+  qualificationReason: QualificationReason;
+  payoutPercent: number;
+}
+
+export interface TeacherForecast {
+  teacherId: string;
+  firstName: string;
+  lastName: string;
+  hourlyRate: number;
+  lessonsCount: number;
+  totalAmount: number;
+  currency: string;
+  lessons: ForecastLesson[];
+}
+
+export interface PayoutForecast {
+  dateFrom: string;
+  dateTo: string;
+  teachers: TeacherForecast[];
+  grandTotal: number;
+  currency: string;
+}
+
 export interface CreatePayoutData {
   teacherId: string;
   periodStart: string;
@@ -273,6 +306,14 @@ const payoutService = {
   getLessonsForDay: async (teacherId: string, date: string): Promise<LessonForDay[]> => {
     const params = new URLSearchParams({ date });
     const response = await api.get(`/payouts/teacher/${teacherId}/lessons?${params.toString()}`);
+    return response.data;
+  },
+
+  // Get payout forecast for a date range (all teachers or one)
+  getForecast: async (dateFrom: string, dateTo: string, teacherId?: string): Promise<PayoutForecast> => {
+    const params = new URLSearchParams({ dateFrom, dateTo });
+    if (teacherId) params.append('teacherId', teacherId);
+    const response = await api.get(`/payouts/forecast?${params.toString()}`);
     return response.data;
   },
 

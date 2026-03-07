@@ -47,6 +47,39 @@ export interface PayoutFilters {
   periodEnd?: Date;
 }
 
+export interface ForecastLesson {
+  id: string;
+  title: string;
+  scheduledAt: Date;
+  durationMinutes: number;
+  status: string;
+  studentName: string;
+  courseType: string | null;
+  amount: number;
+  currency: string;
+  qualificationReason: QualificationReason;
+  payoutPercent: number;
+}
+
+export interface TeacherForecast {
+  teacherId: string;
+  firstName: string;
+  lastName: string;
+  hourlyRate: number;
+  lessonsCount: number;
+  totalAmount: number;
+  currency: string;
+  lessons: ForecastLesson[];
+}
+
+export interface PayoutForecast {
+  dateFrom: string;
+  dateTo: string;
+  teachers: TeacherForecast[];
+  grandTotal: number;
+  currency: string;
+}
+
 class PayoutService {
   /**
    * Check if a lesson qualifies for payout
@@ -656,6 +689,110 @@ class PayoutService {
           : null,
       };
     });
+  }
+
+  /**
+   * Get payout forecast for all teachers for a date range
+   * Includes: COMPLETED, CONFIRMED, and late-CANCELLED lessons in the range
+   */
+  async getForecast(organizationId: string, dateFrom: Date, dateTo: Date, teacherId?: string): Promise<PayoutForecast> {
+    const startOfDay = new Date(dateFrom);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(dateTo);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { currency: true },
+    });
+    const orgCurrency = organization?.currency || 'PLN';
+
+    // Get all active teachers (or just one if filtered)
+    const teachers = await prisma.teacher.findMany({
+      where: {
+        organizationId,
+        user: { isActive: true },
+        ...(teacherId ? { id: teacherId } : {}),
+      },
+      include: {
+        user: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { user: { lastName: 'asc' } },
+    });
+
+    const teacherForecasts: TeacherForecast[] = [];
+
+    for (const teacher of teachers) {
+      const hourlyRate = Number(teacher.hourlyRate);
+      const cancellationSettings = {
+        cancellationPayoutEnabled: teacher.cancellationPayoutEnabled,
+        cancellationPayoutHours: teacher.cancellationPayoutHours,
+        cancellationPayoutPercent: teacher.cancellationPayoutPercent,
+      };
+
+      const lessons = await prisma.lesson.findMany({
+        where: {
+          teacherId: teacher.id,
+          organizationId,
+          scheduledAt: { gte: startOfDay, lte: endOfDay },
+          status: { in: [LessonStatus.COMPLETED, LessonStatus.CONFIRMED, LessonStatus.CANCELLED] },
+        },
+        include: {
+          student: { include: { user: { select: { firstName: true, lastName: true } } } },
+          course: { select: { courseType: true } },
+        },
+        orderBy: { scheduledAt: 'asc' },
+      });
+
+      const forecastLessons: ForecastLesson[] = [];
+
+      for (const lesson of lessons) {
+        const { qualified, reason, payoutPercent } = this.isLessonQualified(lesson, cancellationSettings);
+        if (!qualified || !reason) continue;
+
+        const multiplier = payoutPercent / 100;
+        const amount = this.calculateLessonAmount(lesson.durationMinutes, hourlyRate, multiplier);
+
+        forecastLessons.push({
+          id: lesson.id,
+          title: lesson.title,
+          scheduledAt: lesson.scheduledAt,
+          durationMinutes: lesson.durationMinutes,
+          status: lesson.status,
+          studentName: `${lesson.student.user.firstName} ${lesson.student.user.lastName}`,
+          courseType: lesson.course?.courseType ?? null,
+          amount,
+          currency: lesson.currency,
+          qualificationReason: reason,
+          payoutPercent,
+        });
+      }
+
+      if (forecastLessons.length === 0) continue;
+
+      const totalAmount = forecastLessons.reduce((sum, l) => sum + l.amount, 0);
+
+      teacherForecasts.push({
+        teacherId: teacher.id,
+        firstName: teacher.user.firstName,
+        lastName: teacher.user.lastName,
+        hourlyRate,
+        lessonsCount: forecastLessons.length,
+        totalAmount,
+        currency: forecastLessons[0]?.currency || orgCurrency,
+        lessons: forecastLessons,
+      });
+    }
+
+    const grandTotal = teacherForecasts.reduce((sum, t) => sum + t.totalAmount, 0);
+
+    return {
+      dateFrom: startOfDay.toISOString().split('T')[0],
+      dateTo: endOfDay.toISOString().split('T')[0],
+      teachers: teacherForecasts,
+      grandTotal,
+      currency: orgCurrency,
+    };
   }
 
   async getLessonsForRange(

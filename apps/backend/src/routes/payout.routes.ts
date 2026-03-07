@@ -10,7 +10,8 @@ import {
   deletePayout,
   getTeachersSummary,
   getLessonsForDay,
-  getLessonsForRange
+  getLessonsForRange,
+  getPayoutForecast,
 } from '../controllers/payout.controller';
 
 const router = Router();
@@ -20,6 +21,9 @@ router.use(authenticate);
 
 // Teachers summary for payouts overview
 router.get('/teachers-summary', getTeachersSummary);
+
+// Payout forecast for a given date (all teachers or single teacher)
+router.get('/forecast', getPayoutForecast);
 
 // Get all payouts (with optional filters)
 router.get('/', getPayouts);

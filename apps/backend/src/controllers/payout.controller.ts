@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { TeacherPayoutStatus } from '@prisma/client';
-import payoutService from '../services/payout.service';
+import payoutService, { PayoutForecast } from '../services/payout.service';
 import { AuthRequest } from '../middleware/auth';
 
 export const previewPayout = async (req: AuthRequest, res: Response) => {
@@ -240,6 +240,40 @@ export const getLessonsForDay = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Nie znaleziono lektora' });
     }
     return res.status(500).json({ error: 'Failed to get lessons' });
+  }
+};
+
+// GET /payouts/forecast?date=YYYY-MM-DD&teacherId=optional
+export const getPayoutForecast = async (req: AuthRequest, res: Response) => {
+  try {
+    const organizationId = req.user?.organizationId;
+    if (!organizationId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { dateFrom, dateTo, teacherId } = req.query;
+
+    if (!dateFrom || !dateTo) {
+      return res.status(400).json({ error: 'dateFrom and dateTo are required' });
+    }
+
+    const dateFromObj = new Date(dateFrom as string);
+    const dateToObj = new Date(dateTo as string);
+    if (isNaN(dateFromObj.getTime()) || isNaN(dateToObj.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+
+    const forecast = await payoutService.getForecast(
+      organizationId,
+      dateFromObj,
+      dateToObj,
+      teacherId as string | undefined
+    );
+
+    return res.json(forecast);
+  } catch (error) {
+    console.error('Get payout forecast error:', error);
+    return res.status(500).json({ error: 'Failed to get payout forecast' });
   }
 };
 

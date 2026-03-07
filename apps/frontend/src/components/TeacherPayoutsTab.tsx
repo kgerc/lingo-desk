@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import payoutService, {
@@ -6,6 +6,7 @@ import payoutService, {
   PayoutPreview,
   LessonForDay,
   TeacherPayoutStatus,
+  TeacherForecast,
   groupLessonsByStudent,
   groupLessonsForDayByStudent,
 } from '../services/payoutService';
@@ -26,6 +27,8 @@ import {
   ChevronDown,
   User,
   AlertCircle,
+  TrendingUp,
+  Info,
 } from 'lucide-react';
 import LoadingSpinner from './LoadingSpinner';
 import ConfirmDialog from './ConfirmDialog';
@@ -55,11 +58,30 @@ export default function TeacherPayoutsTab() {
   const [calendarFilter, setCalendarFilter] =
     useState<CalendarFilter>({ type: 'ALL' });
 
+  // Forecast state
+  const [listTab, setListTab] = useState<'payouts' | 'forecast'>('payouts');
+  const [forecastDateFrom, setForecastDateFrom] = useState<string>(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+  });
+  const [forecastDateTo, setForecastDateTo] = useState<string>(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  });
+  const [expandedForecastTeachers, setExpandedForecastTeachers] = useState<Set<string>>(new Set());
+
   // Fetch teachers summary
   const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery({
     queryKey: ['payouts-teachers-summary'],
     queryFn: () => payoutService.getTeachersSummary(),
     enabled: viewMode === 'list',
+  });
+
+  // Fetch payout forecast
+  const { data: forecast, isLoading: isLoadingForecast, isError: isForecastError } = useQuery({
+    queryKey: ['payout-forecast', forecastDateFrom, forecastDateTo],
+    queryFn: () => payoutService.getForecast(forecastDateFrom, forecastDateTo),
+    enabled: viewMode === 'list' && listTab === 'forecast' && !!forecastDateFrom && !!forecastDateTo,
   });
 
   // Fetch teacher payouts history
@@ -438,112 +460,347 @@ export default function TeacherPayoutsTab() {
 
   const dayNames = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
 
+  const toggleForecastTeacher = (teacherId: string) => {
+    setExpandedForecastTeachers((prev) => {
+      const next = new Set(prev);
+      if (next.has(teacherId)) next.delete(teacherId);
+      else next.add(teacherId);
+      return next;
+    });
+  };
+
+  const getCourseTypeLabel = (courseType: string | null) => {
+    if (courseType === 'GROUP') return 'Grupowy';
+    if (courseType === 'INDIVIDUAL') return 'Indywidualny';
+    return '—';
+  };
+
+  const getQualificationReasonBadge = (reason: string, payoutPercent: number) => {
+    if (reason === 'LATE_CANCELLATION') {
+      return (
+        <span className="px-1.5 py-0.5 text-xs rounded bg-orange-100 text-orange-700">
+          Późna anulacja{payoutPercent < 100 ? ` ${payoutPercent}%` : ''}
+        </span>
+      );
+    }
+    if (reason === 'CONFIRMED') {
+      return <span className="px-1.5 py-0.5 text-xs rounded bg-blue-100 text-blue-700">Potwierdzona</span>;
+    }
+    return <span className="px-1.5 py-0.5 text-xs rounded bg-green-100 text-green-700">Ukończona</span>;
+  };
+
   // Render teacher list view
   if (viewMode === 'list') {
     return (
       <div>
-        {/* Search */}
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Szukaj lektora..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
-            />
-          </div>
+        {/* Tab switcher */}
+        <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+          <button
+            onClick={() => setListTab('payouts')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              listTab === 'payouts' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <DollarSign className="w-4 h-4" />
+            Wypłaty
+          </button>
+          <button
+            onClick={() => setListTab('forecast')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              listTab === 'forecast' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            Prognoza wypłat
+          </button>
         </div>
 
-        {/* Teachers Table */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Lektor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Stawka godzinowa
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Oczekujące wypłaty
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Akcje
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {isLoadingTeachers ? (
-                  <tr>
-                    <td colSpan={4}>
-                      <LoadingSpinner message="Ładowanie lektorów..." />
-                    </td>
-                  </tr>
-                ) : filteredTeachers.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
-                      Brak lektorów do wyświetlenia
-                    </td>
-                  </tr>
-                ) : (
-                  filteredTeachers.map((teacher) => (
-                    <tr key={teacher.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 flex-shrink-0">
-                            <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-semibold">
-                              {teacher.firstName[0]}
-                              {teacher.lastName[0]}
-                            </div>
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {teacher.firstName} {teacher.lastName}
-                            </div>
-                            <div className="text-sm text-gray-500">{teacher.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {formatCurrency(teacher.hourlyRate)}/h
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {teacher.pendingPayoutsCount > 0 ? (
-                          <div>
-                            <div className="text-sm font-medium text-yellow-600">
-                              {teacher.pendingPayoutsCount} wypłat
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {formatCurrency(teacher.pendingPayoutsTotal)}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-500">Brak</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <button
-                          onClick={() => handleSelectTeacher(teacher)}
-                          className="flex items-center gap-1 text-primary hover:text-primary/80 font-medium text-sm"
-                        >
-                          <DollarSign className="w-4 h-4" />
-                          Rozlicz
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </td>
+        {listTab === 'payouts' && (
+          <>
+            {/* Search */}
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Szukaj lektora..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Teachers Table */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Lektor
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Stawka godzinowa
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Oczekujące wypłaty
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Akcje
+                      </th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {isLoadingTeachers ? (
+                      <tr>
+                        <td colSpan={4}>
+                          <LoadingSpinner message="Ładowanie lektorów..." />
+                        </td>
+                      </tr>
+                    ) : filteredTeachers.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                          Brak lektorów do wyświetlenia
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTeachers.map((teacher) => (
+                        <tr key={teacher.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="h-10 w-10 flex-shrink-0">
+                                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-semibold">
+                                  {teacher.firstName[0]}
+                                  {teacher.lastName[0]}
+                                </div>
+                              </div>
+                              <div className="ml-4">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {teacher.firstName} {teacher.lastName}
+                                </div>
+                                <div className="text-sm text-gray-500">{teacher.email}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {formatCurrency(teacher.hourlyRate)}/h
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {teacher.pendingPayoutsCount > 0 ? (
+                              <div>
+                                <div className="text-sm font-medium text-yellow-600">
+                                  {teacher.pendingPayoutsCount} wypłat
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {formatCurrency(teacher.pendingPayoutsTotal)}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">Brak</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={() => handleSelectTeacher(teacher)}
+                              className="flex items-center gap-1 text-primary hover:text-primary/80 font-medium text-sm"
+                            >
+                              <DollarSign className="w-4 h-4" />
+                              Rozlicz
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+
+        {listTab === 'forecast' && (
+          <div>
+            {/* Info banner */}
+            <div className="flex items-start gap-2 px-4 py-3 mb-5 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>
+                Prognoza pokazuje szacunkowe kwoty do wypłaty dla wszystkich lektorów w wybranym zakresie dat.
+                Uwzględniane są lekcje potwierdzone, ukończone i anulowane po limicie godzinowym.
+                To jest prognoza – nie faktyczna wypłata.
+              </span>
+            </div>
+
+            {/* Date range picker */}
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-gray-400" />
+                <label className="text-sm font-medium text-gray-700">Zakres dat:</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={forecastDateFrom}
+                  onChange={(e) => setForecastDateFrom(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-secondary focus:border-transparent"
+                />
+                <span className="text-sm text-gray-500">–</span>
+                <input
+                  type="date"
+                  value={forecastDateTo}
+                  min={forecastDateFrom}
+                  onChange={(e) => setForecastDateTo(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-secondary focus:border-transparent"
+                />
+              </div>
+              {forecast && !isLoadingForecast && (
+                <div className="ml-auto flex items-center gap-4">
+                  <span className="text-sm text-gray-500">
+                    {forecast.teachers.length} {forecast.teachers.length === 1 ? 'lektor' : 'lektorów'}
+                  </span>
+                  <div className="text-sm font-semibold text-gray-900">
+                    Łącznie: {formatCurrency(forecast.grandTotal, forecast.currency)}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Forecast table */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              {isLoadingForecast ? (
+                <LoadingSpinner message="Obliczanie prognozy..." />
+              ) : isForecastError ? (
+                <div className="px-6 py-12 text-center text-red-500">
+                  <p className="font-medium">Błąd podczas pobierania prognozy</p>
+                  <p className="text-sm text-red-400 mt-1">Spróbuj odświeżyć stronę</p>
+                </div>
+              ) : !forecast || forecast.teachers.length === 0 ? (
+                <div className="px-6 py-12 text-center text-gray-500">
+                  <TrendingUp className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                  <p className="font-medium">Brak lekcji kwalifikujących się do wypłaty w wybranym zakresie dat</p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Uwzględniane są lekcje ze statusem: Potwierdzona, Ukończona, Anulowana po limicie.
+                    Wybierz inny zakres dat.
+                  </p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Lektor
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Liczba lekcji
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Przewidywana kwota
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Szczegóły
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {forecast.teachers.map((teacher: TeacherForecast) => (
+                      <React.Fragment key={teacher.teacherId}>
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-semibold text-sm">
+                                {teacher.firstName[0]}{teacher.lastName[0]}
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {teacher.firstName} {teacher.lastName}
+                                </div>
+                                <div className="text-xs text-gray-500">{formatCurrency(teacher.hourlyRate)}/h</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                            {teacher.lessonsCount} {teacher.lessonsCount === 1 ? 'lekcja' : teacher.lessonsCount < 5 ? 'lekcje' : 'lekcji'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm font-semibold text-gray-900">
+                              {formatCurrency(teacher.totalAmount, teacher.currency)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={() => toggleForecastTeacher(teacher.teacherId)}
+                              className="flex items-center gap-1 text-sm text-secondary hover:text-secondary/80 font-medium"
+                            >
+                              <ChevronDown
+                                className={`w-4 h-4 transition-transform ${
+                                  expandedForecastTeachers.has(teacher.teacherId) ? 'rotate-180' : ''
+                                }`}
+                              />
+                              {expandedForecastTeachers.has(teacher.teacherId) ? 'Zwiń' : 'Rozwiń'}
+                            </button>
+                          </td>
+                        </tr>
+                        {expandedForecastTeachers.has(teacher.teacherId) && (
+                          <tr key={`${teacher.teacherId}-details`}>
+                            <td colSpan={4} className="bg-gray-50 px-6 py-3">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="text-xs text-gray-500 border-b border-gray-200">
+                                    <th className="text-left pb-2 font-medium">Data</th>
+                                    <th className="text-left pb-2 font-medium">Tytuł lekcji</th>
+                                    <th className="text-left pb-2 font-medium">Uczeń</th>
+                                    <th className="text-left pb-2 font-medium">Typ kursu</th>
+                                    <th className="text-left pb-2 font-medium">Status</th>
+                                    <th className="text-right pb-2 font-medium">Kwota</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {teacher.lessons.map((lesson) => (
+                                    <tr key={lesson.id} className="text-gray-700">
+                                      <td className="py-2 text-gray-500 whitespace-nowrap">
+                                        {new Date(lesson.scheduledAt).toLocaleDateString('pl-PL')} {new Date(lesson.scheduledAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
+                                      </td>
+                                      <td className="py-2 font-medium">{lesson.title}</td>
+                                      <td className="py-2">{lesson.studentName}</td>
+                                      <td className="py-2">{getCourseTypeLabel(lesson.courseType)}</td>
+                                      <td className="py-2">
+                                        {getQualificationReasonBadge(lesson.qualificationReason, lesson.payoutPercent)}
+                                      </td>
+                                      <td className="py-2 text-right font-semibold">
+                                        {formatCurrency(lesson.amount, lesson.currency)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-gray-50 border-t-2 border-gray-300">
+                    <tr>
+                      <td className="px-6 py-3 text-sm font-semibold text-gray-700">
+                        Łącznie ({forecast.teachers.length} lektorów)
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-600">
+                        {forecast.teachers.reduce((sum, t) => sum + t.lessonsCount, 0)} lekcji
+                      </td>
+                      <td className="px-6 py-3 text-sm font-bold text-gray-900">
+                        {formatCurrency(forecast.grandTotal, forecast.currency)}
+                      </td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }
