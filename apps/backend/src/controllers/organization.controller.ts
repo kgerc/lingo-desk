@@ -316,6 +316,37 @@ class OrganizationController {
     }
   }
 
+  async uploadLogo(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.file) {
+        res.status(400).json({ success: false, error: { message: 'Brak pliku' } });
+        return;
+      }
+      const organizationId = req.user!.organizationId;
+      const userId = req.user!.id;
+      const logoUrl = await organizationService.uploadLogo(
+        organizationId,
+        req.file.buffer,
+        req.file.mimetype,
+        userId
+      );
+      res.json({ success: true, data: { logoUrl } });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteLogo(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizationId = req.user!.organizationId;
+      const userId = req.user!.id;
+      await organizationService.deleteLogo(organizationId, userId);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async checkHoliday(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { date } = req.query;

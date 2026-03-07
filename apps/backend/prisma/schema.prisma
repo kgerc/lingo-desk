@@ -148,6 +148,7 @@ model Organization {
   name                 String
   slug                 String   @unique
   logoUrl              String?  @map("logo_url")
+  logoStoragePath      String?  @map("logo_storage_path")
   primaryColor         String?  @default("#3B82F6") @map("primary_color")
   timezone             String   @default("Europe/Warsaw")
   currency             String   @default("PLN")

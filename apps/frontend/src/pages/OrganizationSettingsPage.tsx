@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import organizationService, { UpdateOrganizationData } from '../services/organizationService';
-import { Building2, Save, CalendarOff, Info } from 'lucide-react';
+import { Building2, Save, CalendarOff, Info, Upload, Trash2 } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 
 const OrganizationSettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch current organization
   const { data: organization, isLoading } = useQuery({
@@ -109,6 +110,36 @@ const OrganizationSettingsPage: React.FC = () => {
     skipHolidaysMutation.mutate(checked);
   };
 
+  // Logo mutations
+  const uploadLogoMutation = useMutation({
+    mutationFn: (file: File) => organizationService.uploadLogo(file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['organization'] });
+      toast.success('Logo zostało zaktualizowane');
+    },
+    onError: () => toast.error('Błąd podczas wgrywania logo'),
+  });
+
+  const deleteLogoMutation = useMutation({
+    mutationFn: () => organizationService.deleteLogo(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['organization'] });
+      toast.success('Logo zostało usunięte');
+    },
+    onError: () => toast.error('Błąd podczas usuwania logo'),
+  });
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Plik nie może być większy niż 5 MB');
+      return;
+    }
+    uploadLogoMutation.mutate(file);
+    e.target.value = '';
+  };
+
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: (data: UpdateOrganizationData) => organizationService.updateOrganization(data),
@@ -151,8 +182,56 @@ const OrganizationSettingsPage: React.FC = () => {
       {/* Form */}
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow border border-gray-200">
         <div className="p-6 space-y-6">
-          {/* Basic Information */}
+          {/* Logo */}
           <div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Logo organizacji</h2>
+            <div className="flex items-center gap-6">
+              <div className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 flex-shrink-0">
+                {organization?.logoUrl ? (
+                  <img
+                    src={organization.logoUrl}
+                    alt="Logo organizacji"
+                    className="w-full h-full object-contain p-1"
+                  />
+                ) : (
+                  <Building2 className="h-10 w-10 text-gray-300" />
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                  className="hidden"
+                  onChange={handleLogoChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadLogoMutation.isPending}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 text-sm"
+                >
+                  <Upload className="h-4 w-4" />
+                  {uploadLogoMutation.isPending ? 'Wgrywanie...' : 'Wgraj logo'}
+                </button>
+                {organization?.logoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => deleteLogoMutation.mutate()}
+                    disabled={deleteLogoMutation.isPending}
+                    className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 text-sm"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {deleteLogoMutation.isPending ? 'Usuwanie...' : 'Usuń logo'}
+                  </button>
+                )}
+                <p className="text-xs text-gray-500">PNG, JPG, WebP lub SVG. Maks. 5 MB.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Basic Information */}
+          <div className="border-t pt-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Podstawowe informacje</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">

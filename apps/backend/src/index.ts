@@ -36,7 +36,7 @@ import classroomRoutes from './routes/classroom.routes';
 
 // Import scheduler and jobs
 import scheduler from './utils/scheduler';
-import { initializeStorage } from './utils/supabase';
+import { initializeStorage, initializeLogosBucket } from './utils/supabase';
 import { startExchangeRateJob } from './jobs/exchange-rate.job';
 import { startPurgeArchivedStudentsJob } from './jobs/purge-archived-students.job';
 
@@ -154,6 +154,7 @@ app.listen(PORT, async () => {
 
   // Initialize Supabase Storage
   await initializeStorage();
+  await initializeLogosBucket();
 
   // Start scheduled tasks
   if (process.env.NODE_ENV !== 'test') {

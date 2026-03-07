@@ -562,6 +562,41 @@ class OrganizationService {
 
     return settings;
   }
+
+  async uploadLogo(organizationId: string, file: Buffer, contentType: string, userId: string): Promise<string> {
+    const userOrg = await prisma.userOrganization.findFirst({
+      where: { userId, organizationId, role: { in: ['ADMIN', 'MANAGER'] } },
+    });
+    if (!userOrg) throw new Error('You do not have permission to update this organization');
+
+    const { uploadOrgLogo } = await import('../utils/supabase');
+    const { publicUrl, path } = await uploadOrgLogo(file, organizationId, contentType);
+
+    await prisma.organization.update({
+      where: { id: organizationId },
+      data: { logoUrl: publicUrl, logoStoragePath: path },
+    });
+
+    return publicUrl;
+  }
+
+  async deleteLogo(organizationId: string, userId: string): Promise<void> {
+    const userOrg = await prisma.userOrganization.findFirst({
+      where: { userId, organizationId, role: { in: ['ADMIN', 'MANAGER'] } },
+    });
+    if (!userOrg) throw new Error('You do not have permission to update this organization');
+
+    const org = await prisma.organization.findUnique({ where: { id: organizationId } });
+    if (org?.logoStoragePath) {
+      const { deleteOrgLogo } = await import('../utils/supabase');
+      await deleteOrgLogo(org.logoStoragePath).catch(() => {});
+    }
+
+    await prisma.organization.update({
+      where: { id: organizationId },
+      data: { logoUrl: null, logoStoragePath: null },
+    });
+  }
 }
 
 export const organizationService = new OrganizationService();

@@ -10,6 +10,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 export const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export const STORAGE_BUCKET = 'course-materials';
+export const LOGOS_BUCKET = 'org-logos';
 
 /**
  * Initialize Supabase storage bucket if it doesn't exist
@@ -61,6 +62,56 @@ export async function initializeStorage() {
   } catch (error) {
     console.error('Error initializing Supabase storage:', error);
   }
+}
+
+/**
+ * Initialize org-logos bucket (public)
+ */
+export async function initializeLogosBucket() {
+  try {
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    if (listError) return;
+    const exists = buckets?.some(b => b.name === LOGOS_BUCKET);
+    if (!exists) {
+      await supabase.storage.createBucket(LOGOS_BUCKET, {
+        public: true,
+        fileSizeLimit: 5242880, // 5MB
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'],
+      });
+      console.log('✅ Supabase org-logos bucket created');
+    }
+  } catch (error) {
+    console.error('Error initializing org-logos bucket:', error);
+  }
+}
+
+/**
+ * Upload organization logo to Supabase Storage
+ */
+export async function uploadOrgLogo(
+  file: Buffer,
+  organizationId: string,
+  contentType: string
+): Promise<{ path: string; publicUrl: string }> {
+  const ext = contentType.split('/')[1] || 'png';
+  const filePath = `${organizationId}/logo.${ext}`;
+
+  const { error } = await supabase.storage
+    .from(LOGOS_BUCKET)
+    .upload(filePath, file, { contentType, upsert: true });
+
+  if (error) throw new Error(`Logo upload failed: ${error.message}`);
+
+  const { data } = supabase.storage.from(LOGOS_BUCKET).getPublicUrl(filePath);
+  return { path: filePath, publicUrl: `${data.publicUrl}?t=${Date.now()}` };
+}
+
+/**
+ * Delete organization logo from Supabase Storage
+ */
+export async function deleteOrgLogo(filePath: string): Promise<void> {
+  const { error } = await supabase.storage.from(LOGOS_BUCKET).remove([filePath]);
+  if (error) throw new Error(`Logo delete failed: ${error.message}`);
 }
 
 /**

@@ -116,6 +116,12 @@ function readLocalSidebarOrder(userId: string, defaults: NavItem[]): NavItem[] |
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuthStore();
+  const { data: organization } = useQuery({
+    queryKey: ['organization'],
+    queryFn: () => import('../services/organizationService').then(m => m.default.getOrganization()),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
   const { isCollapsed, toggleSidebar } = useSidebarStore();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -263,16 +269,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="h-20 flex items-center border-b border-secondary/20 flex-shrink-0 px-3.5">
           <div className="flex items-center gap-3">
             {/* Stały kontener logo */}
-            <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
-              <img
-                src="/lingodesk_logo_medium.png"
-                alt="LingoDesk Logo"
-                className="h-full w-full object-cover scale-150 ml-1 mt-1"
-                onError={(e) => {
-                  console.error('Logo failed to load');
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
+            <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 overflow-hidden">
+              {organization?.logoUrl ? (
+                <img
+                  src={organization.logoUrl}
+                  alt={organization.name}
+                  className="h-full w-full object-contain p-1"
+                />
+              ) : (
+                <img
+                  src="/lingodesk_logo_medium.png"
+                  alt="LingoDesk Logo"
+                  className="h-full w-full object-cover scale-150 ml-1 mt-1"
+                />
+              )}
             </div>
 
             {/* Nazwa – tylko opacity */}
@@ -281,7 +291,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
               }`}
             >
-              LingoDesk
+              {organization?.name || 'LingoDesk'}
             </h1>
           </div>
         </div>

@@ -193,6 +193,19 @@ const organizationService = {
     const response = await api.put('/organizations/regulations', { regulationsContent }) as any;
     return response.data.data;
   },
+
+  async uploadLogo(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('logo', file);
+    const response = await api.post('/organizations/logo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }) as any;
+    return response.data.data.logoUrl;
+  },
+
+  async deleteLogo(): Promise<void> {
+    await api.delete('/organizations/logo');
+  },
 };
 
 export default organizationService;

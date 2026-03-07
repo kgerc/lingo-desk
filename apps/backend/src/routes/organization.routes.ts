@@ -2,12 +2,28 @@ import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth';
 import { UserRole } from '@prisma/client';
 import { organizationController } from '../controllers/organization.controller';
+import { upload } from '../controllers/file.controller';
 
 const router = Router();
 router.use(authenticate);
 
 // Get current organization
 router.get('/', organizationController.getOrganization.bind(organizationController));
+
+// Upload organization logo (ADMIN or MANAGER)
+router.post(
+  '/logo',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  upload.single('logo'),
+  organizationController.uploadLogo.bind(organizationController)
+);
+
+// Delete organization logo (ADMIN or MANAGER)
+router.delete(
+  '/logo',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  organizationController.deleteLogo.bind(organizationController)
+);
 
 // Get all organizations user has access to
 router.get('/my-organizations', organizationController.getUserOrganizations.bind(organizationController));
