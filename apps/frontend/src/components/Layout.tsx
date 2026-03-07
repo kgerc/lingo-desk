@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '../stores/authStore';
 import { useSidebarStore } from '../stores/sidebarStore';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import alertService from '../services/alertService';
+import userProfileService from '../services/userProfileService';
 import {
   Home,
   Users,
@@ -25,94 +27,226 @@ import {
   UserCog,
   ClipboardList,
   Building2,
+  GripVertical,
+  RotateCcw,
+  Check,
 } from 'lucide-react';
+
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  badge?: number;
+}
 
 interface LayoutProps {
   children: React.ReactNode;
+}
+
+function getDefaultNavItems(role: string | undefined): NavItem[] {
+  const commonItems: NavItem[] = [
+    { name: 'Dashboard', href: '/dashboard', icon: Home },
+  ];
+  switch (role) {
+    case 'ADMIN':
+    case 'MANAGER':
+      return [
+        ...commonItems,
+        { name: 'Alerty', href: '/alerts', icon: Bell },
+        { name: 'Użytkownicy', href: '/users', icon: UserCog },
+        { name: 'Uczniowie', href: '/students', icon: Users },
+        { name: 'Lektorzy', href: '/teachers', icon: GraduationCap },
+        { name: 'Kursy', href: '/courses', icon: BookOpen },
+        { name: 'Materiały', href: '/materials', icon: FileText },
+        { name: 'Grafik', href: '/lessons', icon: Clock },
+        { name: 'Sale', href: '/classrooms', icon: Building2 },
+        { name: 'Zgłoszenia', href: '/applications', icon: ClipboardList },
+        { name: 'Rozliczenia', href: '/payments', icon: CreditCard },
+        { name: 'Dłużnicy', href: '/debtors', icon: AlertCircle },
+        { name: 'Mailing', href: '/mailing', icon: Mail },
+        { name: 'Raporty', href: '/reports', icon: BarChart3 },
+      ];
+    case 'TEACHER':
+      return [
+        ...commonItems,
+        { name: 'Alerty', href: '/alerts', icon: Bell },
+        { name: 'Mój grafik', href: '/teacher/schedule', icon: Calendar },
+        { name: 'Moje lekcje', href: '/lessons', icon: BookOpen },
+        { name: 'Uczniowie', href: '/students', icon: Users },
+      ];
+    case 'STUDENT':
+      return [
+        ...commonItems,
+        { name: 'Alerty', href: '/alerts', icon: Bell },
+        { name: 'Moje lekcje', href: '/lessons', icon: Clock },
+        { name: 'Moje kursy', href: '/courses', icon: BookOpen },
+        { name: 'Grafik', href: '/calendar', icon: Calendar },
+        { name: 'Wpłaty', href: '/payments?tab=payments', icon: CreditCard },
+      ];
+    case 'PARENT':
+      return [
+        ...commonItems,
+        { name: 'Dzieci', href: '/students', icon: Users },
+        { name: 'Grafik', href: '/lessons', icon: Clock },
+        { name: 'Wpłaty', href: '/payments?tab=payments', icon: CreditCard },
+      ];
+    default:
+      return commonItems;
+  }
+}
+
+function readLocalSidebarOrder(userId: string, defaults: NavItem[]): NavItem[] | null {
+  try {
+    const raw = localStorage.getItem(`sidebar-order-${userId}`);
+    if (!raw) return null;
+    const saved: string[] = JSON.parse(raw);
+    const ordered: NavItem[] = [];
+    for (const name of saved) {
+      const item = defaults.find((i) => i.name === name);
+      if (item) ordered.push(item);
+    }
+    for (const item of defaults) {
+      if (!ordered.find((o) => o.name === item.name)) ordered.push(item);
+    }
+    return ordered.length > 0 ? ordered : null;
+  } catch {
+    return null;
+  }
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuthStore();
   const { isCollapsed, toggleSidebar } = useSidebarStore();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   // Fetch unread alerts count (with auto-generation for admin/manager)
   const { data: unreadCount } = useQuery({
     queryKey: ['unreadCount'],
     queryFn: async () => {
-      // Generate system alerts only for admin/manager (org-wide alerts)
       if (user?.role === 'ADMIN' || user?.role === 'MANAGER') {
         await alertService.generateSystemAlerts();
       }
       return await alertService.getUnreadCount();
     },
-    refetchInterval: 60000, // Refetch every minute
+    refetchInterval: 60000,
   });
 
-  // Role-based navigation (without Settings)
-  const getNavigationForRole = () => {
-    const role = user?.role;
+  // Navigation order state — initialize from localStorage for instant render
+  const [navItems, setNavItems] = useState<NavItem[]>(() => {
+    const { user: initialUser } = useAuthStore.getState();
+    const defaults = getDefaultNavItems(initialUser?.role);
+    if (!initialUser?.id) return defaults;
+    return readLocalSidebarOrder(initialUser.id, defaults) ?? defaults;
+  });
+  const [isEditMode, setIsEditMode] = useState(false);
+  const draggingName = useRef<string | null>(null);
 
-    // Common items for all roles
-    const commonItems = [
-      { name: 'Dashboard', href: '/dashboard', icon: Home },
-    ];
+  // Load saved sidebar order from backend
+  const { data: savedOrder } = useQuery({
+    queryKey: ['sidebar-order'],
+    queryFn: () => userProfileService.getSidebarOrder(),
+    enabled: !!user,
+    staleTime: Infinity,
+  });
 
-    // Role-specific items (Settings moved to bottom)
-    switch (role) {
-      case 'ADMIN':
-      case 'MANAGER':
-        return [
-          ...commonItems,
-          { name: 'Alerty', href: '/alerts', icon: Bell, badge: unreadCount || 0 },
-          { name: 'Użytkownicy', href: '/users', icon: UserCog },
-          { name: 'Uczniowie', href: '/students', icon: Users },
-          { name: 'Lektorzy', href: '/teachers', icon: GraduationCap },
-          { name: 'Kursy', href: '/courses', icon: BookOpen },
-          // { name: 'Grupy', href: '/groups', icon: Users2 }, // Hidden temporarily
-          { name: 'Materiały', href: '/materials', icon: FileText },
-          { name: 'Grafik', href: '/lessons', icon: Clock },
-          { name: 'Sale', href: '/classrooms', icon: Building2 },
-          { name: 'Zgłoszenia', href: '/applications', icon: ClipboardList },
-          { name: 'Rozliczenia', href: '/payments', icon: CreditCard },
-          { name: 'Dłużnicy', href: '/debtors', icon: AlertCircle },
-          { name: 'Mailing', href: '/mailing', icon: Mail },
-          { name: 'Raporty', href: '/reports', icon: BarChart3 },
-        ];
+  // Save sidebar order mutation
+  const saveMutation = useMutation({
+    mutationFn: (order: string[]) => {
+      if (user?.id) {
+        localStorage.setItem(`sidebar-order-${user.id}`, JSON.stringify(order));
+      }
+      return userProfileService.saveSidebarOrder(order);
+    },
+    onSuccess: () => {
+      toast.success('Układ sidebaru zapisany');
+      queryClient.invalidateQueries({ queryKey: ['sidebar-order'] });
+      setIsEditMode(false);
+    },
+    onError: () => {
+      toast.error('Błąd podczas zapisywania układu');
+    },
+  });
 
-      case 'TEACHER':
-        return [
-          ...commonItems,
-          { name: 'Alerty', href: '/alerts', icon: Bell, badge: unreadCount || 0 },
-          { name: 'Mój grafik', href: '/teacher/schedule', icon: Calendar },
-          { name: 'Moje lekcje', href: '/lessons', icon: BookOpen },
-          { name: 'Uczniowie', href: '/students', icon: Users },
-        ];
-
-      case 'STUDENT':
-        return [
-          ...commonItems,
-          { name: 'Alerty', href: '/alerts', icon: Bell, badge: unreadCount || 0 },
-          { name: 'Moje lekcje', href: '/lessons', icon: Clock },
-          { name: 'Moje kursy', href: '/courses', icon: BookOpen },
-          { name: 'Grafik', href: '/calendar', icon: Calendar },
-          { name: 'Wpłaty', href: '/payments?tab=payments', icon: CreditCard },
-        ];
-
-      case 'PARENT':
-        return [
-          ...commonItems,
-          { name: 'Dzieci', href: '/students', icon: Users },
-          { name: 'Grafik', href: '/lessons', icon: Clock },
-          { name: 'Wpłaty', href: '/payments?tab=payments', icon: CreditCard },
-        ];
-
-      default:
-        return commonItems;
+  // Apply saved order from backend and sync to localStorage
+  useEffect(() => {
+    // savedOrder undefined means query hasn't resolved yet — don't touch navItems
+    if (savedOrder === undefined) return;
+    const defaults = getDefaultNavItems(user?.role);
+    if (savedOrder && savedOrder.length > 0) {
+      if (user?.id) {
+        localStorage.setItem(`sidebar-order-${user.id}`, JSON.stringify(savedOrder));
+      }
+      const ordered: NavItem[] = [];
+      for (const name of savedOrder) {
+        const item = defaults.find((i) => i.name === name);
+        if (item) ordered.push(item);
+      }
+      for (const item of defaults) {
+        if (!ordered.find((o) => o.name === item.name)) ordered.push(item);
+      }
+      setNavItems(ordered);
     }
+    // savedOrder null/empty and no localStorage — set defaults
+    else if (!user?.id || !localStorage.getItem(`sidebar-order-${user.id}`)) {
+      setNavItems(defaults);
+    }
+  }, [savedOrder, user?.role]);
+
+  // Update badges without reordering
+  useEffect(() => {
+    setNavItems((prev) =>
+      prev.map((item) => {
+        if (item.href === '/alerts') return { ...item, badge: unreadCount || 0 };
+        return item;
+      })
+    );
+  }, [unreadCount]);
+
+  const handleDragStart = (name: string, e: React.DragEvent) => {
+    if (!isEditMode) {
+      e.preventDefault();
+      return;
+    }
+    draggingName.current = name;
+    const ghost = document.createElement('div');
+    ghost.style.position = 'fixed';
+    ghost.style.top = '-9999px';
+    ghost.style.left = '-9999px';
+    ghost.style.width = '1px';
+    ghost.style.height = '1px';
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 0, 0);
+    requestAnimationFrame(() => document.body.removeChild(ghost));
   };
 
-  const navigation = getNavigationForRole();
+  const handleDragEnter = (targetName: string) => {
+    const fromName = draggingName.current;
+    if (!fromName || fromName === targetName) return;
+    setNavItems((prev) => {
+      const fromIdx = prev.findIndex((i) => i.name === fromName);
+      const toIdx = prev.findIndex((i) => i.name === targetName);
+      if (fromIdx === -1 || toIdx === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+  };
+
+  const handleDragEnd = () => {
+    draggingName.current = null;
+  };
+
+  const handleSaveOrder = () => {
+    saveMutation.mutate(navItems.map((i) => i.name));
+  };
+
+  const handleResetOrder = () => {
+    const defaults = getDefaultNavItems(user?.role);
+    setNavItems(defaults);
+    saveMutation.mutate(defaults.map((i) => i.name));
+  };
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -154,42 +288,101 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         {/* Navigation */}
         <nav className="p-4 space-y-1 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
-          {navigation.map((item) => {
-            const Icon = item.icon;
-            const hasBadge = 'badge' in item && item.badge && item.badge > 0;
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                title={isCollapsed ? item.name : ''}
-                className={`flex items-center px-2 py-3 rounded-lg transition-colors ${
-                  isActive(item.href)
-                    ? 'bg-white/10 text-white shadow-sm'
-                    : 'text-white/80 hover:bg-white/5 hover:text-white'
-                }`}
+          {/* Edit mode toolbar */}
+          {!isCollapsed && (
+            <div
+              className={`flex items-center gap-2 mb-2 transition-all duration-200 overflow-hidden ${
+                isEditMode ? 'max-h-12 opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+              }`}
+            >
+              <button
+                onClick={handleSaveOrder}
+                disabled={saveMutation.isPending}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-green-500 hover:bg-green-400 text-white text-xs font-medium transition-colors"
               >
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="w-8 flex justify-center relative">
-                    <Icon className="h-5 w-5" />
-                  </div>
+                <Check className="w-3 h-3" />
+                Zapisz
+              </button>
+              <button
+                onClick={handleResetOrder}
+                disabled={saveMutation.isPending}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white/80 text-xs font-medium transition-colors"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Reset
+              </button>
+              <button
+                onClick={() => setIsEditMode(false)}
+                className="ml-auto text-white/50 hover:text-white/80 text-xs"
+              >
+                Anuluj
+              </button>
+            </div>
+          )}
 
-                  <span
-                    className={`font-medium whitespace-nowrap transition-opacity duration-200 flex-1 ${
-                      isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
-                    }`}
-                  >
-                    {item.name}
-                  </span>
-
-                  {hasBadge && !isCollapsed && (
-                    <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold">
-                      {item.badge}
-                    </span>
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const hasBadge = item.badge && item.badge > 0;
+            return (
+              <div
+                key={item.name}
+                draggable={isEditMode}
+                onDragStart={(e) => handleDragStart(item.name, e)}
+                onDragEnter={() => handleDragEnter(item.name)}
+                onDragOver={(e) => e.preventDefault()}
+                onDragEnd={handleDragEnd}
+                className={isEditMode ? 'cursor-grab active:cursor-grabbing' : ''}
+              >
+                <Link
+                  to={isEditMode ? '#' : item.href}
+                  onClick={isEditMode ? (e) => e.preventDefault() : undefined}
+                  draggable={false}
+                  title={isCollapsed ? item.name : ''}
+                  className={`flex items-center px-2 py-3 rounded-lg transition-colors ${
+                    isEditMode
+                      ? 'bg-white/5 text-white/70 hover:bg-white/10'
+                      : isActive(item.href)
+                      ? 'bg-white/10 text-white shadow-sm'
+                      : 'text-white/80 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  {isEditMode && !isCollapsed && (
+                    <GripVertical className="h-4 w-4 text-white/40 mr-1 flex-shrink-0" />
                   )}
-                </div>
-              </Link>
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-8 flex justify-center relative">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <span
+                      className={`font-medium whitespace-nowrap transition-opacity duration-200 flex-1 ${
+                        isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                      }`}
+                    >
+                      {item.name}
+                    </span>
+                    {hasBadge && !isCollapsed && !isEditMode && (
+                      <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold">
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              </div>
             );
           })}
+
+          {/* Edit order button */}
+          {!isCollapsed && !isEditMode && (
+            <button
+              onClick={() => setIsEditMode(true)}
+              className="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors text-xs mt-2"
+            >
+              <div className="w-8 flex justify-center">
+                <GripVertical className="h-4 w-4" />
+              </div>
+              Zmień kolejność
+            </button>
+          )}
         </nav>
 
         {/* Bottom Section: Settings + Toggle */}

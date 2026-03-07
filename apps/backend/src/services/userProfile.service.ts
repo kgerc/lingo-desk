@@ -131,6 +131,25 @@ class UserProfileService {
   }
 
   /**
+   * Get sidebar order for a user
+   */
+  async getSidebarOrder(userId: string): Promise<string[] | null> {
+    const profile = await this.getProfile(userId);
+    return (profile.sidebarOrder as string[]) || null;
+  }
+
+  /**
+   * Save sidebar order for a user
+   */
+  async saveSidebarOrder(userId: string, order: string[]): Promise<void> {
+    await this.getProfile(userId); // ensure profile exists
+    await prisma.userProfile.update({
+      where: { userId },
+      data: { sidebarOrder: order },
+    });
+  }
+
+  /**
    * Get notification preferences for a user
    */
   async getNotificationPreferences(userId: string): Promise<NotificationPreferences> {

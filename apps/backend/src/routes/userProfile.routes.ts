@@ -23,4 +23,10 @@ router.put(
   userProfileController.updateNotificationPreferences.bind(userProfileController)
 );
 
+// Get sidebar order
+router.get('/sidebar-order', userProfileController.getSidebarOrder.bind(userProfileController));
+
+// Save sidebar order
+router.put('/sidebar-order', userProfileController.saveSidebarOrder.bind(userProfileController));
+
 export default router;

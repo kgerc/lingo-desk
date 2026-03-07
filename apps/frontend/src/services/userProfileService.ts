@@ -58,6 +58,15 @@ class UserProfileService {
     const response = await api.put('/profile/notification-preferences', preferences) as any;
     return response.data.data;
   }
+
+  async getSidebarOrder(): Promise<string[] | null> {
+    const response = await api.get('/profile/sidebar-order') as any;
+    return response.data.data;
+  }
+
+  async saveSidebarOrder(order: string[]): Promise<void> {
+    await api.put('/profile/sidebar-order', { order });
+  }
 }
 
 export default new UserProfileService();

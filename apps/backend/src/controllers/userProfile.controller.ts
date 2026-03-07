@@ -11,6 +11,10 @@ const updateProfileSchema = z.object({
   languagePreference: optionalString('Preferowany język'),
 });
 
+const saveSidebarOrderSchema = z.object({
+  order: z.array(z.string()).min(1),
+});
+
 const updateNotificationPreferencesSchema = z.object({
   emailReminders: optionalBoolean('Przypomnienia email'),
   emailConfirmations: optionalBoolean('Potwierdzenia email'),
@@ -55,6 +59,25 @@ class UserProfileController {
       const preferences = updateNotificationPreferencesSchema.parse(req.body);
       const profile = await userProfileService.updateNotificationPreferences(req.user!.id, preferences);
       res.json({ message: 'Preferencje powiadomień zaktualizowane pomyślnie', data: profile });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getSidebarOrder(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const order = await userProfileService.getSidebarOrder(req.user!.id);
+      res.json({ data: order });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async saveSidebarOrder(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { order } = saveSidebarOrderSchema.parse(req.body);
+      await userProfileService.saveSidebarOrder(req.user!.id, order);
+      res.json({ message: 'Układ sidebaru zapisany pomyślnie' });
     } catch (error) {
       next(error);
     }

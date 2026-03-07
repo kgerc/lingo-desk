@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { TeacherPayoutStatus } from '@prisma/client';
-import payoutService, { PayoutForecast } from '../services/payout.service';
+import payoutService from '../services/payout.service';
 import { AuthRequest } from '../middleware/auth';
 
 export const previewPayout = async (req: AuthRequest, res: Response) => {
