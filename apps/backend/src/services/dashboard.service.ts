@@ -372,12 +372,14 @@ export class DashboardService {
     const { startDate, endDate, groupBy } = this.getDateRangeAndGrouping(rangeType, year, month);
 
     const [revenueData, lessonsData] = await Promise.all([
-      this.getRevenueChartData(organizationId, startDate, endDate, groupBy),
+      this.getRevenueChartDataByStudentType(organizationId, startDate, endDate, groupBy),
       this.getLessonsChartData(organizationId, startDate, endDate, groupBy),
     ]);
 
     // Calculate totals
-    const totalRevenue = revenueData.reduce((sum, item) => sum + item.amount, 0);
+    const totalRevenue = revenueData.reduce((sum, item) => sum + item.amountNew + item.amountReturning, 0);
+    const totalRevenueNew = revenueData.reduce((sum, item) => sum + item.amountNew, 0);
+    const totalRevenueReturning = revenueData.reduce((sum, item) => sum + item.amountReturning, 0);
     const totalLessons = lessonsData.reduce((sum, item) => sum + item.count, 0);
 
     return {
@@ -388,6 +390,8 @@ export class DashboardService {
       revenue: {
         data: revenueData,
         total: totalRevenue,
+        totalNew: totalRevenueNew,
+        totalReturning: totalRevenueReturning,
       },
       lessons: {
         data: lessonsData,
@@ -438,45 +442,122 @@ export class DashboardService {
   }
 
   /**
-   * Get revenue chart data with flexible grouping
+   * Get revenue chart data split by new vs returning students.
+   * A student is "new" in a given period if their very first completed payment
+   * ever falls within that period; otherwise they are "returning".
    */
-  private async getRevenueChartData(
+  private async getRevenueChartDataByStudentType(
     organizationId: string,
     startDate: Date,
     endDate: Date,
     groupBy: 'day' | 'month'
   ) {
+    // Fetch all completed payments in range with studentId
     const payments = await prisma.payment.findMany({
       where: {
         organizationId,
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
-        },
+        createdAt: { gte: startDate, lte: endDate },
         status: 'COMPLETED',
       },
-      select: {
-        amount: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
+      select: { amount: true, createdAt: true, studentId: true },
+      orderBy: { createdAt: 'asc' },
     });
 
-    // Group payments
-    const groupedData = new Map<string, number>();
+    if (payments.length === 0) {
+      return this.buildEmptyRevenueChart(startDate, endDate, groupBy);
+    }
+
+    // Find the earliest-ever completed payment date for each student in this org
+    const studentIds = [...new Set(payments.map(p => p.studentId))];
+    const firstPayments = await prisma.payment.findMany({
+      where: {
+        organizationId,
+        studentId: { in: studentIds },
+        status: 'COMPLETED',
+      },
+      select: { studentId: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Map studentId -> date of their very first completed payment
+    const firstPaymentDate = new Map<string, Date>();
+    firstPayments.forEach(p => {
+      if (!firstPaymentDate.has(p.studentId)) {
+        firstPaymentDate.set(p.studentId, p.createdAt);
+      }
+    });
+
+    // Group payments into new/returning buckets per period key
+    const newData = new Map<string, number>();
+    const returningData = new Map<string, number>();
 
     payments.forEach((payment) => {
       const key = groupBy === 'day'
         ? payment.createdAt.toISOString().split('T')[0]
         : `${payment.createdAt.getFullYear()}-${String(payment.createdAt.getMonth() + 1).padStart(2, '0')}`;
-      const currentAmount = groupedData.get(key) || 0;
-      groupedData.set(key, currentAmount + parseFloat(payment.amount.toString()));
+
+      const amount = parseFloat(payment.amount.toString());
+      const firstDate = firstPaymentDate.get(payment.studentId);
+
+      // Student is "new" if this payment IS their first ever payment
+      const isNew = firstDate && firstDate.getTime() === payment.createdAt.getTime() &&
+        firstDate >= startDate && firstDate <= endDate;
+
+      if (isNew) {
+        newData.set(key, (newData.get(key) || 0) + amount);
+      } else {
+        returningData.set(key, (returningData.get(key) || 0) + amount);
+      }
     });
 
-    // Create array with all periods in range
-    const chartData: Array<{ date: string; label: string; amount: number }> = [];
+    // Build full chart array
+    const chartData: Array<{ date: string; label: string; amountNew: number; amountReturning: number; amount: number }> = [];
+
+    if (groupBy === 'day') {
+      const current = new Date(startDate);
+      while (current <= endDate) {
+        const dateStr = current.toISOString().split('T')[0];
+        const amountNew = newData.get(dateStr) || 0;
+        const amountReturning = returningData.get(dateStr) || 0;
+        chartData.push({
+          date: dateStr,
+          label: current.toLocaleDateString('pl-PL', { month: 'short', day: 'numeric' }),
+          amountNew,
+          amountReturning,
+          amount: amountNew + amountReturning,
+        });
+        current.setDate(current.getDate() + 1);
+      }
+    } else {
+      const startYear = startDate.getFullYear();
+      const startMonth = startDate.getMonth();
+      const endYear = endDate.getFullYear();
+      const endMonth = endDate.getMonth();
+
+      for (let y = startYear; y <= endYear; y++) {
+        const monthStart = y === startYear ? startMonth : 0;
+        const monthEnd = y === endYear ? endMonth : 11;
+        for (let m = monthStart; m <= monthEnd; m++) {
+          const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+          const date = new Date(y, m, 1);
+          const amountNew = newData.get(key) || 0;
+          const amountReturning = returningData.get(key) || 0;
+          chartData.push({
+            date: key,
+            label: date.toLocaleDateString('pl-PL', { month: 'short', year: '2-digit' }),
+            amountNew,
+            amountReturning,
+            amount: amountNew + amountReturning,
+          });
+        }
+      }
+    }
+
+    return chartData;
+  }
+
+  private buildEmptyRevenueChart(startDate: Date, endDate: Date, groupBy: 'day' | 'month') {
+    const chartData: Array<{ date: string; label: string; amountNew: number; amountReturning: number; amount: number }> = [];
 
     if (groupBy === 'day') {
       const current = new Date(startDate);
@@ -485,12 +566,13 @@ export class DashboardService {
         chartData.push({
           date: dateStr,
           label: current.toLocaleDateString('pl-PL', { month: 'short', day: 'numeric' }),
-          amount: groupedData.get(dateStr) || 0,
+          amountNew: 0,
+          amountReturning: 0,
+          amount: 0,
         });
         current.setDate(current.getDate() + 1);
       }
     } else {
-      // Group by month
       const startYear = startDate.getFullYear();
       const startMonth = startDate.getMonth();
       const endYear = endDate.getFullYear();
@@ -505,7 +587,9 @@ export class DashboardService {
           chartData.push({
             date: key,
             label: date.toLocaleDateString('pl-PL', { month: 'short', year: '2-digit' }),
-            amount: groupedData.get(key) || 0,
+            amountNew: 0,
+            amountReturning: 0,
+            amount: 0,
           });
         }
       }

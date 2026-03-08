@@ -5,7 +5,7 @@ import { dashboardService, DashboardStats, DateRangeType, ChartDataParams } from
 import organizationService from '../services/organizationService';
 import { Users, GraduationCap, BookOpen, Calendar, TrendingUp, BarChart3, AlertTriangle, CreditCard, LucideIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import TeacherDashboard from './TeacherDashboard';
 import StudentDashboard from './StudentDashboard';
 import StudentModal from '../components/StudentModal';
@@ -167,7 +167,8 @@ const DashboardPage: React.FC = () => {
   // Format revenue data for chart from new API
   const revenueData = chartData?.revenue.data.map(item => ({
     date: item.label,
-    amount: item.amount || 0,
+    'Nowi kursanci': item.amountNew || 0,
+    'Stali kursanci': item.amountReturning || 0,
   })) || [];
 
   // Format lessons data for chart from new API
@@ -334,12 +335,12 @@ const DashboardPage: React.FC = () => {
                   </h2>
                 </div>
                 {isLoadingCharts ? (
-                  <div className="h-[250px] flex items-center justify-center">
+                  <div className="h-[280px] flex items-center justify-center">
                     <LoadingSpinner message="Ładowanie..." />
                   </div>
                 ) : revenueData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={250}>
-                    <LineChart data={revenueData}>
+                    <BarChart data={revenueData}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis
                         dataKey="date"
@@ -348,34 +349,33 @@ const DashboardPage: React.FC = () => {
                         textAnchor="end"
                         height={80}
                       />
-                      <YAxis tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${v} PLN`} />
                       <Tooltip
-                        formatter={(value: number | undefined) => value !== undefined ? `${value.toFixed(2)} PLN` : 'N/A'}
+                        formatter={(value: number | undefined, name: string | undefined) => [value !== undefined ? `${Number(value).toFixed(2)} PLN` : 'N/A', name ?? '']}
                         labelStyle={{ color: '#000' }}
                       />
-                      <Line
-                        type="monotone"
-                        dataKey="amount"
-                        stroke="#10b981"
-                        strokeWidth={2}
-                        dot={{ fill: '#10b981', r: 4 }}
-                        activeDot={{ r: 6 }}
-                        name="Przychód"
-                      />
-                    </LineChart>
+                      <Bar dataKey="Nowi kursanci" stackId="revenue" fill="#10b981" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="Stali kursanci" stackId="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-[250px] flex items-center justify-center text-gray-500">
+                  <div className="h-[280px] flex items-center justify-center text-gray-500">
                     Brak danych o przychodach
                   </div>
                 )}
                 {chartData?.revenue.total !== undefined && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-sm text-gray-600">
-                      Łączny przychód: <span className="font-bold text-secondary">
-                        {chartData.revenue.total.toFixed(2)} PLN
-                      </span>
-                    </p>
+                  <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-6 text-sm text-gray-600">
+                    <span>
+                      Łącznie: <span className="font-bold text-gray-900">{chartData.revenue.total.toFixed(2)} PLN</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded-sm bg-emerald-500" />
+                      Nowi uczniowie: <span className="font-semibold text-emerald-700">{(chartData.revenue.totalNew ?? 0).toFixed(2)} PLN</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded-sm bg-blue-500" />
+                      Stali uczniowie: <span className="font-semibold text-blue-700">{(chartData.revenue.totalReturning ?? 0).toFixed(2)} PLN</span>
+                    </span>
                   </div>
                 )}
               </div>

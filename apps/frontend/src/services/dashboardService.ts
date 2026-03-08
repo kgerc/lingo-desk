@@ -57,11 +57,18 @@ export interface ChartDataParams {
   month?: number;
 }
 
-export interface ChartDataPoint {
+export interface RevenueDataPoint {
   date: string;
   label: string;
-  amount?: number;
-  count?: number;
+  amountNew: number;
+  amountReturning: number;
+  amount: number;
+}
+
+export interface LessonsDataPoint {
+  date: string;
+  label: string;
+  count: number;
 }
 
 export interface ChartData {
@@ -70,11 +77,13 @@ export interface ChartData {
   endDate: string;
   groupBy: 'day' | 'month';
   revenue: {
-    data: ChartDataPoint[];
+    data: RevenueDataPoint[];
     total: number;
+    totalNew: number;
+    totalReturning: number;
   };
   lessons: {
-    data: ChartDataPoint[];
+    data: LessonsDataPoint[];
     total: number;
   };
 }
