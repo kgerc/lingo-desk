@@ -7,6 +7,7 @@ const router = Router();
 
 router.post('/register', authLimiter, authController.register.bind(authController));
 router.post('/login', authLimiter, authController.login.bind(authController));
+router.post('/google', authLimiter, authController.googleAuth.bind(authController));
 router.get('/me', authenticate, authController.getMe.bind(authController));
 
 export default router;

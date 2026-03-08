@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '../stores/authStore';
 import { authService } from '../services/authService';
 
@@ -15,6 +16,22 @@ const RegisterPage: React.FC = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    if (!credentialResponse.credential) return;
+    setError('');
+    setGoogleLoading(true);
+    try {
+      const { user, token } = await authService.googleLogin(credentialResponse.credential);
+      setAuth(user, token);
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Rejestracja przez Google nie powiodła się');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
@@ -169,6 +186,34 @@ const RegisterPage: React.FC = () => {
           >
             {loading ? 'Tworzenie konta...' : 'Załóż konto'}
           </button>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-gray-50 text-gray-500">lub zarejestruj się przez</span>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            {googleLoading ? (
+              <button
+                type="button"
+                disabled
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-secondary opacity-50 cursor-not-allowed"
+              >
+                Tworzenie konta...
+              </button>
+            ) : (
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError('Rejestracja przez Google nie powiodła się')}
+                text="signup_with"
+                width="368"
+              />
+            )}
+          </div>
         </form>
       </div>
     </div>

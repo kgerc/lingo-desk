@@ -35,7 +35,8 @@
       "Bash(npx prisma:*)",
       "Bash(xargs grep -l \"student.*modal\\\\|StudentModal\" -i)",
       "Bash(xargs basename -a)",
-      "Bash(sed 's/\\\\.tsx$//')"
+      "Bash(sed 's/\\\\.tsx$//')",
+      "Bash(PRISMA_MIGRATE_SKIP_GENERATE=true npx prisma migrate dev --name add_google_id)"
     ]
   }
 }

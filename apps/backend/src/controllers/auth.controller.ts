@@ -71,6 +71,22 @@ export class AuthController {
       return next(error);
     }
   }
+
+  async googleAuth(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { idToken } = req.body;
+      if (!idToken) {
+        return res.status(400).json({ error: { message: 'Brak tokenu Google' } });
+      }
+      const result = await authService.googleAuth(idToken);
+      return res.json({
+        message: 'Zalogowano pomyślnie przez Google',
+        data: result,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
 }
 
 export default new AuthController();

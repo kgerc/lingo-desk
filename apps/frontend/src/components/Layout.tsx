@@ -287,7 +287,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
             {/* Nazwa – tylko opacity */}
             <h1
-              className={`text-2xl font-bold text-white whitespace-nowrap transition-opacity duration-200 ${
+              className={`text-xl font-bold text-white whitespace-nowrap transition-opacity duration-200 ${
                 isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
               }`}
             >

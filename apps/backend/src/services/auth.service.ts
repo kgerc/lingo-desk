@@ -1,7 +1,10 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 import prisma from '../utils/prisma';
 import { UserRole } from '@prisma/client';
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 interface RegisterData {
   email: string;
@@ -126,6 +129,11 @@ export class AuthService {
       throw new Error('Account is deactivated');
     }
 
+    // Account has no password (Google-only)
+    if (!user.passwordHash) {
+      throw new Error('To konto używa logowania przez Google. Użyj przycisku „Zaloguj przez Google".');
+    }
+
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
 
@@ -208,6 +216,82 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  async googleAuth(idToken: string) {
+    // Verify Google token
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload) throw new Error('Nieprawidłowy token Google');
+
+    const { sub: googleId, email, given_name: firstName, family_name: lastName, email_verified, picture: avatarUrl } = payload;
+
+    if (!email) throw new Error('Konto Google nie ma powiązanego adresu email');
+    if (!email_verified) throw new Error('Adres email w koncie Google nie jest zweryfikowany');
+
+    // Case 1: user with this googleId exists → login
+    let user = await prisma.user.findUnique({ where: { googleId } });
+
+    if (user) {
+      if (!user.isActive) throw new Error('Konto jest dezaktywowane');
+      await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+      const fullUser = await this.getMe(user.id);
+      return { user: fullUser, token: this.generateToken({ id: user.id, email: user.email, role: user.role, organizationId: user.organizationId }) };
+    }
+
+    // Case 2: user with same email exists → link Google to existing account
+    const existingByEmail = await prisma.user.findUnique({ where: { email } });
+
+    if (existingByEmail) {
+      if (!existingByEmail.isActive) throw new Error('Konto jest dezaktywowane');
+      user = await prisma.user.update({
+        where: { id: existingByEmail.id },
+        data: { googleId, avatarUrl: existingByEmail.avatarUrl || avatarUrl || null, lastLoginAt: new Date() },
+      });
+      const fullUser = await this.getMe(user.id);
+      return { user: fullUser, token: this.generateToken({ id: user.id, email: user.email, role: user.role, organizationId: user.organizationId }), linked: true };
+    }
+
+    // Case 3: new user → register with Google
+    const result = await prisma.$transaction(async (tx) => {
+      const organization = await tx.organization.create({
+        data: {
+          name: `${firstName || email}'s School`,
+          slug: this.generateSlug(`${firstName || email}'s School`),
+        },
+      });
+      await tx.organizationSettings.create({ data: { organizationId: organization.id } });
+
+      const newUser = await tx.user.create({
+        data: {
+          email,
+          passwordHash: null,
+          googleId,
+          firstName: firstName || email.split('@')[0],
+          lastName: lastName || '',
+          avatarUrl: avatarUrl || null,
+          organizationId: organization.id,
+          role: UserRole.MANAGER,
+        },
+        select: { id: true, email: true, firstName: true, lastName: true, role: true, organizationId: true },
+      });
+
+      await tx.userOrganization.create({
+        data: { userId: newUser.id, organizationId: organization.id, role: UserRole.MANAGER },
+      });
+      await tx.userProfile.create({ data: { userId: newUser.id } });
+
+      return newUser;
+    });
+
+    const fullUser = await this.getMe(result.id);
+    return {
+      user: fullUser,
+      token: this.generateToken({ id: result.id, email: result.email, role: result.role, organizationId: result.organizationId }),
+    };
   }
 
   private generateToken(payload: {
