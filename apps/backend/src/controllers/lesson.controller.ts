@@ -3,6 +3,8 @@ import { z } from 'zod';
 import lessonService from '../services/lesson.service';
 import { AuthRequest } from '../middleware/auth';
 import googleCalendarService from '../services/google-calendar.service';
+import emailService from '../services/email.service';
+import prisma from '../utils/prisma';
 import {
   requiredUuid,
   optionalUuid,
@@ -307,6 +309,72 @@ class LessonController {
         data: results,
         message: `Zaktualizowano ${results.updated} lekcji${results.failed > 0 ? `, ${results.failed} błędów` : ''}`,
       });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async setRecording(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { recordingUrl, sendEmail } = req.body;
+      const organizationId = req.user!.organizationId;
+
+      if (!recordingUrl || typeof recordingUrl !== 'string') {
+        return res.status(400).json({ success: false, error: { message: 'Link do nagrania jest wymagany' } });
+      }
+
+      const lesson = await prisma.lesson.update({
+        where: { id: id as string, organizationId },
+        data: { recordingUrl },
+        include: {
+          student: { include: { user: { select: { email: true, firstName: true, lastName: true } } } },
+          teacher: { include: { user: { select: { firstName: true, lastName: true } } } },
+        },
+      });
+
+      if (sendEmail && lesson.student?.user?.email) {
+        const studentName = `${lesson.student.user.firstName} ${lesson.student.user.lastName}`;
+        const teacherName = `${lesson.teacher?.user?.firstName} ${lesson.teacher?.user?.lastName}`;
+        const lessonDate = new Date(lesson.scheduledAt).toLocaleDateString('pl-PL', {
+          day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+        });
+        await emailService.sendEmail({
+          to: lesson.student.user.email,
+          subject: `Nagranie z lekcji – ${lesson.title}`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #1e293b;">Nagranie z Twojej lekcji jest dostępne</h2>
+              <p>Cześć ${studentName},</p>
+              <p>Nagranie z lekcji <strong>${lesson.title}</strong> z dnia ${lessonDate} (lektor: ${teacherName}) jest gotowe do obejrzenia.</p>
+              <p style="margin: 24px 0;">
+                <a href="${recordingUrl}" style="background: #3b82f6; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold;">
+                  Obejrzyj nagranie
+                </a>
+              </p>
+              <p style="color: #64748b; font-size: 14px;">Jeśli przycisk nie działa, skopiuj i wklej poniższy link w przeglądarce:<br>${recordingUrl}</p>
+            </div>
+          `,
+        });
+      }
+
+      return res.json({ success: true, data: lesson });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async deleteRecording(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user!.organizationId;
+
+      const lesson = await prisma.lesson.update({
+        where: { id: id as string, organizationId },
+        data: { recordingUrl: null },
+      });
+
+      return res.json({ success: true, data: lesson });
     } catch (error) {
       return next(error);
     }

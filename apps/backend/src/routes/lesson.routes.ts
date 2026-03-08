@@ -69,4 +69,18 @@ router.post(
   lessonController.confirmLesson.bind(lessonController)
 );
 
+// Set recording URL (teachers, managers, admins)
+router.post(
+  '/:id/recording',
+  authorize(UserRole.ADMIN, UserRole.MANAGER, UserRole.TEACHER),
+  lessonController.setRecording.bind(lessonController)
+);
+
+// Delete recording URL (teachers, managers, admins)
+router.delete(
+  '/:id/recording',
+  authorize(UserRole.ADMIN, UserRole.MANAGER, UserRole.TEACHER),
+  lessonController.deleteRecording.bind(lessonController)
+);
+
 export default router;

@@ -25,4 +25,9 @@ router.delete('/:id', materialController.deleteMaterial.bind(materialController)
 // Reorder materials for a course
 router.post('/course/:courseId/reorder', materialController.reorderMaterials.bind(materialController));
 
+// Lesson materials
+router.get('/lesson/:lessonId', materialController.getMaterialsByLesson.bind(materialController));
+router.post('/lesson', materialController.createLessonMaterial.bind(materialController));
+router.delete('/lesson/:id', materialController.deleteLessonMaterial.bind(materialController));
+
 export default router;

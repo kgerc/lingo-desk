@@ -56,6 +56,7 @@ export interface Lesson {
   classroomId?: string;
   deliveryMode: LessonDeliveryMode;
   meetingUrl?: string;
+  recordingUrl?: string;
   status: LessonStatus;
   isRecurring: boolean;
   recurringPatternId?: string;
@@ -211,6 +212,16 @@ export const lessonService = {
 
   async confirmLesson(id: string) {
     const response = await api.post(`/lessons/${id}/confirm`) as any;
+    return response.data.data as Lesson;
+  },
+
+  async setRecording(id: string, recordingUrl: string, sendEmail: boolean) {
+    const response = await api.post(`/lessons/${id}/recording`, { recordingUrl, sendEmail }) as any;
+    return response.data.data as Lesson;
+  },
+
+  async deleteRecording(id: string) {
+    const response = await api.delete(`/lessons/${id}/recording`) as any;
     return response.data.data as Lesson;
   },
 

@@ -9,6 +9,14 @@ export interface CreateMaterialData {
   orderIndex: number;
 }
 
+export interface CreateLessonMaterialData {
+  lessonId: string;
+  fileId: string;
+  title: string;
+  description?: string;
+  orderIndex: number;
+}
+
 export interface UpdateMaterialData {
   title?: string;
   description?: string;
@@ -202,6 +210,82 @@ class MaterialService {
       // If file deletion fails (e.g., used elsewhere), that's okay
       // The material was still deleted successfully
       console.log('File not deleted (may be in use elsewhere):', error);
+    }
+
+    return { success: true };
+  }
+
+  async getMaterialsByLesson(lessonId: string, organizationId: string) {
+    const materials = await prisma.lessonMaterial.findMany({
+      where: {
+        lessonId,
+        lesson: { organizationId },
+      },
+      include: {
+        file: {
+          include: {
+            uploader: {
+              select: { id: true, firstName: true, lastName: true, email: true },
+            },
+          },
+        },
+      },
+      orderBy: { orderIndex: 'asc' },
+    });
+
+    return materials.map(m => ({
+      ...m,
+      file: { ...m.file, fileSize: Number(m.file.fileSize) },
+    }));
+  }
+
+  async createLessonMaterial(data: CreateLessonMaterialData, organizationId: string) {
+    const lesson = await prisma.lesson.findFirst({
+      where: { id: data.lessonId, organizationId },
+    });
+    if (!lesson) throw new Error('Lesson not found or does not belong to your organization');
+
+    const file = await prisma.file.findFirst({
+      where: { id: data.fileId, organizationId },
+    });
+    if (!file) throw new Error('File not found or does not belong to your organization');
+
+    const material = await prisma.lessonMaterial.create({
+      data: {
+        lessonId: data.lessonId,
+        fileId: data.fileId,
+        title: data.title,
+        description: data.description,
+        orderIndex: data.orderIndex,
+      },
+      include: {
+        file: {
+          include: {
+            uploader: {
+              select: { id: true, firstName: true, lastName: true, email: true },
+            },
+          },
+        },
+      },
+    });
+
+    return { ...material, file: { ...material.file, fileSize: Number(material.file.fileSize) } };
+  }
+
+  async deleteLessonMaterial(id: string, organizationId: string) {
+    const existing = await prisma.lessonMaterial.findFirst({
+      where: { id, lesson: { organizationId } },
+      include: { file: true },
+    });
+    if (!existing) throw new Error('Material not found or does not belong to your organization');
+
+    const fileId = existing.fileId;
+    await prisma.lessonMaterial.delete({ where: { id } });
+
+    try {
+      await fileService.deleteFile(fileId, organizationId);
+    } catch {
+      // file may be used elsewhere
     }
 
     return { success: true };

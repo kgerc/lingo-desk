@@ -380,6 +380,7 @@ class LessonService {
           pricePerLesson: true,
           currency: true,
           cancellationReason: true,
+          recordingUrl: true,
           //isPaidCancellation: true,
           createdAt: true,
           teacher: {
@@ -511,6 +512,7 @@ class LessonService {
         pricePerLesson: true,
         currency: true,
         cancellationReason: true,
+        recordingUrl: true,
         //isPaidCancellation: true,
         teacher: {
           select: {

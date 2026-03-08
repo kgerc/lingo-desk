@@ -32,6 +32,8 @@ import {
   ChevronsUpDown,
   ChevronUp,
   ChevronDown,
+  Link,
+  Send,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
@@ -155,6 +157,9 @@ const LessonsPage: React.FC = () => {
   const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; lessonId: string | null }>({ isOpen: false, lessonId: null });
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; lessonId: string | null }>({ isOpen: false, lessonId: null });
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [recordingModal, setRecordingModal] = useState<{ isOpen: boolean; lesson: Lesson | null }>({ isOpen: false, lesson: null });
+  const [recordingUrl, setRecordingUrl] = useState('');
+  const [recordingSendEmail, setRecordingSendEmail] = useState(true);
   const dropdownTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   // Calendar view states
@@ -296,6 +301,33 @@ const LessonsPage: React.FC = () => {
   });
 
 
+
+  const setRecordingMutation = useMutation({
+    mutationFn: ({ id, url, sendEmail }: { id: string; url: string; sendEmail: boolean }) =>
+      lessonService.setRecording(id, url, sendEmail),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      queryClient.invalidateQueries({ queryKey: ['lessons-recordings'] });
+      toast.success('Nagranie zostało zapisane');
+      setRecordingModal({ isOpen: false, lesson: null });
+      setRecordingUrl('');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Błąd zapisywania nagrania');
+    },
+  });
+
+  const deleteRecordingMutation = useMutation({
+    mutationFn: (id: string) => lessonService.deleteRecording(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      queryClient.invalidateQueries({ queryKey: ['lessons-recordings'] });
+      toast.success('Nagranie zostało usunięte');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Błąd usuwania nagrania');
+    },
+  });
 
   // Bulk update mutation
   const bulkUpdateMutation = useMutation({
@@ -583,6 +615,18 @@ const LessonsPage: React.FC = () => {
               {lesson.course && (
                 <div className="text-xs text-gray-500">{lesson.course.name}</div>
               )}
+              {lesson.recordingUrl && (
+                <a
+                  href={lesson.recordingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 mt-0.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Link className="h-3 w-3" />
+                  Nagranie
+                </a>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <GraduationCap className="h-4 w-4 text-gray-400" />
@@ -674,6 +718,23 @@ const LessonsPage: React.FC = () => {
                         label: 'Cofnij zakończenie',
                         onClick: () => handleUncompleteLesson(lesson.id),
                       },
+                      {
+                        label: lesson.recordingUrl ? 'Edytuj nagranie' : 'Dodaj nagranie',
+                        onClick: () => {
+                          setRecordingModal({ isOpen: true, lesson });
+                          setRecordingUrl(lesson.recordingUrl || '');
+                          setRecordingSendEmail(true);
+                        },
+                      },
+                      ...(lesson.recordingUrl
+                        ? [
+                            {
+                              label: 'Usuń nagranie',
+                              onClick: () => deleteRecordingMutation.mutate(lesson.id),
+                              variant: 'danger' as const,
+                            },
+                          ]
+                        : []),
                     ]
                   : []),
                 {
@@ -1060,6 +1121,75 @@ const LessonsPage: React.FC = () => {
         cancelText="Anuluj"
         variant="info"
       />
+
+      {/* Recording Modal */}
+      {recordingModal.isOpen && recordingModal.lesson && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {recordingModal.lesson.recordingUrl ? 'Edytuj nagranie' : 'Dodaj nagranie'}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">{recordingModal.lesson.title}</p>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Link do nagrania
+                </label>
+                <input
+                  type="url"
+                  value={recordingUrl}
+                  onChange={(e) => setRecordingUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={recordingSendEmail}
+                  onChange={(e) => setRecordingSendEmail(e.target.checked)}
+                  className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                />
+                <span className="text-sm text-gray-700 flex items-center gap-1">
+                  <Send className="h-3.5 w-3.5 text-gray-500" />
+                  Wyślij powiadomienie email do studenta
+                </span>
+              </label>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setRecordingModal({ isOpen: false, lesson: null });
+                  setRecordingUrl('');
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Anuluj
+              </button>
+              <button
+                onClick={() => {
+                  if (!recordingUrl.trim()) return;
+                  setRecordingMutation.mutate({
+                    id: recordingModal.lesson!.id,
+                    url: recordingUrl.trim(),
+                    sendEmail: recordingSendEmail,
+                  });
+                }}
+                disabled={!recordingUrl.trim() || setRecordingMutation.isPending}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {setRecordingMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Zapisywanie...</>
+                ) : (
+                  'Zapisz nagranie'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .rbc-calendar {

@@ -485,6 +485,7 @@ model Lesson {
   classroomId           String?            @map("classroom_id")
   deliveryMode          LessonDeliveryMode @map("delivery_mode")
   meetingUrl            String?            @map("meeting_url")
+  recordingUrl          String?            @map("recording_url")
   status                LessonStatus
   isRecurring           Boolean            @default(false) @map("is_recurring")
   recurringPatternId    String?            @map("recurring_pattern_id")
@@ -512,6 +513,7 @@ model Lesson {
   googleCalendarEvent LessonGoogleCalendarEvent?
   substitution        Substitution?
   payoutLessons       TeacherPayoutLesson[]
+  materials           LessonMaterial[]
 
   @@index([organizationId])
   @@index([teacherId])
@@ -912,6 +914,7 @@ model File {
   organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   uploader          User               @relation(fields: [uploadedBy], references: [id])
   courseMaterials   CourseMaterial[]
+  lessonMaterials   LessonMaterial[]
   studentDocuments  StudentDocument[]
 
   @@index([organizationId])
@@ -935,6 +938,24 @@ model CourseMaterial {
 
   @@index([courseId])
   @@map("course_materials")
+}
+
+model LessonMaterial {
+  id          String   @id @default(uuid())
+  lessonId    String   @map("lesson_id")
+  fileId      String   @map("file_id")
+  title       String
+  description String?
+  orderIndex  Int      @map("order_index")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  file   File   @relation(fields: [fileId], references: [id])
+
+  @@index([lessonId])
+  @@map("lesson_materials")
 }
 
 // ============================================

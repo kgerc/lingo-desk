@@ -2,7 +2,8 @@ import api from '../lib/api';
 
 export interface Material {
   id: string;
-  courseId: string;
+  courseId?: string;
+  lessonId?: string;
   fileId: string;
   title: string;
   description?: string;
@@ -31,6 +32,14 @@ export interface Material {
 
 export interface CreateMaterialData {
   courseId: string;
+  fileId: string;
+  title: string;
+  description?: string;
+  orderIndex: number;
+}
+
+export interface CreateLessonMaterialData {
+  lessonId: string;
   fileId: string;
   title: string;
   description?: string;
@@ -70,6 +79,20 @@ const materialService = {
 
   async reorderMaterials(courseId: string, materialIds: string[]): Promise<void> {
     await api.post(`/materials/course/${courseId}/reorder`, { materialIds });
+  },
+
+  async getMaterialsByLesson(lessonId: string): Promise<Material[]> {
+    const response = await api.get(`/materials/lesson/${lessonId}`) as any;
+    return response.data.data;
+  },
+
+  async createLessonMaterial(data: CreateLessonMaterialData): Promise<Material> {
+    const response = await api.post('/materials/lesson', data) as any;
+    return response.data.data;
+  },
+
+  async deleteLessonMaterial(id: string): Promise<void> {
+    await api.delete(`/materials/lesson/${id}`);
   },
 };
 

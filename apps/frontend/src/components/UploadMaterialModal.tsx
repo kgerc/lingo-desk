@@ -6,8 +6,10 @@ import fileService from '../services/fileService';
 import materialService from '../services/materialService';
 
 interface UploadMaterialModalProps {
-  courseId: string;
-  courseName: string;
+  courseId?: string;
+  courseName?: string;
+  lessonId?: string;
+  lessonTitle?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -15,6 +17,8 @@ interface UploadMaterialModalProps {
 const UploadMaterialModal: React.FC<UploadMaterialModalProps> = ({
   courseId,
   courseName,
+  lessonId,
+  lessonTitle,
   onClose,
   onSuccess,
 }) => {
@@ -82,19 +86,29 @@ const UploadMaterialModal: React.FC<UploadMaterialModalProps> = ({
     try {
       // 1. Upload file to Supabase
       const uploadedFile = await fileService.uploadFile(selectedFile, {
-        relatedToType: 'course',
-        relatedToId: courseId,
+        relatedToType: lessonId ? 'lesson' : 'course',
+        relatedToId: lessonId ?? courseId!,
         isPublic: false,
       });
 
       // 2. Create material entry
-      await materialService.createMaterial({
-        courseId,
-        fileId: uploadedFile.id,
-        title: title.trim(),
-        description: description.trim() || undefined,
-        orderIndex: 0, // Will be reordered automatically
-      });
+      if (lessonId) {
+        await materialService.createLessonMaterial({
+          lessonId,
+          fileId: uploadedFile.id,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          orderIndex: 0,
+        });
+      } else {
+        await materialService.createMaterial({
+          courseId: courseId!,
+          fileId: uploadedFile.id,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          orderIndex: 0,
+        });
+      }
 
       toast.success('Materiał został pomyślnie dodany');
       queryClient.invalidateQueries({ queryKey: ['materials'] });
@@ -122,7 +136,9 @@ const UploadMaterialModal: React.FC<UploadMaterialModalProps> = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Dodaj materiał</h2>
-            <p className="text-sm text-gray-600 mt-1">Kurs: {courseName}</p>
+            <p className="text-sm text-gray-600 mt-1">
+            {lessonId ? `Lekcja: ${lessonTitle}` : `Kurs: ${courseName}`}
+          </p>
           </div>
           <button
             onClick={onClose}
