@@ -663,22 +663,41 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                     </div>
 
                     {formData.deliveryMode === 'ONLINE' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Link do spotkania
-                        </label>
-                        <input
-                          type="url"
-                          name="meetingUrl"
-                          value={formData.meetingUrl}
-                          onChange={handleChange}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                            errors.meetingUrl ? 'border-red-500' : 'border-gray-300'
-                          }`}
-                          placeholder="https://meet.google.com/..."
-                        />
-                        {errors.meetingUrl && (
-                          <p className="mt-1 text-sm text-red-600">{errors.meetingUrl}</p>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Link do spotkania (własny)
+                          </label>
+                          <input
+                            type="url"
+                            name="meetingUrl"
+                            value={formData.meetingUrl}
+                            onChange={handleChange}
+                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                              errors.meetingUrl ? 'border-red-500' : 'border-gray-300'
+                            }`}
+                            placeholder="https://meet.google.com/..."
+                          />
+                          {errors.meetingUrl && (
+                            <p className="mt-1 text-sm text-red-600">{errors.meetingUrl}</p>
+                          )}
+                        </div>
+                        {lesson?.teamsMeetingUrl && (
+                          <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+                            <svg className="h-4 w-4 text-indigo-600 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M19.5 3h-15A1.5 1.5 0 003 4.5v15A1.5 1.5 0 004.5 21h15a1.5 1.5 0 001.5-1.5v-15A1.5 1.5 0 0019.5 3zM9 17H6v-7h3v7zm-1.5-8.25A1.5 1.5 0 116 7.5a1.5 1.5 0 011.5 1.25zM18 17h-3v-4c0-.55-.45-1-1-1s-1 .45-1 1v4h-3v-7h3v1.13C13.52 10.45 14.26 10 15 10c1.65 0 3 1.35 3 3v4z"/>
+                            </svg>
+                            <span className="text-sm text-indigo-700 font-medium">Spotkanie Microsoft Teams:</span>
+                            <a
+                              href={lesson.teamsMeetingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-indigo-600 hover:text-indigo-800 underline truncate"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Dołącz do spotkania
+                            </a>
+                          </div>
                         )}
                       </div>
                     )}

@@ -376,6 +376,8 @@ class LessonService {
           status: true,
           deliveryMode: true,
           meetingUrl: true,
+          teamsMeetingUrl: true,
+          teamsMeetingId: true,
           teacherRate: true,
           pricePerLesson: true,
           currency: true,

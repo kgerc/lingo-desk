@@ -56,6 +56,8 @@ export interface Lesson {
   classroomId?: string;
   deliveryMode: LessonDeliveryMode;
   meetingUrl?: string;
+  teamsMeetingUrl?: string;
+  teamsMeetingId?: string;
   recordingUrl?: string;
   status: LessonStatus;
   isRecurring: boolean;

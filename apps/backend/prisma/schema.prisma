@@ -183,6 +183,7 @@ model Organization {
   alerts                Alert[]
   settings              OrganizationSettings?
   googleCalendarSyncs   GoogleCalendarSync[]
+  microsoftTeamsSyncs   MicrosoftTeamsSync[]
   exchangeRates         ExchangeRate[]
   studentSettlements    StudentSettlement[]
   substitutions         Substitution[]
@@ -222,6 +223,7 @@ model User {
   notesCreated        Note[]
   alerts              Alert[]
   googleCalendarSync  GoogleCalendarSync?
+  microsoftTeamsSync  MicrosoftTeamsSync?
 
   @@index([organizationId])
   @@index([email])
@@ -485,6 +487,8 @@ model Lesson {
   classroomId           String?            @map("classroom_id")
   deliveryMode          LessonDeliveryMode @map("delivery_mode")
   meetingUrl            String?            @map("meeting_url")
+  teamsMeetingUrl       String?            @map("teams_meeting_url")
+  teamsMeetingId        String?            @map("teams_meeting_id")
   recordingUrl          String?            @map("recording_url")
   status                LessonStatus
   isRecurring           Boolean            @default(false) @map("is_recurring")
@@ -1177,6 +1181,34 @@ model ExternalCalendarEvent {
   @@index([googleCalendarSyncId])
   @@index([startTime])
   @@map("external_calendar_events")
+}
+
+// ============================================
+// MICROSOFT TEAMS INTEGRATION
+// ============================================
+
+model MicrosoftTeamsSync {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  organizationId String    @map("organization_id")
+  accessToken    String    @map("access_token")
+  refreshToken   String    @map("refresh_token")
+  tokenExpiry    DateTime  @map("token_expiry")
+  microsoftUserId String   @map("microsoft_user_id") // Object ID from Azure AD
+  email          String    // Microsoft account email
+  isActive       Boolean   @default(true) @map("is_active")
+  lastSyncAt     DateTime? @map("last_sync_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("microsoft_teams_syncs")
 }
 
 // ============================================

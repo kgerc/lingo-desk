@@ -3,6 +3,7 @@ import { z } from 'zod';
 import lessonService from '../services/lesson.service';
 import { AuthRequest } from '../middleware/auth';
 import googleCalendarService from '../services/google-calendar.service';
+import microsoftTeamsService from '../services/microsoft-teams.service';
 import emailService from '../services/email.service';
 import prisma from '../utils/prisma';
 import {
@@ -138,6 +139,10 @@ class LessonController {
         googleCalendarService.createEventFromLesson(lesson.id, req.user.id).catch(error => {
           console.error('Failed to sync lesson to Google Calendar:', error);
         });
+        // Create Teams meeting if user has Teams connected and lesson is online
+        microsoftTeamsService.createMeetingForLesson(lesson.id, req.user.id).catch(error => {
+          console.error('Failed to create Microsoft Teams meeting:', error);
+        });
       }
 
       res.status(201).json({ message: 'Lekcja utworzona pomyślnie', data: lesson });
@@ -157,6 +162,10 @@ class LessonController {
         googleCalendarService.updateEventFromLesson(id as string, req.user.id).catch(error => {
           console.error('Failed to update lesson in Google Calendar:', error);
         });
+        // Update or create Teams meeting
+        microsoftTeamsService.updateMeetingForLesson(id as string, req.user.id).catch(error => {
+          console.error('Failed to update Microsoft Teams meeting:', error);
+        });
       }
 
       res.json({ message: 'Lekcja zaktualizowana pomyślnie', data: lesson });
@@ -169,10 +178,13 @@ class LessonController {
     try {
       const { id } = req.params;
 
-      // Sync to Google Calendar asynchronously before deleting (don't block response)
+      // Sync to external calendars asynchronously before deleting (don't block response)
       if (req.user?.id) {
         googleCalendarService.deleteEventFromLesson(id as string).catch(error => {
           console.error('Failed to delete lesson from Google Calendar:', error);
+        });
+        microsoftTeamsService.deleteMeetingForLesson(id as string, req.user.id).catch(error => {
+          console.error('Failed to delete Microsoft Teams meeting:', error);
         });
       }
 
