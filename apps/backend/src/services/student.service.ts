@@ -741,18 +741,11 @@ export class StudentService {
           ? (languageLevelRaw as LanguageLevel)
           : 'A1'; // Default to A1 if not provided or invalid
 
-        // Check if user already exists
+        // Find existing user by email (global — email is unique across DB)
         const existingUser = await prisma.user.findUnique({
           where: { email },
+          include: { students: true },
         });
-
-        if (existingUser) {
-          throw new Error('Użytkownik z tym emailem już istnieje');
-        }
-
-        // Generate default password (can be changed later)
-        const defaultPassword = 'LingoDesk2024!';
-        const passwordHash = await bcrypt.hash(defaultPassword, 10);
 
         // Parse optional fields
         const phone = row[columnMapping.phone]?.trim() || undefined;
@@ -770,61 +763,108 @@ export class StudentService {
           ? parseInt(row[columnMapping.paymentDueDayOfMonth])
           : undefined;
 
-        // Generate student number
-        const lastStudent = await prisma.student.findFirst({
-          where: { organizationId },
-          orderBy: { studentNumber: 'desc' },
-        });
+        if (existingUser) {
+          const existingStudent = existingUser.students.find(s => s.organizationId === organizationId);
 
-        const studentNumber = lastStudent
-          ? String(parseInt(lastStudent.studentNumber) + 1).padStart(6, '0')
-          : '000001';
+          if (existingStudent) {
+            if (!existingStudent.archivedAt) {
+              // Active student in this org — duplicate
+              throw new Error('Uczeń z tym emailem już istnieje w tej szkole');
+            }
+            // Archived student in this org — restore
+            await prisma.$transaction([
+              prisma.user.update({
+                where: { id: existingUser.id },
+                data: { isActive: true },
+              }),
+              prisma.student.update({
+                where: { id: existingStudent.id },
+                data: {
+                  archivedAt: null,
+                  languageLevel,
+                  goals,
+                  isMinor,
+                  paymentDueDays,
+                  paymentDueDayOfMonth,
+                },
+              }),
+            ]);
+          } else {
+            // User exists but has no Student record in this org — create Student + budget
+            const lastStudent = await prisma.student.findFirst({
+              where: { organizationId },
+              orderBy: { studentNumber: 'desc' },
+            });
+            const studentNumber = lastStudent
+              ? String(parseInt(lastStudent.studentNumber) + 1).padStart(6, '0')
+              : '000001';
 
-        // Create student in transaction
-        await prisma.$transaction(async (tx) => {
-          // Create user
-          const user = await tx.user.create({
-            data: {
-              email,
-              passwordHash,
-              firstName,
-              lastName,
-              phone,
-              role: UserRole.STUDENT,
-              organizationId,
-            },
+            await prisma.$transaction(async (tx) => {
+              const student = await tx.student.create({
+                data: {
+                  userId: existingUser.id,
+                  organizationId,
+                  studentNumber,
+                  languageLevel,
+                  goals,
+                  isMinor,
+                  paymentDueDays,
+                  paymentDueDayOfMonth,
+                },
+              });
+              await tx.studentBudget.create({
+                data: { studentId: student.id, organizationId },
+              });
+            });
+          }
+        } else {
+          // Brand new user — create User, UserProfile, Student and budget
+          const lastStudent = await prisma.student.findFirst({
+            where: { organizationId },
+            orderBy: { studentNumber: 'desc' },
           });
+          const studentNumber = lastStudent
+            ? String(parseInt(lastStudent.studentNumber) + 1).padStart(6, '0')
+            : '000001';
 
-          // Create user profile
-          await tx.userProfile.create({
-            data: {
-              userId: user.id,
-              address,
-            },
-          });
+          const defaultPassword = 'LingoDesk2024!';
+          const passwordHash = await bcrypt.hash(defaultPassword, 10);
 
-          // Create student
-          const student = await tx.student.create({
-            data: {
-              userId: user.id,
-              organizationId,
-              studentNumber,
-              languageLevel,
-              goals,
-              isMinor,
-              paymentDueDays,
-              paymentDueDayOfMonth,
-            },
-          });
+          await prisma.$transaction(async (tx) => {
+            const user = await tx.user.create({
+              data: {
+                email,
+                passwordHash,
+                firstName,
+                lastName,
+                phone,
+                role: UserRole.STUDENT,
+                organizationId,
+              },
+            });
 
-          // Create empty budget
-          await tx.studentBudget.create({
-            data: {
-              studentId: student.id,
-              organizationId,
-            },
+            await tx.userProfile.create({
+              data: { userId: user.id, address },
+            });
+
+            const student = await tx.student.create({
+              data: {
+                userId: user.id,
+                organizationId,
+                studentNumber,
+                languageLevel,
+                goals,
+                isMinor,
+                paymentDueDays,
+                paymentDueDayOfMonth,
+              },
+            });
+
+            await tx.studentBudget.create({
+              data: { studentId: student.id, organizationId },
+            });
           });
-        });
+        }
 
         results.successful++;
       } catch (error: any) {

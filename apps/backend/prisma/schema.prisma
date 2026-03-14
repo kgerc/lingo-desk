@@ -216,7 +216,7 @@ model User {
   organizations       UserOrganization[]
   profile             UserProfile?
   teacher             Teacher?
-  student             Student?
+  students            Student[]
   parentRelations     ParentStudentRelation[] @relation("ParentRelations")
   notifications       Notification[]
   filesUploaded       File[]
@@ -289,7 +289,7 @@ model Teacher {
 
 model Student {
   id             String        @id @default(uuid())
-  userId         String        @unique @map("user_id")
+  userId         String        @map("user_id")
   organizationId String        @map("organization_id")
   studentNumber  String        @map("student_number")
   enrollmentDate DateTime      @default(now()) @map("enrollment_date")
@@ -326,6 +326,7 @@ model Student {
   documents         StudentDocument[]
   loginHistory      StudentLoginHistory[]
 
+  @@unique([userId, organizationId])
   @@unique([organizationId, studentNumber])
   @@index([organizationId])
   @@map("students")

@@ -149,8 +149,8 @@ export class AuthService {
 
     // Record login in student history (only for STUDENT role)
     if (user.role === 'STUDENT') {
-      const student = await prisma.student.findUnique({
-        where: { userId: user.id },
+      const student = await prisma.student.findFirst({
+        where: { userId: user.id, organizationId: user.organizationId },
         select: { id: true, organizationId: true },
       });
       if (student) {

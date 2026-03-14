@@ -77,6 +77,7 @@ const ImportStudentsModal: React.FC<ImportStudentsModalProps> = ({ onClose, onSu
       setImportResults(data);
       setStep('results');
       if (data.successful > 0) {
+        toast.success(`Zaimportowano ${data.successful} ${data.successful === 1 ? 'ucznia' : 'uczniów'} pomyślnie`);
         onSuccess();
       }
     },

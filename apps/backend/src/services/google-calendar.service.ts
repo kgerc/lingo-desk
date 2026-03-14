@@ -445,7 +445,7 @@ class GoogleCalendarService {
         where: { id: userId },
         include: {
           teacher: true,
-          student: true,
+          students: true,
           organizations: {
             include: {
               organization: {
@@ -491,15 +491,17 @@ class GoogleCalendarService {
           console.log(`Syncing lessons for TEACHER ${user.teacher.id}`);
           break;
 
-        case 'STUDENT':
-          // Only lessons where user is the student
-          if (!user.student) {
+        case 'STUDENT': {
+          // Only lessons where user is the student — pick the student record for current org
+          const studentRecord = user.students.find(s => s.organizationId === user.organizationId);
+          if (!studentRecord) {
             console.log(`User ${userId} is STUDENT but has no student profile`);
             return { total: 0, synced: 0, failed: 0 };
           }
-          lessonFilter.studentId = user.student.id;
-          console.log(`Syncing lessons for STUDENT ${user.student.id}`);
+          lessonFilter.studentId = studentRecord.id;
+          console.log(`Syncing lessons for STUDENT ${studentRecord.id}`);
           break;
+        }
 
         default:
           console.log(`User ${userId} has role ${user.role}, no lessons to sync`);
