@@ -1,8 +1,6 @@
 import { LessonStatus, TeacherPayoutStatus } from '@prisma/client';
 import prisma from '../utils/prisma';
 
-// Cancellation time limit in hours - if cancelled later than this before lesson, payout still applies
-const LATE_CANCELLATION_LIMIT_HOURS = 24;
 
 export type QualificationReason = 'COMPLETED' | 'CONFIRMED' | 'LATE_CANCELLATION';
 
@@ -110,27 +108,20 @@ class PayoutService {
       return { qualified: true, reason: 'CONFIRMED', payoutPercent: 100 };
     }
 
-    if (lesson.status === LessonStatus.CANCELLED && lesson.cancelledAt) {
-      const scheduledTime = new Date(lesson.scheduledAt).getTime();
-      const cancelledTime = new Date(lesson.cancelledAt).getTime();
-      const hoursBeforeLesson = (scheduledTime - cancelledTime) / (1000 * 60 * 60);
-
+    // CANCELLED_LATE: teacher is paid according to cancellation payout settings
+    if (lesson.status === LessonStatus.CANCELLED_LATE) {
       if (teacherCancellationSettings.cancellationPayoutEnabled) {
-        // Use teacher-configured threshold and percent
-        const threshold = teacherCancellationSettings.cancellationPayoutHours ?? LATE_CANCELLATION_LIMIT_HOURS;
         const percent = teacherCancellationSettings.cancellationPayoutPercent ?? 100;
-        if (hoursBeforeLesson < threshold) {
-          return { qualified: true, reason: 'LATE_CANCELLATION', payoutPercent: percent };
-        }
-      } else {
-        // Backward compat: use hardcoded 24h limit at 100%
-        if (hoursBeforeLesson < LATE_CANCELLATION_LIMIT_HOURS) {
-          return { qualified: true, reason: 'LATE_CANCELLATION', payoutPercent: 100 };
-        }
+        return { qualified: true, reason: 'LATE_CANCELLATION', payoutPercent: percent };
       }
+      // Default: 100% payout for late cancellation
+      return { qualified: true, reason: 'LATE_CANCELLATION', payoutPercent: 100 };
     }
 
-    return { qualified: false, reason: null, payoutPercent: 100 };
+    // CANCELLED_ON_TIME: teacher receives no payout
+    // (lesson.status === LessonStatus.CANCELLED_ON_TIME falls through to not qualified)
+
+    return { qualified: false, reason: null, payoutPercent: 0 };
   }
 
   /**
@@ -186,7 +177,7 @@ class PayoutService {
           lte: periodEnd,
         },
         status: {
-          in: [LessonStatus.COMPLETED, LessonStatus.CONFIRMED, LessonStatus.CANCELLED],
+          in: [LessonStatus.COMPLETED, LessonStatus.CONFIRMED, LessonStatus.CANCELLED_LATE],
         },
       },
       include: {
@@ -735,7 +726,7 @@ class PayoutService {
           teacherId: teacher.id,
           organizationId,
           scheduledAt: { gte: startOfDay, lte: endOfDay },
-          status: { in: [LessonStatus.COMPLETED, LessonStatus.CONFIRMED, LessonStatus.CANCELLED] },
+          status: { in: [LessonStatus.COMPLETED, LessonStatus.CONFIRMED, LessonStatus.CANCELLED_LATE] },
         },
         include: {
           student: { include: { user: { select: { firstName: true, lastName: true } } } },

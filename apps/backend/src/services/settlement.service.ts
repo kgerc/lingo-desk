@@ -458,14 +458,14 @@ class SettlementService {
     const currentBalance = budget ? Number(budget.currentBalance) : 0;
     const currency = budget?.currency || 'PLN';
 
-    // Get upcoming lessons (SCHEDULED or CONFIRMED, not CANCELLED/COMPLETED)
+    // Get upcoming lessons (CONFIRMED only, not cancelled/completed)
     // Include teacherRate and enrollment→course to resolve pricePerLesson when not set directly on lesson
     const upcomingLessons = await prisma.lesson.findMany({
       where: {
         studentId,
         organizationId,
         scheduledAt: { gte: now },
-        status: { in: [LessonStatus.SCHEDULED, LessonStatus.CONFIRMED] },
+        status: { in: [LessonStatus.CONFIRMED] },
       },
       select: {
         id: true,

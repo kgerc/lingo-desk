@@ -355,7 +355,7 @@ export class TeacherService {
       where: {
         teacherId: id,
         scheduledAt: { gte: new Date() },
-        status: { in: ['SCHEDULED', 'CONFIRMED'] },
+        status: { in: ['CONFIRMED'] },
       },
     });
 
@@ -386,9 +386,9 @@ export class TeacherService {
       where: {
         teacherId: id,
         scheduledAt: { gte: new Date() },
-        status: { in: ['SCHEDULED', 'CONFIRMED'] },
+        status: { in: ['CONFIRMED'] },
       },
-      data: { status: 'CANCELLED' },
+      data: { status: 'CANCELLED_ON_TIME' },
     });
 
     // Soft delete: deactivate user

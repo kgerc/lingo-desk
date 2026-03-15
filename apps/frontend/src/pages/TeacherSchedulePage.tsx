@@ -35,18 +35,14 @@ const getEventStyle = (lesson: Lesson) => {
   };
 
   switch (lesson.status) {
-    case 'SCHEDULED':
-      return { ...baseStyle, backgroundColor: '#3B82F6', color: 'white' }; // Blue
     case 'CONFIRMED':
-      return { ...baseStyle, backgroundColor: '#10B981', color: 'white' }; // Green
+      return { ...baseStyle, backgroundColor: '#3B82F6', color: 'white' }; // Blue
     case 'COMPLETED':
       return { ...baseStyle, backgroundColor: '#6B7280', color: 'white' }; // Gray
-    case 'CANCELLED':
-      return { ...baseStyle, backgroundColor: '#EF4444', color: 'white' }; // Red
-    case 'PENDING_CONFIRMATION':
+    case 'CANCELLED_ON_TIME':
       return { ...baseStyle, backgroundColor: '#F59E0B', color: 'white' }; // Amber
-    case 'NO_SHOW':
-      return { ...baseStyle, backgroundColor: '#DC2626', color: 'white' }; // Red
+    case 'CANCELLED_LATE':
+      return { ...baseStyle, backgroundColor: '#EF4444', color: 'white' }; // Red
     default:
       return { ...baseStyle, backgroundColor: '#6B7280', color: 'white' };
   }
@@ -218,27 +214,19 @@ const TeacherSchedulePage: React.FC = () => {
         <div className="flex flex-wrap gap-4">
           <div className="flex items-center gap-2">
             <div className="h-4 w-4 rounded" style={{ backgroundColor: '#3B82F6' }}></div>
-            <span className="text-sm text-gray-700">Zaplanowana</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-4 w-4 rounded" style={{ backgroundColor: '#10B981' }}></div>
             <span className="text-sm text-gray-700">Potwierdzona</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-4 w-4 rounded" style={{ backgroundColor: '#F59E0B' }}></div>
-            <span className="text-sm text-gray-700">Oczekuje na potwierdzenie</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="h-4 w-4 rounded" style={{ backgroundColor: '#6B7280' }}></div>
             <span className="text-sm text-gray-700">Zakończona</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="h-4 w-4 rounded" style={{ backgroundColor: '#EF4444' }}></div>
-            <span className="text-sm text-gray-700">Anulowana</span>
+            <div className="h-4 w-4 rounded" style={{ backgroundColor: '#F59E0B' }}></div>
+            <span className="text-sm text-gray-700">Odwołana na czas</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="h-4 w-4 rounded" style={{ backgroundColor: '#DC2626' }}></div>
-            <span className="text-sm text-gray-700">Nieobecność</span>
+            <div className="h-4 w-4 rounded" style={{ backgroundColor: '#EF4444' }}></div>
+            <span className="text-sm text-gray-700">Odwołana nie na czas</span>
           </div>
         </div>
       </div>

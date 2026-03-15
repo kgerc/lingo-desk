@@ -394,12 +394,11 @@ export const commonFields = {
     'IN_PERSON': 'Stacjonarnie',
     'ONLINE': 'Online',
   }),
-  lessonStatus: requiredEnum('Status lekcji', ['SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const, {
-    'SCHEDULED': 'Zaplanowana',
-    'IN_PROGRESS': 'W trakcie',
+  lessonStatus: requiredEnum('Status lekcji', ['CONFIRMED', 'COMPLETED', 'CANCELLED_ON_TIME', 'CANCELLED_LATE'] as const, {
+    'CONFIRMED': 'Potwierdzona',
     'COMPLETED': 'Zakończona',
-    'CANCELLED': 'Anulowana',
-    'NO_SHOW': 'Nieobecność',
+    'CANCELLED_ON_TIME': 'Odwołana na czas',
+    'CANCELLED_LATE': 'Odwołana nie na czas',
   }),
   courseType: requiredEnum('Typ kursu', ['GROUP', 'INDIVIDUAL'] as const, {
     'GROUP': 'Grupowy',

@@ -98,9 +98,12 @@ class CourseApplicationService {
     if (data.courseId) {
       const course = await prisma.course.findFirst({
         where: { id: data.courseId, organizationId: organization.id, isActive: true },
+        select: { id: true, courseType: true },
       });
       if (!course) {
         data.courseId = undefined;
+      } else if (course.courseType === 'INDIVIDUAL') {
+        throw new Error('Nie można zgłosić się na kurs indywidualny przez formularz publiczny');
       }
     }
 
@@ -176,6 +179,7 @@ class CourseApplicationService {
       where: {
         organizationId: organization.id,
         isActive: true,
+        courseType: 'GROUP',
       },
       select: {
         id: true,

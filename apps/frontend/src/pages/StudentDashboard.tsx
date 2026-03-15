@@ -34,7 +34,7 @@ const StudentDashboard: React.FC = () => {
   }
 
   const upcomingLessons = lessons.filter(
-    (lesson: any) => new Date(lesson.scheduledAt) > new Date() && lesson.status === 'SCHEDULED'
+    (lesson: any) => new Date(lesson.scheduledAt) > new Date() && lesson.status === 'CONFIRMED'
   ).slice(0, 5);
 
   const completedLessonsCount = lessons.filter((lesson: any) => lesson.status === 'COMPLETED').length;

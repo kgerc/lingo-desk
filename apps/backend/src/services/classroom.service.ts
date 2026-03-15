@@ -124,7 +124,7 @@ class ClassroomService {
       where: {
         classroomId: id,
         scheduledAt: { gte: new Date() },
-        status: { notIn: ['CANCELLED'] },
+        status: { notIn: ['CANCELLED_ON_TIME', 'CANCELLED_LATE'] },
       },
     });
 
@@ -206,7 +206,7 @@ class ClassroomService {
     const conflictingLessons = await prisma.lesson.findMany({
       where: {
         classroomId,
-        status: { notIn: ['CANCELLED'] },
+        status: { notIn: ['CANCELLED_ON_TIME', 'CANCELLED_LATE'] },
         ...(excludeLessonId ? { id: { not: excludeLessonId } } : {}),
         // Check for overlap: lesson starts before our end AND ends after our start
         scheduledAt: { lt: endTime },

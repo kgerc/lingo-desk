@@ -31,15 +31,18 @@ export default function PublicApplicationForm() {
 
   const submitMutation = useMutation({
     mutationFn: () => {
+      const isIndividualRequest = formData.courseId === 'INDIVIDUAL_REQUEST';
       const submitData: SubmitApplicationData = {
         name: formData.name,
         email: formData.email,
         phone: formData.phone || undefined,
-        courseId: formData.courseId || undefined,
+        courseId: isIndividualRequest ? undefined : formData.courseId || undefined,
         preferences: formData.preferences || undefined,
         languageLevel: formData.languageLevel || undefined,
         availability: formData.availability || undefined,
-        notes: formData.notes || undefined,
+        notes: isIndividualRequest
+          ? [formData.notes, 'Preferencja: kurs indywidualny'].filter(Boolean).join('\n')
+          : formData.notes || undefined,
       };
       return courseApplicationService.submitApplication(orgSlug!, submitData);
     },
@@ -175,23 +178,22 @@ export default function PublicApplicationForm() {
           </div>
 
           {/* Course selection */}
-          {courses.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Preferowany kurs</label>
-              <select
-                value={formData.courseId}
-                onChange={(e) => handleChange('courseId', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">-- Wybierz kurs --</option>
-                {courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.name} ({course.level})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Preferowany kurs</label>
+            <select
+              value={formData.courseId}
+              onChange={(e) => handleChange('courseId', e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">-- Wybierz kurs --</option>
+              {courses.map((course) => (
+                <option key={course.id} value={course.id}>
+                  {course.name} ({course.level})
+                </option>
+              ))}
+              <option value="INDIVIDUAL_REQUEST">Chcę kurs indywidualny</option>
+            </select>
+          </div>
 
           {/* Preferences */}
           <div>

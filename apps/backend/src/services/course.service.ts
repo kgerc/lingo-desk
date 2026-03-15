@@ -402,7 +402,7 @@ class CourseService {
                 durationMinutes: lessonDate.durationMinutes,
                 deliveryMode: lessonDate.deliveryMode as LessonDeliveryMode,
                 meetingUrl: lessonDate.meetingUrl,
-                status: 'SCHEDULED' as LessonStatus,
+                status: 'CONFIRMED' as LessonStatus,
                 pricePerLesson,
                 currency: courseData.currency || 'PLN',
               },
@@ -470,7 +470,7 @@ class CourseService {
 
   /**
    * Bulk update future lessons of a course
-   * Only updates lessons with status SCHEDULED and scheduledAt >= now
+   * Only updates lessons with status CONFIRMED and scheduledAt >= now
    */
   async bulkUpdateCourseLessons(
     courseId: string,
@@ -496,7 +496,7 @@ class CourseService {
         courseId,
         organizationId,
         scheduledAt: { gte: now },
-        status: 'SCHEDULED',
+        status: 'CONFIRMED',
       },
       select: { id: true },
     });
@@ -595,10 +595,10 @@ class CourseService {
 
     return lessons.map(lesson => ({
       ...lesson,
-      canEdit: lesson.scheduledAt >= now && lesson.status === 'SCHEDULED',
+      canEdit: lesson.scheduledAt >= now && lesson.status === 'CONFIRMED',
       editBlockReason: lesson.scheduledAt < now
         ? 'Lekcja już się odbyła'
-        : lesson.status !== 'SCHEDULED'
+        : lesson.status !== 'CONFIRMED'
           ? `Status: ${lesson.status}`
           : null,
     }));
@@ -873,7 +873,7 @@ class CourseService {
         },
       }),
       prisma.lesson.count({
-        where: { courseId: id, scheduledAt: { gte: now }, status: { in: ['SCHEDULED', 'CONFIRMED'] } },
+        where: { courseId: id, scheduledAt: { gte: now }, status: { in: ['CONFIRMED'] } },
       }),
       prisma.lesson.count({
         where: { courseId: id, scheduledAt: { lt: now } },

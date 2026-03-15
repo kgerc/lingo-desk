@@ -49,7 +49,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     meetingUrl: lesson?.meetingUrl || '',
     locationId: lesson?.locationId || '',
     classroomId: lesson?.classroomId || '',
-    status: lesson?.status || 'SCHEDULED',
+    status: lesson?.status || 'CONFIRMED',
   });
 
   const [isRecurring, setIsRecurring] = useState(false);
@@ -1102,7 +1102,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                 >
                   Zamknij
                 </button>
-                {isEdit && lesson && lesson.status !== 'CANCELLED' && lesson.status !== 'COMPLETED' && (
+                {isEdit && lesson && lesson.status !== 'CANCELLED_ON_TIME' && lesson.status !== 'CANCELLED_LATE' && lesson.status !== 'COMPLETED' && (
                   <button
                     type="button"
                     onClick={() => setIsCancelDialogOpen(true)}
@@ -1115,7 +1115,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
               </div>
 
               <div className="flex gap-2">
-                {isEdit && lesson && (lesson.status === 'SCHEDULED' || lesson.status === 'CONFIRMED') && (
+                {isEdit && lesson && lesson.status === 'CONFIRMED' && (
                   <button
                     type="button"
                     onClick={handleCompleteLesson}

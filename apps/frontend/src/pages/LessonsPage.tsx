@@ -22,7 +22,6 @@ import {
   Video,
   MapPin,
   CheckCircle,
-  AlertCircle,
   XCircle,
   MoreVertical,
   RefreshCw,
@@ -85,18 +84,14 @@ const getEventStyle = (event: CalendarEvent) => {
 
   const lesson = event.resource as Lesson;
   switch (lesson.status) {
-    case 'SCHEDULED':
-      return { ...baseStyle, backgroundColor: '#3B82F6', color: 'white' };
     case 'CONFIRMED':
-      return { ...baseStyle, backgroundColor: '#10B981', color: 'white' };
+      return { ...baseStyle, backgroundColor: '#3B82F6', color: 'white' };
     case 'COMPLETED':
       return { ...baseStyle, backgroundColor: '#6B7280', color: 'white' };
-    case 'CANCELLED':
-      return { ...baseStyle, backgroundColor: '#EF4444', color: 'white' };
-    case 'PENDING_CONFIRMATION':
+    case 'CANCELLED_ON_TIME':
       return { ...baseStyle, backgroundColor: '#F59E0B', color: 'white' };
-    case 'NO_SHOW':
-      return { ...baseStyle, backgroundColor: '#DC2626', color: 'white' };
+    case 'CANCELLED_LATE':
+      return { ...baseStyle, backgroundColor: '#EF4444', color: 'white' };
     default:
       return { ...baseStyle, backgroundColor: '#6B7280', color: 'white' };
   }
@@ -396,10 +391,6 @@ const LessonsPage: React.FC = () => {
     }
   };
 
-  const handleConfirmLesson = (id: string) => {
-    setConfirmDialog({ isOpen: true, lessonId: id });
-  };
-
   const confirmLessonStatus = async () => {
     if (confirmDialog.lessonId) {
       await confirmMutation.mutateAsync(confirmDialog.lessonId);
@@ -537,14 +528,9 @@ const LessonsPage: React.FC = () => {
   // Helper functions
   const getStatusBadge = (status: LessonStatus) => {
     const badges: Record<LessonStatus, { text: string; className: string; icon: any }> = {
-      SCHEDULED: {
-        text: 'Zaplanowana',
-        className: 'bg-blue-100 text-blue-800',
-        icon: CalendarIcon,
-      },
       CONFIRMED: {
         text: 'Potwierdzona',
-        className: 'bg-green-100 text-green-800',
+        className: 'bg-blue-100 text-blue-800',
         icon: CheckCircle,
       },
       COMPLETED: {
@@ -552,19 +538,14 @@ const LessonsPage: React.FC = () => {
         className: 'bg-gray-100 text-gray-800',
         icon: CheckCircle,
       },
-      CANCELLED: {
-        text: 'Anulowana',
-        className: 'bg-red-100 text-red-800',
+      CANCELLED_ON_TIME: {
+        text: 'Odwołana na czas',
+        className: 'bg-yellow-100 text-yellow-800',
         icon: XCircle,
       },
-      PENDING_CONFIRMATION: {
-        text: 'Oczekuje potwierdzenia',
-        className: 'bg-yellow-100 text-yellow-800',
-        icon: AlertCircle,
-      },
-      NO_SHOW: {
-        text: 'Nieobecność',
-        className: 'bg-orange-100 text-orange-800',
+      CANCELLED_LATE: {
+        text: 'Odwołana nie na czas',
+        className: 'bg-red-100 text-red-800',
         icon: XCircle,
       },
     };
@@ -696,15 +677,7 @@ const LessonsPage: React.FC = () => {
               onClose={() => setOpenDropdownId(null)}
               triggerRef={{ current: dropdownTriggerRefs.current.get(lesson.id) || null }}
               items={[
-                ...(lesson.status === 'SCHEDULED'
-                  ? [
-                      {
-                        label: 'Potwierdź lekcję',
-                        onClick: () => handleConfirmLesson(lesson.id),
-                      },
-                    ]
-                  : []),
-                ...((lesson.status === 'SCHEDULED' || lesson.status === 'CONFIRMED')
+                ...(lesson.status === 'CONFIRMED'
                   ? [
                       {
                         label: 'Oznacz jako zakończoną',
@@ -888,12 +861,10 @@ const LessonsPage: React.FC = () => {
         searchPlaceholder="Szukaj lekcji po tytule, lektorze lub studencie..."
         filters={[
           { key: 'status', label: 'Status', type: 'select', options: [
-            { value: 'SCHEDULED', label: 'Zaplanowana' },
             { value: 'CONFIRMED', label: 'Potwierdzona' },
-            { value: 'PENDING_CONFIRMATION', label: 'Oczekuje potwierdzenia' },
             { value: 'COMPLETED', label: 'Zakończona' },
-            { value: 'CANCELLED', label: 'Anulowana' },
-            { value: 'NO_SHOW', label: 'Nieobecność' },
+            { value: 'CANCELLED_ON_TIME', label: 'Odwołana na czas' },
+            { value: 'CANCELLED_LATE', label: 'Odwołana nie na czas' },
           ]},
           { key: 'courseId', label: 'Kurs', type: 'select', options: courses.map((c) => ({ value: c.id, label: c.name })) },
           { key: 'deliveryMode', label: 'Tryb', type: 'select', options: [
@@ -950,12 +921,10 @@ const LessonsPage: React.FC = () => {
                 className="text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:ring-2 focus:ring-primary focus:border-transparent"
               >
                 <option value="">Zmień status na...</option>
-                <option value="SCHEDULED">Zaplanowana</option>
                 <option value="CONFIRMED">Potwierdzona</option>
                 <option value="COMPLETED">Zakończona</option>
-                <option value="CANCELLED">Anulowana</option>
-                <option value="PENDING_CONFIRMATION">Oczekuje potwierdzenia</option>
-                <option value="NO_SHOW">Nieobecność</option>
+                <option value="CANCELLED_ON_TIME">Odwołana na czas</option>
+                <option value="CANCELLED_LATE">Odwołana nie na czas</option>
               </select>
               <button
                 onClick={handleBulkStatusChange}

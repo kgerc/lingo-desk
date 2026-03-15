@@ -34,13 +34,15 @@ export default function CancelLessonDialog({
     enabled: isOpen,
   });
 
-  // Cancel lesson mutation
+  // Cancel lesson mutation — status depends on whether it's a late cancellation
   const cancelMutation = useMutation({
-    mutationFn: () =>
-      lessonService.updateLesson(lesson.id, {
-        status: 'CANCELLED',
+    mutationFn: () => {
+      const status = feePreview?.feeApplies ? 'CANCELLED_LATE' : 'CANCELLED_ON_TIME';
+      return lessonService.updateLesson(lesson.id, {
+        status,
         cancellationReason: cancellationReason || undefined,
-      }),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lessons'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });

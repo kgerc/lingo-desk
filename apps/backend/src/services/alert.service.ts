@@ -191,14 +191,13 @@ class AlertService {
   async generateSystemAlerts(organizationId: string) {
     const generatedAlerts = [];
 
-    // 1. Check for unconfirmed lessons (< 24h before start)
-    const upcomingUnconfirmedLessons = await prisma.lesson.findMany({
+    // 1. Check for late-cancelled lessons in the last 24h (requires financial settlement)
+    const recentLateCancelledLessons = await prisma.lesson.findMany({
       where: {
         organizationId,
-        status: 'SCHEDULED',
-        scheduledAt: {
-          gte: new Date(),
-          lte: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        status: 'CANCELLED_LATE',
+        cancelledAt: {
+          gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
         },
       },
       include: {
@@ -215,12 +214,12 @@ class AlertService {
       },
     });
 
-    if (upcomingUnconfirmedLessons.length > 0) {
+    if (recentLateCancelledLessons.length > 0) {
       // Check if this alert already exists (avoid duplicates)
       const existingAlert = await prisma.alert.findFirst({
         where: {
           organizationId,
-          metadata: { path: ['alertType'], equals: 'UNCONFIRMED_LESSONS' },
+          metadata: { path: ['alertType'], equals: 'LATE_CANCELLED_LESSONS' },
           createdAt: { gte: new Date(Date.now() - 12 * 60 * 60 * 1000) }, // Last 12h
         },
       });
@@ -230,13 +229,13 @@ class AlertService {
           organizationId,
           type: 'WARNING',
           priority: AlertPriority.HIGH,
-          title: `Niepotwierdzone lekcje (${upcomingUnconfirmedLessons.length})`,
-          message: `Masz ${upcomingUnconfirmedLessons.length} lekcji w ciągu najbliższych 24h, które nie zostały potwierdzone przez lektora.`,
+          title: `Lekcje odwołane nie na czas (${recentLateCancelledLessons.length})`,
+          message: `${recentLateCancelledLessons.length} lekcji zostało odwołanych nie na czas w ciągu ostatnich 24h. Sprawdź rozliczenia.`,
           metadata: {
-            alertType: 'UNCONFIRMED_LESSONS',
-            count: upcomingUnconfirmedLessons.length,
-            lessonIds: upcomingUnconfirmedLessons.map(l => l.id),
-            lessons: upcomingUnconfirmedLessons.map(l => ({
+            alertType: 'LATE_CANCELLED_LESSONS',
+            count: recentLateCancelledLessons.length,
+            lessonIds: recentLateCancelledLessons.map(l => l.id),
+            lessons: recentLateCancelledLessons.map(l => ({
               id: l.id,
               title: l.title,
               scheduledAt: l.scheduledAt.toISOString(),
@@ -257,7 +256,7 @@ class AlertService {
           lt: new Date(Date.now() - 24 * 60 * 60 * 1000),
         },
         status: {
-          notIn: ['COMPLETED', 'CANCELLED'],
+          notIn: ['COMPLETED', 'CANCELLED_ON_TIME', 'CANCELLED_LATE'],
         },
       },
       include: {

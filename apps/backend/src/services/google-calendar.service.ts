@@ -463,7 +463,7 @@ class GoogleCalendarService {
       }
 
       let lessonFilter: any = {
-        status: { not: 'CANCELLED' },
+        status: { notIn: ['CANCELLED_ON_TIME', 'CANCELLED_LATE'] },
         googleCalendarEvent: null, // Don't sync already synced lessons
       };
 
@@ -751,12 +751,20 @@ class GoogleCalendarService {
 
       // Check if event was deleted
       if (event.status === 'cancelled') {
-        // Delete lesson or mark as cancelled
+        // Determine cancellation type based on time remaining until lesson
+        const now = new Date();
+        const lessonTime = new Date(mapping.lesson.scheduledAt);
+        const hoursUntilLesson = (lessonTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+        const LATE_CANCELLATION_THRESHOLD_HOURS = 24;
+        const cancellationStatus = hoursUntilLesson < LATE_CANCELLATION_THRESHOLD_HOURS
+          ? 'CANCELLED_LATE'
+          : 'CANCELLED_ON_TIME';
+
         await prisma.lesson.update({
           where: { id: mapping.lessonId },
           data: {
-            status: 'CANCELLED',
-            cancelledAt: new Date(),
+            status: cancellationStatus,
+            cancelledAt: now,
             cancellationReason: 'Cancelled in Google Calendar',
           },
         });

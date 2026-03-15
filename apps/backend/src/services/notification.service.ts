@@ -202,7 +202,7 @@ class NotificationService {
           lt: dayAfterTomorrow,
         },
         status: {
-          in: ['SCHEDULED', 'CONFIRMED'],
+          in: ['CONFIRMED'],
         },
       },
       include: {
@@ -318,7 +318,7 @@ class NotificationService {
               lte: reminderEnd,
             },
             status: {
-              in: ['SCHEDULED', 'CONFIRMED'],
+              in: ['CONFIRMED'],
             },
           },
           include: {

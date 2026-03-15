@@ -25,12 +25,10 @@ enum UserRole {
 }
 
 enum LessonStatus {
-  SCHEDULED
   CONFIRMED
   COMPLETED
-  CANCELLED
-  PENDING_CONFIRMATION
-  NO_SHOW
+  CANCELLED_ON_TIME
+  CANCELLED_LATE
 }
 
 enum LessonDeliveryMode {

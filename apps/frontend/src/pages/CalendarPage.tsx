@@ -38,18 +38,14 @@ const getEventStyle = (lesson: Lesson) => {
   };
 
   switch (lesson.status) {
-    case 'SCHEDULED':
-      return { ...baseStyle, backgroundColor: '#3B82F6', color: 'white' }; // Blue
     case 'CONFIRMED':
-      return { ...baseStyle, backgroundColor: '#10B981', color: 'white' }; // Green
+      return { ...baseStyle, backgroundColor: '#3B82F6', color: 'white' }; // Blue
     case 'COMPLETED':
       return { ...baseStyle, backgroundColor: '#6B7280', color: 'white' }; // Gray
-    case 'CANCELLED':
-      return { ...baseStyle, backgroundColor: '#EF4444', color: 'white' }; // Red
-    case 'PENDING_CONFIRMATION':
+    case 'CANCELLED_ON_TIME':
       return { ...baseStyle, backgroundColor: '#F59E0B', color: 'white' }; // Amber
-    case 'NO_SHOW':
-      return { ...baseStyle, backgroundColor: '#DC2626', color: 'white' }; // Red
+    case 'CANCELLED_LATE':
+      return { ...baseStyle, backgroundColor: '#EF4444', color: 'white' }; // Red
     default:
       return { ...baseStyle, backgroundColor: '#6B7280', color: 'white' };
   }
@@ -285,11 +281,10 @@ const CalendarPage: React.FC = () => {
             className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">Wszystkie statusy</option>
-            <option value="SCHEDULED">Zaplanowane</option>
             <option value="CONFIRMED">Potwierdzone</option>
             <option value="COMPLETED">Zakończone</option>
-            <option value="CANCELLED">Anulowane</option>
-            <option value="PENDING_CONFIRMATION">Oczekujące</option>
+            <option value="CANCELLED_ON_TIME">Odwołane na czas</option>
+            <option value="CANCELLED_LATE">Odwołane nie na czas</option>
           </select>
 
           {/* Status legend */}
@@ -297,10 +292,6 @@ const CalendarPage: React.FC = () => {
             <span className="text-sm text-gray-600">Legenda:</span>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded" style={{ backgroundColor: '#3B82F6' }}></div>
-              <span className="text-sm">Zaplanowane</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#10B981' }}></div>
               <span className="text-sm">Potwierdzone</span>
             </div>
             <div className="flex items-center gap-2">
@@ -308,8 +299,12 @@ const CalendarPage: React.FC = () => {
               <span className="text-sm">Zakończone</span>
             </div>
             <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#F59E0B' }}></div>
+              <span className="text-sm">Odwołane na czas</span>
+            </div>
+            <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded" style={{ backgroundColor: '#EF4444' }}></div>
-              <span className="text-sm">Anulowane</span>
+              <span className="text-sm">Odwołane nie na czas</span>
             </div>
           </div>
         </div>

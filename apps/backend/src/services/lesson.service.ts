@@ -24,7 +24,7 @@ export interface CreateLessonData {
   classroomId?: string;
   deliveryMode: 'IN_PERSON' | 'ONLINE';
   meetingUrl?: string;
-  status?: 'SCHEDULED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'PENDING_CONFIRMATION' | 'NO_SHOW';
+  status?: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED_ON_TIME' | 'CANCELLED_LATE';
   isRecurring?: boolean;
   recurringPatternId?: string;
 }
@@ -41,7 +41,7 @@ export interface UpdateLessonData {
   classroomId?: string;
   deliveryMode?: 'IN_PERSON' | 'ONLINE';
   meetingUrl?: string;
-  status?: 'SCHEDULED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'PENDING_CONFIRMATION' | 'NO_SHOW';
+  status?: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED_ON_TIME' | 'CANCELLED_LATE';
   cancellationReason?: string;
 }
 
@@ -208,7 +208,7 @@ class LessonService {
         enrollmentId: contractEnrollmentId!,
         teacherId,
         studentId,
-        status: data.status || 'SCHEDULED',
+        status: data.status || 'CONFIRMED',
         teacherRate: calculatedTeacherRate,
         ...lessonData,
       },
@@ -657,9 +657,10 @@ class LessonService {
     const isRescheduling = data.scheduledAt &&
       new Date(data.scheduledAt).getTime() !== new Date(existingLesson.scheduledAt).getTime();
 
-    // If cancelling, set cancelled timestamp and check for cancellation fee
+    // If cancelling, set cancelled timestamp and apply appropriate cancellation logic
     const updateData: any = { ...data };
-    const isCancellingLesson = data.status === 'CANCELLED' && existingLesson.status !== 'CANCELLED' && !existingLesson.cancelledAt;
+    const wasAlreadyCancelled = existingLesson.status === 'CANCELLED_ON_TIME' || existingLesson.status === 'CANCELLED_LATE';
+    const isCancellingLesson = (data.status === 'CANCELLED_ON_TIME' || data.status === 'CANCELLED_LATE') && !wasAlreadyCancelled && !existingLesson.cancelledAt;
 
     if (isCancellingLesson) {
       // Check if cancellation limit is exceeded
@@ -670,17 +671,20 @@ class LessonService {
 
       updateData.cancelledAt = new Date();
 
-      // Check if cancellation fee should be applied
-      const cancellationFeeResult = await this.checkAndApplyCancellationFee(
-        existingLesson,
-        organizationId
-      );
+      // CANCELLED_LATE: apply cancellation fee (charge student, pay teacher)
+      if (data.status === 'CANCELLED_LATE') {
+        const cancellationFeeResult = await this.checkAndApplyCancellationFee(
+          existingLesson,
+          organizationId
+        );
 
-      if (cancellationFeeResult) {
-        updateData.cancellationFeeApplied = true;
-        updateData.cancellationFeeAmount = cancellationFeeResult.feeAmount;
-        updateData.cancellationFeePaymentId = cancellationFeeResult.paymentId;
+        if (cancellationFeeResult) {
+          updateData.cancellationFeeApplied = true;
+          updateData.cancellationFeeAmount = cancellationFeeResult.feeAmount;
+          updateData.cancellationFeePaymentId = cancellationFeeResult.paymentId;
+        }
       }
+      // CANCELLED_ON_TIME: no fee, no charges
     }
 
     // If completing, set completed timestamp and deduct from budget
@@ -1011,7 +1015,7 @@ class LessonService {
     const cancellationsCount = await prisma.lesson.count({
       where: {
         studentId,
-        status: 'CANCELLED',
+        status: { in: ['CANCELLED_ON_TIME', 'CANCELLED_LATE'] },
         cancelledAt: {
           gte: periodStart,
         },
@@ -1097,7 +1101,7 @@ class LessonService {
     const cancelledLessons = await prisma.lesson.findMany({
       where: {
         studentId,
-        status: 'CANCELLED',
+        status: { in: ['CANCELLED_ON_TIME', 'CANCELLED_LATE'] },
         cancelledAt: periodStart ? { gte: periodStart } : { not: null },
       },
       select: {
@@ -1579,7 +1583,7 @@ class LessonService {
       throw new Error('Lesson not found');
     }
 
-    if (lesson.status === 'CANCELLED') {
+    if (lesson.status === 'CANCELLED_ON_TIME' || lesson.status === 'CANCELLED_LATE') {
       throw new Error('Cannot confirm cancelled lesson');
     }
 
@@ -1637,10 +1641,10 @@ class LessonService {
       where: { organizationId },
     });
 
-    const scheduled = await prisma.lesson.count({
+    const confirmed = await prisma.lesson.count({
       where: {
         organizationId,
-        status: 'SCHEDULED',
+        status: 'CONFIRMED',
       },
     });
 
@@ -1651,26 +1655,27 @@ class LessonService {
       },
     });
 
-    const cancelled = await prisma.lesson.count({
+    const cancelledOnTime = await prisma.lesson.count({
       where: {
         organizationId,
-        status: 'CANCELLED',
+        status: 'CANCELLED_ON_TIME',
       },
     });
 
-    const pendingConfirmation = await prisma.lesson.count({
+    const cancelledLate = await prisma.lesson.count({
       where: {
         organizationId,
-        status: 'PENDING_CONFIRMATION',
+        status: 'CANCELLED_LATE',
       },
     });
 
     return {
       total,
-      scheduled,
+      confirmed,
       completed,
-      cancelled,
-      pendingConfirmation,
+      cancelledOnTime,
+      cancelledLate,
+      cancelled: cancelledOnTime + cancelledLate,
     };
   }
 
@@ -1690,7 +1695,7 @@ class LessonService {
     const baseWhere: any = {
       organizationId,
       status: {
-        notIn: ['CANCELLED', 'NO_SHOW'],
+        notIn: ['CANCELLED_ON_TIME', 'CANCELLED_LATE'],
       },
       scheduledAt: {
         lt: lessonEnd,

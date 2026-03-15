@@ -201,7 +201,7 @@ const TeacherDashboard: React.FC = () => {
                   <span className={`text-xs px-2 py-1 rounded ${
                     lesson.status === 'COMPLETED'
                       ? 'bg-green-100 text-green-800'
-                      : lesson.status === 'SCHEDULED'
+                      : lesson.status === 'CONFIRMED'
                       ? 'bg-blue-100 text-blue-800'
                       : 'bg-gray-100 text-gray-800'
                   }`}>

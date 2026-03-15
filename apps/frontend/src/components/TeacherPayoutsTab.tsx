@@ -682,7 +682,7 @@ export default function TeacherPayoutsTab() {
                   <TrendingUp className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                   <p className="font-medium">Brak lekcji kwalifikujących się do wypłaty w wybranym zakresie dat</p>
                   <p className="text-sm text-gray-400 mt-1">
-                    Uwzględniane są lekcje ze statusem: Potwierdzona, Ukończona, Anulowana po limicie.
+                    Uwzględniane są lekcje ze statusem: Potwierdzona, Zakończona, Odwołana nie na czas.
                     Wybierz inny zakres dat.
                   </p>
                 </div>

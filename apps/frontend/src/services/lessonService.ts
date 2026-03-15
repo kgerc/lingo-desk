@@ -1,12 +1,10 @@
 import api from '../lib/api';
 
 export type LessonStatus =
-  | 'SCHEDULED'
   | 'CONFIRMED'
   | 'COMPLETED'
-  | 'CANCELLED'
-  | 'PENDING_CONFIRMATION'
-  | 'NO_SHOW';
+  | 'CANCELLED_ON_TIME'
+  | 'CANCELLED_LATE';
 
 export type LessonDeliveryMode = 'IN_PERSON' | 'ONLINE';
 
@@ -231,10 +229,11 @@ export const lessonService = {
     const response = await api.get('/lessons/stats') as any;
     return response.data.data as {
       total: number;
-      scheduled: number;
+      confirmed: number;
       completed: number;
+      cancelledOnTime: number;
+      cancelledLate: number;
       cancelled: number;
-      pendingConfirmation: number;
     };
   },
 

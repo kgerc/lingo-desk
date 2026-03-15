@@ -25,12 +25,10 @@ import {
 // Polish labels for enums
 const lessonDeliveryModeLabels = { IN_PERSON: 'Stacjonarnie', ONLINE: 'Online' };
 const lessonStatusLabels = {
-  SCHEDULED: 'Zaplanowana',
   CONFIRMED: 'Potwierdzona',
   COMPLETED: 'Zakończona',
-  CANCELLED: 'Anulowana',
-  PENDING_CONFIRMATION: 'Oczekuje na potwierdzenie',
-  NO_SHOW: 'Nieobecność',
+  CANCELLED_ON_TIME: 'Odwołana na czas',
+  CANCELLED_LATE: 'Odwołana nie na czas',
 };
 
 const createLessonSchema = z.object({
@@ -46,7 +44,7 @@ const createLessonSchema = z.object({
   classroomId: optionalUuid('Sala'),
   deliveryMode: requiredEnum('Tryb lekcji', ['IN_PERSON', 'ONLINE'] as const, lessonDeliveryModeLabels),
   meetingUrl: optionalUrl('Link do spotkania'),
-  status: requiredEnum('Status', ['SCHEDULED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'PENDING_CONFIRMATION', 'NO_SHOW'] as const, lessonStatusLabels).default('SCHEDULED'),
+  status: requiredEnum('Status', ['CONFIRMED', 'COMPLETED', 'CANCELLED_ON_TIME', 'CANCELLED_LATE'] as const, lessonStatusLabels).default('CONFIRMED'),
   isRecurring: requiredBoolean('Cykliczna').default(false),
   recurringPatternId: optionalUuid('Wzorzec cykliczny'),
   teacherRate: optionalNonNegative('Stawka lektora'),
@@ -61,7 +59,7 @@ const updateLessonSchema = z.object({
   classroomId: optionalUuid('Sala'),
   deliveryMode: optionalEnum('Tryb lekcji', ['IN_PERSON', 'ONLINE'] as const, lessonDeliveryModeLabels),
   meetingUrl: optionalUrl('Link do spotkania'),
-  status: optionalEnum('Status', ['SCHEDULED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'PENDING_CONFIRMATION', 'NO_SHOW'] as const, lessonStatusLabels),
+  status: optionalEnum('Status', ['CONFIRMED', 'COMPLETED', 'CANCELLED_ON_TIME', 'CANCELLED_LATE'] as const, lessonStatusLabels),
   cancellationReason: optionalString('Powód anulowania'),
   teacherRate: optionalNonNegative('Stawka lektora'),
 });
@@ -301,7 +299,7 @@ class LessonController {
         });
       }
 
-      const validStatuses = ['SCHEDULED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'PENDING_CONFIRMATION', 'NO_SHOW'];
+      const validStatuses = ['CONFIRMED', 'COMPLETED', 'CANCELLED_ON_TIME', 'CANCELLED_LATE'];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({
           success: false,
