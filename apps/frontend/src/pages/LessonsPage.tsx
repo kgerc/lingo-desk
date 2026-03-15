@@ -34,7 +34,7 @@ import {
   Link,
   Send,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, addDays, startOfDay } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { Calendar, momentLocalizer, View, SlotInfo } from 'react-big-calendar';
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
@@ -117,10 +117,13 @@ const LessonsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<LessonStatus | ''>('');
   const [courseFilter, setCourseFilter] = useState<string>('');
   const [deliveryModeFilter, setDeliveryModeFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const getDefaultDateFrom = () => format(startOfDay(new Date()), 'yyyy-MM-dd');
+  const getDefaultDateTo = () => format(addDays(startOfDay(new Date()), 14), 'yyyy-MM-dd');
+
+  const [dateFrom, setDateFrom] = useState(getDefaultDateFrom);
+  const [dateTo, setDateTo] = useState(getDefaultDateTo);
   const [sortBy, setSortBy] = useState<'scheduledAt' | 'createdAt' | 'title' | 'teacher' | 'student'>('scheduledAt');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -579,8 +582,9 @@ const LessonsPage: React.FC = () => {
   // Render lesson row
   const renderLessonRow = (lesson: Lesson) => {
     const isSelected = selectedLessonIds.has(lesson.id);
+    const isToday = lesson.scheduledAt.startsWith(format(new Date(), 'yyyy-MM-dd'));
     return (
-      <div key={lesson.id} className={`border-b border-gray-200 ${isSelected ? 'bg-primary/5' : ''}`}>
+      <div key={lesson.id} className={`border-b border-gray-200 ${isSelected ? 'bg-primary/5' : isToday ? 'bg-blue-50' : ''}`}>
         <div className="px-6 py-4 hover:bg-gray-50 transition-colors flex items-center">
           <div className="w-10 flex-shrink-0">
             <input
@@ -891,8 +895,9 @@ const LessonsPage: React.FC = () => {
         }}
         onClearAll={() => {
           setSearchTerm(''); setStatusFilter(''); setCourseFilter('');
-          setDeliveryModeFilter(''); setDateFrom(''); setDateTo('');
-          setSortBy('scheduledAt'); setSortOrder('desc'); setPage(1);
+          setDeliveryModeFilter('');
+          setDateFrom(getDefaultDateFrom()); setDateTo(getDefaultDateTo());
+          setSortBy('scheduledAt'); setSortOrder('asc'); setPage(1);
         }}
         filterCols={5}
       />

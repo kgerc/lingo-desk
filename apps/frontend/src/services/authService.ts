@@ -33,4 +33,14 @@ export const authService = {
     const response = await api.post('/auth/google', { idToken }) as any;
     return response.data.data;
   },
+
+  async forgotPassword(email: string) {
+    const response = await api.post('/auth/forgot-password', { email }) as any;
+    return response.data.message as string;
+  },
+
+  async resetPassword(token: string, password: string) {
+    const response = await api.post('/auth/reset-password', { token, password }) as any;
+    return response.data.message as string;
+  },
 };

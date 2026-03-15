@@ -246,11 +246,16 @@ export default function PublicApplicationForm() {
           </div>
 
           {/* Submit error */}
-          {submitMutation.isError && (
-            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
-              {(submitMutation.error as any)?.response?.data?.error?.message || 'Wystąpił błąd. Spróbuj ponownie.'}
-            </div>
-          )}
+          {submitMutation.isError && (() => {
+            const err = (submitMutation.error as any)?.response?.data?.error;
+            const fieldErrors = err?.errors?.map((e: any) => e.message).join(', ');
+            const message = fieldErrors || err?.message || 'Wystąpił błąd. Spróbuj ponownie.';
+            return (
+              <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
+                {message}
+              </div>
+            );
+          })()}
 
           {/* Submit button */}
           <button

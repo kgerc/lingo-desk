@@ -4,6 +4,7 @@ import googleCalendarService from './google-calendar.service';
 import balanceService from './balance.service';
 import { getHolidayName } from '../utils/polish-holidays';
 import { alertService } from './alert.service';
+import classroomService from './classroom.service';
 
 const prisma = new PrismaClient();
 
@@ -199,6 +200,18 @@ class LessonService {
       courseTypePricePerLesson,
       teacherHourlyRate
     );
+
+    // Check classroom conflict for IN_PERSON lessons
+    if (data.deliveryMode === 'IN_PERSON' && data.classroomId) {
+      const conflict = await classroomService.checkConflict(
+        data.classroomId,
+        new Date(data.scheduledAt),
+        data.durationMinutes
+      );
+      if (conflict.hasConflict) {
+        throw new Error('Sala jest już zarezerwowana w tym terminie.');
+      }
+    }
 
     // Create lesson
     const lesson = await prisma.lesson.create({
@@ -656,6 +669,18 @@ class LessonService {
     // Check if scheduledAt is being changed (lesson rescheduled)
     const isRescheduling = data.scheduledAt &&
       new Date(data.scheduledAt).getTime() !== new Date(existingLesson.scheduledAt).getTime();
+
+    // Check classroom conflict when classroom or time changes for IN_PERSON lessons
+    const effectiveDeliveryMode = existingLesson.deliveryMode;
+    const effectiveClassroomId = data.classroomId !== undefined ? data.classroomId : existingLesson.classroomId;
+    if (effectiveDeliveryMode === 'IN_PERSON' && effectiveClassroomId && (isRescheduling || data.classroomId !== undefined)) {
+      const scheduledAt = data.scheduledAt ? new Date(data.scheduledAt) : new Date(existingLesson.scheduledAt);
+      const durationMinutes = data.durationMinutes ?? existingLesson.durationMinutes;
+      const conflict = await classroomService.checkConflict(effectiveClassroomId, scheduledAt, durationMinutes, id);
+      if (conflict.hasConflict) {
+        throw new Error('Sala jest już zarezerwowana w tym terminie.');
+      }
+    }
 
     // If cancelling, set cancelled timestamp and apply appropriate cancellation logic
     const updateData: any = { ...data };

@@ -26,6 +26,8 @@ const UsersPage = lazy(() => import('./pages/UsersPage'))
 const CourseApplicationsPage = lazy(() => import('./pages/CourseApplicationsPage'))
 const ClassroomsPage = lazy(() => import('./pages/ClassroomsPage'))
 const PublicApplicationForm = lazy(() => import('./pages/PublicApplicationForm'))
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
 
 // Wrapper to handle Suspense inside Layout
 const LazyPage = ({ children }: { children: ReactNode }) => (
@@ -86,6 +88,31 @@ function App() {
             ) : (
               <Suspense>
                 <RegisterPage />
+              </Suspense>
+            )
+          }
+        />
+
+        <Route
+          path="/forgot-password"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/dashboard" />
+            ) : (
+              <Suspense>
+                <ForgotPasswordPage />
+              </Suspense>
+            )
+          }
+        />
+        <Route
+          path="/reset-password"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/dashboard" />
+            ) : (
+              <Suspense>
+                <ResetPasswordPage />
               </Suspense>
             )
           }

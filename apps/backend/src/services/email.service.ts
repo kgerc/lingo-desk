@@ -870,6 +870,47 @@ class EmailService {
   }
 
   /**
+   * Send password reset link email (self-service reset flow)
+   */
+  async sendPasswordResetLink(data: {
+    to: string;
+    firstName: string;
+    organizationName: string;
+    token: string;
+  }) {
+    const { to, firstName, organizationName, token } = data;
+
+    const resetUrl = `https://app.lingodesk.pl/reset-password?token=${token}`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #1e293b;">🔐 Reset hasła</h2>
+        <p>Cześć ${firstName},</p>
+        <p>Otrzymaliśmy prośbę o zresetowanie hasła do Twojego konta w LingoDesk. Kliknij poniższy przycisk, aby ustawić nowe hasło:</p>
+
+        <p style="margin: 28px 0;">
+          <a href="${resetUrl}" style="display: inline-block; background-color: #3b82f6; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+            Zresetuj hasło
+          </a>
+        </p>
+
+        <p style="color: #6b7280; font-size: 14px;">Link jest ważny przez <strong>1 godzinę</strong>.</p>
+        <p style="color: #6b7280; font-size: 14px;">Jeśli przycisk nie działa, skopiuj i wklej poniższy link w przeglądarce:</p>
+        <p style="color: #6b7280; font-size: 13px; word-break: break-all;">${resetUrl}</p>
+
+        <p style="margin-top: 24px;">Jeśli nie prosiłeś/aś o reset hasła, zignoruj tę wiadomość — Twoje konto pozostaje bezpieczne.</p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">${organizationName} — LingoDesk</p>
+      </div>
+    `;
+
+    return await this.sendEmail({
+      to,
+      subject: `🔐 Reset hasła — LingoDesk`,
+      html,
+    });
+  }
+
+  /**
    * Send password reset email with new temporary password
    */
   async sendPasswordReset(data: {

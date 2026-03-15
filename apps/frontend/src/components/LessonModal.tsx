@@ -370,6 +370,10 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
       newErrors.meetingUrl = 'Podaj prawidłowy URL spotkania';
     }
 
+    if (formData.deliveryMode === 'IN_PERSON' && !formData.classroomId) {
+      newErrors.classroomId = 'Sala jest wymagana dla lekcji stacjonarnej';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -389,7 +393,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
     if (!validate()) {
       if (errors.title || errors.deliveryMode) {
         setActiveTab('basic');
-      } else if (errors.scheduledAt || errors.durationMinutes) {
+      } else if (errors.scheduledAt || errors.durationMinutes || errors.classroomId) {
         setActiveTab('schedule');
       } else if (errors.teacherId || errors.studentIds) {
         setActiveTab('participants');
@@ -705,15 +709,15 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                     {formData.deliveryMode === 'IN_PERSON' && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Sala (opcjonalnie)
+                          Sala <span className="text-red-500">*</span>
                         </label>
                         <select
                           name="classroomId"
                           value={formData.classroomId}
                           onChange={handleChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${errors.classroomId ? 'border-red-500' : 'border-gray-300'}`}
                         >
-                          <option value="">Brak / nie wybrano</option>
+                          <option value="">-- Wybierz salę --</option>
                           {classrooms.map((c) => (
                             <option key={c.id} value={c.id}>
                               {c.location?.name ? `${c.location.name} — ` : ''}{c.name}
@@ -721,6 +725,7 @@ const LessonModal: React.FC<LessonModalProps> = ({ lesson, initialDate, initialD
                             </option>
                           ))}
                         </select>
+                        {errors.classroomId && <p className="mt-1 text-xs text-red-600">{errors.classroomId}</p>}
                       </div>
                     )}
                   </div>

@@ -100,9 +100,14 @@ const LoginPage: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Hasło
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Hasło
+                </label>
+                <Link to="/forgot-password" className="text-sm text-primary hover:text-primary/80">
+                  Zapomniałeś hasła?
+                </Link>
+              </div>
               <input
                 id="password"
                 type="password"

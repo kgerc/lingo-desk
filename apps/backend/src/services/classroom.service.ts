@@ -1,5 +1,11 @@
 import prisma from '../utils/prisma';
 
+function pluralSala(count: number): string {
+  if (count === 1) return '1 sala';
+  if (count >= 2 && count <= 4) return `${count} sale`;
+  return `${count} sal`;
+}
+
 class ClassroomService {
   /**
    * Get all classrooms for an organization (via location)
@@ -186,7 +192,7 @@ class ClassroomService {
 
     const classroomCount = await prisma.classroom.count({ where: { locationId: id } });
     if (classroomCount > 0) {
-      throw new Error(`Nie można usunąć lokalizacji — ma ${classroomCount} sal`);
+      throw new Error(`Nie można usunąć lokalizacji — ma ${pluralSala(classroomCount)}`);
     }
 
     await prisma.location.delete({ where: { id } });

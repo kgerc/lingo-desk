@@ -9,5 +9,7 @@ router.post('/register', authLimiter, authController.register.bind(authControlle
 router.post('/login', authLimiter, authController.login.bind(authController));
 router.post('/google', authLimiter, authController.googleAuth.bind(authController));
 router.get('/me', authenticate, authController.getMe.bind(authController));
+router.post('/forgot-password', authLimiter, authController.forgotPassword.bind(authController));
+router.post('/reset-password', authLimiter, authController.resetPassword.bind(authController));
 
 export default router;

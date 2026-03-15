@@ -22,6 +22,15 @@ const loginSchema = z.object({
   password: requiredString('Hasło'),
 });
 
+const forgotPasswordSchema = z.object({
+  email: requiredEmail('Email'),
+});
+
+const resetPasswordSchema = z.object({
+  token: requiredString('Token'),
+  password: requiredString('Hasło', { min: 8 }),
+});
+
 export class AuthController {
   async register(req: Request, res: Response, next: NextFunction) {
     try {
@@ -83,6 +92,27 @@ export class AuthController {
         message: 'Zalogowano pomyślnie przez Google',
         data: result,
       });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async forgotPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = forgotPasswordSchema.parse(req.body);
+      await authService.forgotPassword(email);
+      // Always return 200 — never reveal whether email exists
+      return res.json({ message: 'Jeśli podany adres email istnieje w systemie, wyślemy na niego link do zresetowania hasła.' });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async resetPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { token, password } = resetPasswordSchema.parse(req.body);
+      await authService.resetPassword(token, password);
+      return res.json({ message: 'Hasło zostało zmienione pomyślnie. Możesz się teraz zalogować.' });
     } catch (error) {
       return next(error);
     }

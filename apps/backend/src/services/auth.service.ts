@@ -1,8 +1,10 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import prisma from '../utils/prisma';
 import { UserRole } from '@prisma/client';
+import emailService from './email.service';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -303,6 +305,63 @@ export class AuthService {
     return jwt.sign(payload, this.JWT_SECRET, {
       expiresIn: this.JWT_EXPIRES_IN as any,
     });
+  }
+
+  async forgotPassword(email: string) {
+    // Always return success — never reveal whether email exists
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || !user.isActive) return;
+
+    // Invalidate any previous unused tokens for this user
+    await prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await prisma.passwordResetToken.create({
+      data: { userId: user.id, token, expiresAt },
+    });
+
+    const organization = await prisma.organization.findUnique({ where: { id: user.organizationId } });
+
+    await emailService.sendPasswordResetLink({
+      to: user.email,
+      firstName: user.firstName,
+      organizationName: organization?.name || 'LingoDesk',
+      token,
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const record = await prisma.passwordResetToken.findUnique({ where: { token } });
+
+    if (!record) {
+      throw new Error('Token jest nieprawidłowy lub wygasł. Wygeneruj nowy link resetujący.');
+    }
+
+    if (record.usedAt) {
+      throw new Error('Token został już użyty. Wygeneruj nowy link resetujący.');
+    }
+
+    if (record.expiresAt < new Date()) {
+      throw new Error('Token wygasł. Wygeneruj nowy link resetujący.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: record.userId },
+        data: { passwordHash },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
   }
 
   private generateSlug(name: string): string {

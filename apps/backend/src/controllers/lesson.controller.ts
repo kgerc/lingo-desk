@@ -69,6 +69,13 @@ class LessonController {
     try {
       const { search, teacherId, studentId, courseId, status, deliveryMode, startDate, endDate, page, pageSize, sortBy, sortOrder } = req.query;
 
+      // Default date range: today → today + 14 days (when no dates provided)
+      const defaultFrom = new Date();
+      defaultFrom.setHours(0, 0, 0, 0);
+      const defaultTo = new Date(defaultFrom);
+      defaultTo.setDate(defaultTo.getDate() + 14);
+      defaultTo.setHours(23, 59, 59, 999);
+
       const filters: any = {};
       if (search) filters.search = String(search);
       if (teacherId) filters.teacherId = String(teacherId);
@@ -76,12 +83,13 @@ class LessonController {
       if (courseId) filters.courseId = String(courseId);
       if (status) filters.status = String(status);
       if (deliveryMode) filters.deliveryMode = String(deliveryMode);
-      if (startDate) filters.startDate = String(startDate);
-      if (endDate) filters.endDate = String(endDate);
+      filters.startDate = startDate ? String(startDate) : defaultFrom.toISOString();
+      filters.endDate = endDate ? String(endDate) : defaultTo.toISOString();
       if (page) filters.page = parseInt(String(page), 10);
       if (pageSize) filters.pageSize = parseInt(String(pageSize), 10);
-      if (sortBy) filters.sortBy = String(sortBy);
-      if (sortOrder) filters.sortOrder = String(sortOrder);
+      // Default sort: scheduledAt ASC (nearest first)
+      filters.sortBy = sortBy ? String(sortBy) : 'scheduledAt';
+      filters.sortOrder = sortOrder ? String(sortOrder) : 'asc';
 
       const result = await lessonService.getLessons(req.user!.organizationId, filters);
       res.json({
@@ -127,6 +135,16 @@ class LessonController {
   async createLesson(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const data = createLessonSchema.parse(req.body);
+
+      if (data.deliveryMode === 'IN_PERSON' && !data.classroomId) {
+        return res.status(400).json({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Sala jest wymagana dla lekcji stacjonarnej.',
+          },
+        });
+      }
+
       const lesson = await lessonService.createLesson({
         ...data,
         organizationId: req.user!.organizationId
@@ -143,9 +161,9 @@ class LessonController {
         });
       }
 
-      res.status(201).json({ message: 'Lekcja utworzona pomyślnie', data: lesson });
+      return res.status(201).json({ message: 'Lekcja utworzona pomyślnie', data: lesson });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
